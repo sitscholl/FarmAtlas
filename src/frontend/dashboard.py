@@ -45,12 +45,38 @@ async def get_latest_water_balance(fields, db):
         wb_field = db.latest_water_balance(field.id)
         if wb_field:
             data.append({
-                'Anlage': wb_field.name,
+                'Anlage': field.name,
                 'Datum': wb_field.date.strftime('%Y-%m-%d') if wb_field.date else '',
                 'Wasserbilanz': f"{wb_field.soil_storage:.2f} mm"
             })
 
     return pd.DataFrame(data) if data else pd.DataFrame(columns=['Anlage', 'Datum', 'Wasserbilanz'])
+
+@ui.refreshable
+async def render_dashboard_content(db, fields, force: bool = False):
+    with ui.column().classes('w-full items-center q-pa-xl') as placeholder:
+        ui.spinner(size='lg')
+        ui.label('Updating data...')
+
+    # Run the heavy tasks
+    df_task = get_latest_water_balance(fields, db)
+    fig_task = get_fig(force=force)
+    
+    df_balance, fig = await asyncio.gather(df_task, fig_task)
+    
+    placeholder.delete() # Remove spinner
+
+    # Render actual content
+    with ui.card().classes("w-full shadow-lg rounded-xl overflow-hidden"):
+        ui.label('Water Balance Trend').classes("text-lg font-semibold q-pa-md")
+        ui.plotly(fig).classes('w-full h-[500px]')
+
+    with ui.card().classes("w-full shadow-lg rounded-xl q-pa-none"):
+        ui.label('Latest Readings').classes("text-lg font-semibold q-pa-md")
+        if not df_balance.empty:
+            ui.table.from_pandas(df_balance).classes("w-full").props('flat bordered')
+        else:
+            ui.label('No data available').classes('q-pa-md text-italic')
 
 @ui.page('/')
 async def dashboard():
@@ -58,47 +84,23 @@ async def dashboard():
     db = get_db()
     fields = db.get_all_fields()
     
-    # Pre-fetch table data so it's ready on load
-    df_balance = await get_latest_water_balance(fields, db)
-
     with ui.column().classes("w-full max-w-5xl mx-auto q-pa-md gap-6"):
-        
-        # Header Section
+        # Header Section (Static)
         with ui.row().classes("w-full justify-between items-center"):
             with ui.column():
                 ui.label('Field Overview').classes("text-3xl font-bold text-slate-800")
                 ui.label('Real-time water balance monitoring').classes("text-slate-500")
             
-            ui.button('Refresh Data', icon='refresh', on_click=lambda: load_and_render(force=True)) \
+            # Use the function name directly to refresh
+            ui.button('Refresh Data', icon='refresh', 
+                      on_click=lambda: render_dashboard_content.refresh(force=True)) \
                 .props('outline')
 
-        # Chart Card
-        with ui.card().classes("w-full shadow-lg rounded-xl overflow-hidden"):
-            ui.label('Water Balance Trend').classes("text-lg font-semibold q-pa-md")
-            chart_container = ui.element().classes("w-full h-[500px] flex items-center justify-center")
-            
-            with chart_container:
-                # Show a spinner while the chart loads
-                spinner = ui.spinner(size='lg')
+        # 1. "Place" the refreshable area in the UI.
+        # Since the function is async, calling it without 'await' inside a 
+        # NiceGUI context registers it as a refreshable target.
+        render_dashboard_content(db, fields)
 
-        # Table Card
-        with ui.card().classes("w-full shadow-lg rounded-xl q-pa-none"):
-            ui.label('Latest Readings').classes("text-lg font-semibold q-pa-md")
-            if not df_balance.empty:
-                ui.table.from_pandas(df_balance).classes("w-full").props('flat bordered')
-            else:
-                ui.label('No data available').classes('q-pa-md text-italic')
-
-        async def load_and_render(force: bool = False):
-            chart_container.clear()
-            with chart_container:
-                ui.spinner(size='lg')
-            
-            fig = await get_fig(force=force)
-            
-            chart_container.clear()
-            with chart_container:
-                ui.plotly(fig).classes('w-full h-full')
-
-        # Trigger initial load
-        ui.timer(0.1, lambda: load_and_render(), once=True)
+    # 2. Trigger the actual data load after the page shell is sent to the browser.
+    # This prevents the 3.0s timeout warning.
+    ui.timer(0.1, lambda: render_dashboard_content.refresh(), once=True)

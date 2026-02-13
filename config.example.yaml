@@ -1,6 +1,5 @@
 general:
-    season_start: "01-04-2025"
-    season_end: "01-10-2025"
+  timezone: Europe/Rome
 
 meteo:
     radiation_fallback_provider: province
