@@ -356,8 +356,8 @@ if __name__ == '__main__':
 
     config = load_config('config/config.yaml')
 
-    handler = MeteoHandler(config)
-    handler.query('SBR', ['103'], datetime(2025, 10, 1), datetime(2025, 10, 2), resampler = MeteoResampler(freq='D', min_count = 20))
+    handler = MeteoHandler(config['meteo'])
+    station = handler.query('SBR', '103', datetime(2025, 10, 1), datetime(2025, 10, 2), resampler = MeteoResampler(freq='D', min_count = 20))
 
-    handler.stations[0].data['solar_radiation'].plot()
-    print(handler.stations[0].dataata)
+    station.data['solar_radiation'].plot()
+    print(station.data)
