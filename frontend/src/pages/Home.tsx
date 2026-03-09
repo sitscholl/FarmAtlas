@@ -1,3 +1,5 @@
+import FieldBox from '../components/FieldBox'
+
 type AppleField = {
   id: number
   name: string
@@ -6,49 +8,51 @@ type AppleField = {
 }
 
 const fields: AppleField[] = [
-    {
-        id: 1,
-        name: "Parleng",
-        year: 2010,
-        water_balance: 30
-    },
-    {
-        id: 2,
-        name: "Gänsacker",
-        year: 2015,
-        water_balance: 20
-    },
-    {
-        id: 4,
-        name: "Gasslwiese",
-        year: 2020,
-        water_balance: 10
-    }
+  {
+    id: 1,
+    name: 'Parleng',
+    year: 2010,
+    water_balance: 30,
+  },
+  {
+    id: 2,
+    name: 'Gansacker',
+    year: 2015,
+    water_balance: 20,
+  },
+  {
+    id: 4,
+    name: 'Gasslwiese',
+    year: 2020,
+    water_balance: 10,
+  }
 ]
 
 export default function Home() {
-    return (
-        <main className="min-h-screen w-screen justify-center">
-            <div className="max-w-3xl justify-center border">
-                <div className="mx-auto text-center mt-16">
-                <h1 className="text-4xl font-bold mb-6">
-                    Welcome to My App 🚀
-                </h1>
-                <p className="text-gray-600 mb-8">
-                    This is the landing page of your FastAPI + React application.
-                </p>
-                </div>
+  return (
+    <section className="relative max-w-5xl">
 
-                <div className="grid grid-cols-3 gap-6">
-                    {fields.map((field) => (
-                        <div className="border bg-white/60 p-4">
-                            <p>{field.name}</p>
-                            <p>{field.year}</p>
-                            <p>{field.water_balance}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </main>
-    )
+      <div className="relative rounded-3xl border border-slate-200/70 bg-white/70 p-8 shadow-xl backdrop-blur">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+            Anlagen Übersicht
+          </p>
+          <h1 className="mt-4 text-4xl font-semibold text-slate-900 sm:text-5xl">
+            Oberlenghof
+          </h1>
+        </div>
+
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {fields.map((field) => (
+            <FieldBox
+              key={field.id}
+              name={field.name}
+              year={field.year}
+              waterBalance={field.water_balance}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
 }

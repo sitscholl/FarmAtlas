@@ -4,14 +4,14 @@ import Navbar from './components/Navbar'
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <Navbar />
 
-      <div className="p-6">
+      <main className="flex w-screen min-h-screen items-center justify-center px-6 py-10">
         <Routes>
           <Route path="/" element={<Home />} />
         </Routes>
-      </div>
+      </main>
     </div>
   )
 }
