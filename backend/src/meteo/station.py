@@ -1,13 +1,34 @@
 import pandas as pd
-import geopandas as gpd
 import httpx
-from shapely.geometry import Point
+
+# import geopandas as gpd
+# from shapely.geometry import Point
 
 from dataclasses import dataclass
 import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class StationMetadata:
+    id: str
+    x: float
+    y: float
+    crs: int = 4326
+    elevation: Optional[float] = None
+
+    @classmethod
+    def from_api_payload(cls, station_id: str, metadata: dict, crs: int = 4326) -> "StationMetadata":
+        return cls(
+            id=station_id,
+            x=metadata.get("longitude"),
+            y=metadata.get("latitude"),
+            crs=crs,
+            elevation=metadata.get("elevation"),
+        )
+
 
 @dataclass
 class Station:
@@ -36,35 +57,55 @@ class Station:
             raise ValueError("Latitude must be between -90 and 90")
         if -180 > self.x or self.x > 180:
             raise ValueError("Longitude must be between -180 and 180")
+        if not isinstance(self.data, pd.DataFrame):
+            raise TypeError("Station data must be a pandas DataFrame.")
 
     @classmethod
-    async def create(cls, id, x, y, data, crs, elevation: Optional[float] = None, client: Optional[httpx.AsyncClient] = None):
-        if elevation is None:
+    def create(
+        cls,
+        metadata: StationMetadata,
+        data: pd.DataFrame,
+        client: Optional[httpx.Client] = None,
+        resolve_elevation: bool = False,
+    ) -> "Station":
+
+        if metadata.elevation is None and resolve_elevation:
             try:
-                elevation = await cls.fetch_elevation(x, y, client=client)
-            except Exception as e:
-                logger.warning(f"Fetching elevation for station {id} failed with error: {e}")
-        return cls(id = id, x = x, y = y, crs = crs, elevation = elevation, data = data)
+                elevation = cls.fetch_elevation(metadata.x, metadata.y, client=client)
+            except Exception as exc:
+                logger.warning("Fetching elevation for station %s failed with error: %s", id, exc)
+                elevation = None
+        else:
+            elevation = metadata.elevation
+
+        return cls(
+            id=metadata.id,
+            x=metadata.x,
+            y=metadata.y,
+            data=data,
+            crs=metadata.crs,
+            elevation=elevation,
+        )
 
     @staticmethod
-    async def fetch_elevation(x: float, y: float, client: Optional[httpx.AsyncClient] = None) -> float:
+    def fetch_elevation(x: float, y: float, client: Optional[httpx.Client] = None) -> float:
         api_template = "https://api.opentopodata.org/v1/eudem25m?locations={lat},{lon}"
         url = api_template.format(lat=y, lon=x)
 
         if client is None:
-            async with httpx.AsyncClient() as temp_client:
-                response = await temp_client.get(url)
+            with httpx.Client() as temp_client:
+                response = temp_client.get(url)
                 response.raise_for_status()
                 return response.json()["results"][0]["elevation"]
 
-        response = await client.get(url)
+        response = client.get(url)
         response.raise_for_status()
         return response.json()["results"][0]["elevation"]
 
 @dataclass
 class MeteoData:
     stations: list[Station]
-    crs: str
+    crs: int
 
     def __post_init__(self):
         self.stations = [i for i in self.stations if i is not None]
@@ -97,11 +138,11 @@ class MeteoData:
     def available_stations(self):
         return [i.id for i in self.stations]
 
-    def to_geodataframe(self):
-        return gpd.GeoDataFrame(
-            {'id': [st.id for st in self.stations], "geometry": [Point(st.x, st.y) for st in self.stations]},
-            crs = self.crs
-        )
+    # def to_geodataframe(self):
+    #     return gpd.GeoDataFrame(
+    #         {'id': [st.id for st in self.stations], "geometry": [Point(st.x, st.y) for st in self.stations]},
+    #         crs = self.crs
+    #     )
 
     def to_dataframe(self, include_coords: bool = False) -> pd.DataFrame:
         frames: list[pd.DataFrame] = []
@@ -116,13 +157,16 @@ class MeteoData:
                 continue
 
             df = tbl.copy()
+            if isinstance(df.index, pd.DatetimeIndex):
+                df.index.name = "datetime"
+                df = df.reset_index()
             df["station_id"] = station_id
             df["elevation"] = elev
             if include_coords:
                 df["x"] = x
                 df["y"] = y
             if "datetime" in df.columns:
-                df["datetime"] = pd.to_datetime(df["datetime"])
+                df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
             frames.append(df)
 
         if len(frames) == 0:
@@ -131,7 +175,7 @@ class MeteoData:
         return pd.concat(frames, ignore_index=True)
 
     def get_station_data(self, station_id: str):
-        if station_id not in self.available_stations:
-            logger.warning(f"No data available for station {station_id}")
-            return None
-        return [i for i in self.stations if i.id == station_id]
+        station = next((item for item in self.stations if item.id == station_id), None)
+        if station is None:
+            logger.warning("No data available for station %s", station_id)
+        return station

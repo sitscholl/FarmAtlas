@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import Optional, Tuple
 import logging
 
-from .station import Station, MeteoData
-from .resample import MeteoResampler
+from .station import Station, MeteoData, StationMetadata
+from .validate import MeteoValidator
 
 logger = logging.getLogger(__name__)
 
@@ -15,19 +15,23 @@ class MeteoLoader:
 
     def __init__(
         self, 
-        api_host: str,
-        query_template: str,
+        api_host: Optional[str] = None,
+        query_template: Optional[str] = None,
         radiation_fallback_provider: str = 'province',
         radiation_fallback_station: str = '09700MS',
-        request_timeout = 60
+        request_timeout: int = 60,
+        fetch_missing_elevation: bool = False,
+        convert_solar_radiation_from_watts: bool = True,
         ):
-        
+
         self.api_host = api_host
         self.query_template = query_template
 
         self.radiation_fallback_provider = radiation_fallback_provider
         self.radiation_fallback_station = radiation_fallback_station
         self.request_timeout = request_timeout
+        self.fetch_missing_elevation = fetch_missing_elevation
+        self.convert_solar_radiation_from_watts = convert_solar_radiation_from_watts
 
         self._session = requests.Session()
 
@@ -53,7 +57,7 @@ class MeteoLoader:
             start_date=start,
             end_date=end,
         ).lstrip("/")
-        return f"{self.api_host}/{path}"
+        return f"{self.api_host.rstrip('/')}/{path}"
 
     def _get_data(
         self,
@@ -91,7 +95,8 @@ class MeteoLoader:
 
         response_data = response_data.set_index("datetime").sort_index()
         response_data["station_id"] = station_id
-        response_data = self._convert_solar_radiation_units(response_data)
+        if self.convert_solar_radiation_from_watts:
+            response_data = self._convert_solar_radiation_units(response_data)
         return response_data, response_metadata
 
     def _convert_solar_radiation_units(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -175,7 +180,7 @@ class MeteoLoader:
         
         try:
             df, meta = self._get_data(provider, station_id, start, end)
-            metadata = meta or {}
+            metadata = StationMetadata.from_api_payload(station_id, meta or {})
 
             if df.empty:
                 logger.warning("No data returned for station %s in window %s - %s", station_id, start, end)
@@ -183,12 +188,9 @@ class MeteoLoader:
             
             df = self._fill_solar_radiation(df, start, end)
             station = Station.create(
-                id = station_id,
-                elevation = metadata.get("elevation"),
-                y = metadata.get("latitude"),
-                x = metadata.get("longitude"),
-                data = df,
-                crs = 4326
+                metadata=metadata,
+                data=df,
+                resolve_elevation=self.fetch_missing_elevation,
             )
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Unexpected error while fetching data for station %s: %s", station_id, exc)
@@ -202,7 +204,7 @@ class MeteoLoader:
         station_ids: list[str], 
         start: datetime | str, 
         end: datetime | str, #non inclusive
-    ):
+    ) -> MeteoData:
         if isinstance(station_ids, str):
             station_ids = [station_ids]
 
@@ -232,14 +234,25 @@ class MeteoLoader:
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    from .config import load_config
-    from .resample import MeteoResampler
+    import logging
+    import os
+    from ..runtime import load_config_file
 
-    config = load_config('config/config.yaml')
+    logging.basicConfig(level=logging.INFO, force=True)
 
-    handler = MeteoLoader(config['meteo'])
-    station = handler.query('SBR', '103', datetime(2025, 10, 1), datetime(2025, 10, 2), resampler = MeteoResampler(freq='D', min_count = 20))
+    config = load_config_file("backend/config.example.yaml")
+    
+    validator = MeteoValidator(**config.get('meteo_validator', {}))
+    loader = MeteoLoader(**config["meteo"])
 
-    station.data['solar_radiation'].plot()
-    print(station.data)
+    provider = "province"
+    station_id = "09700MS"
+    end = pd.Timestamp.utcnow().floor("h")
+    start = end - pd.Timedelta(days=4)
+
+    logger.info("Querying provider=%s station_id=%s start=%s end=%s", provider, station_id, start, end)
+    meteo_data = loader.query(provider=provider, station_ids=[station_id], start=start, end=end)
+    validated = validator.validate(meteo_data)
+
+    logger.info("Validated %s station(s): %s", validated.n_stations, validated.available_stations)
+    print(validated.to_dataframe(include_coords=True).head())
