@@ -5,12 +5,13 @@ from dataclasses import dataclass
 import logging
 from zoneinfo import ZoneInfo
 
-from .meteo import MeteoHandler
+from .meteo.load import MeteoLoader
+from .meteo.validate import MeteoValidator
 from .field import FieldHandler
-from .database.db import MeteoDB
-from .resample import MeteoResampler
-from .et0.base import ET0Calculator
-from .et_correction import ETCorrection
+from .database.db import FarmDB
+from .meteo.resample import MeteoResampler
+from .et.base import ET0Calculator
+from .et.et_correction import ETCorrection
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +59,11 @@ class RuntimeContext:
         self.timezone = ZoneInfo(tz_name)
 
         ## Meteo Handler
-        self.meteo_handler = MeteoHandler(**config.get('meteo', {}))
+        self.meteo_loader = MeteoLoader(**config.get('meteo', {}))
         
+        ## Meteo Validator
+        self.meteo_validator = MeteoValidator(**config.get('meteo_validation', {}))
+
         ## Meteo Resampler
         self.min_sample_size = config.get('resampling', {}).get('min_sample_size', {})
         self.meteo_resampler = MeteoResampler(
@@ -67,7 +71,7 @@ class RuntimeContext:
         )
 
         ## Database
-        self.db = MeteoDB(config.get('database', {}).get('path', 'sqlite:///database.db'))
+        self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///database.db'))
        
         ## Fields
         self.fields = [FieldHandler(field) for field in self.db.get_all_fields()]
