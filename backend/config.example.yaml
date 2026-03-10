@@ -1,12 +1,13 @@
 general:
-  timezone: Europe/Rome
+    timezone: Europe/Rome
+    season_start: "01-04-2025"
+    season_end: "01-10-2025"
 
 meteo:
+    api_host: https://meteoservice.oberlenghof.org
+    query_template: api/{provider}/timeseries?station_id={station_id}&start_date={start_date:%Y-%m-%dT%H:%M:%SZ}&end_date={end_date:%Y-%m-%dT%H:%M:%SZ}
     radiation_fallback_provider: province
     radiation_fallback_station: 09700MS
-    api:
-        host: https://api-provider.url
-        query_template: query/?provider={provider}&station_id={station_id}&start_date={start_date:%Y-%m-%dT%H:%M:%SZ}&end_date={end_date:%Y-%m-%dT%H:%M:%SZ}
 
 resampling:
     freq: D
