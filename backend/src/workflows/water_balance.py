@@ -143,6 +143,7 @@ class WaterBalanceWorkflow:
             station.data.reset_index(),
             freq="D",
             min_sample_size=self.min_sample_size,
+            groupby_cols = ['station_id', 'model']
         )
         resampled["datetime"] = pd.to_datetime(resampled["datetime"], utc=True)
         resampled = resampled.set_index("datetime").sort_index()
