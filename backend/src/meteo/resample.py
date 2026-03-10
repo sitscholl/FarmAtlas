@@ -9,7 +9,7 @@ def get_mode(column: pd.Series):
     return column.mode().iloc[0]
 
 DEFAULT_RESAMPLE_COLMAP = {
-    "tair_2m": "mean",  
+    "tair_2m": ["mean", "min", "max"],  
     "tair_2m_min": "min",
     "tair_2m_max": "max", 
     "tsoil_25cm": "mean",     
