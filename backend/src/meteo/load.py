@@ -4,7 +4,6 @@ import logging
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Optional, Tuple, Any
-from dataclasses import dataclass
 
 import pandas as pd
 import pandera.pandas as pa
@@ -15,35 +14,7 @@ from .resample import MeteoResampler
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class Station:
-    id: str
-    elevation: float
-    latitude: float
-    longitude: float
-    data: pd.DataFrame
-
-    def __post_init__(self):
-        if -90 > self.latitude or self.latitude > 90:
-            raise ValueError("Latitude must be between -90 and 90")
-        if -180 > self.longitude or self.longitude > 180:
-            raise ValueError("Longitude must be between -180 and 180")
-
-        if self.elevation is None:
-            try:
-                self.elevation = self.get_elevation()
-            except Exception as e:
-                logger.warning(f"Fetching elevation for station {self.id} failed with error: {e}")
-
-    def get_elevation(self):
-        api_template = "https://api.opentopodata.org/v1/eudem25m?locations={lat},{lon}"
-        url = api_template.format(lat=self.latitude, lon=self.longitude)
-        response = requests.get(url)
-        response.raise_for_status()
-        elevation = response.json()["results"][0]["elevation"]
-        return elevation
-
-class MeteoHandler:
+class MeteoLoader:
     """Manager class to query meteo data from multiple fields/stations and transform returned data to a consistent schema"""
 
     def __init__(self, config: dict, et0_calculator: Optional[object] = None):
@@ -356,7 +327,7 @@ if __name__ == '__main__':
 
     config = load_config('config/config.yaml')
 
-    handler = MeteoHandler(config['meteo'])
+    handler = MeteoLoader(config['meteo'])
     station = handler.query('SBR', '103', datetime(2025, 10, 1), datetime(2025, 10, 2), resampler = MeteoResampler(freq='D', min_count = 20))
 
     station.data['solar_radiation'].plot()
