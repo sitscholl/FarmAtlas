@@ -59,6 +59,8 @@ class Station:
             raise ValueError("Longitude must be between -180 and 180")
         if not isinstance(self.data, pd.DataFrame):
             raise TypeError("Station data must be a pandas DataFrame.")
+        if not self.data.empty and not isinstance(self.data.index, pd.DatetimeIndex):
+            raise TypeError("Station data index must be a pandas DatetimeIndex.")
 
     @classmethod
     def create(
@@ -86,6 +88,14 @@ class Station:
             crs=metadata.crs,
             elevation=elevation,
         )
+
+    @property
+    def latitude(self) -> float:
+        return self.y
+
+    @property
+    def longitude(self) -> float:
+        return self.x
 
     @staticmethod
     def fetch_elevation(x: float, y: float, client: Optional[httpx.Client] = None) -> float:
