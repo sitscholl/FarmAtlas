@@ -1,15 +1,11 @@
-from __future__ import annotations
-
-import logging
-from collections.abc import Sequence
-from datetime import datetime
-from typing import Optional, Tuple, Any
-
 import pandas as pd
-import pandera.pandas as pa
 import requests
-from pandera.errors import SchemaError
 
+from datetime import datetime
+from typing import Optional, Tuple
+import logging
+
+from .station import Station, MeteoData
 from .resample import MeteoResampler
 
 logger = logging.getLogger(__name__)
@@ -17,22 +13,23 @@ logger = logging.getLogger(__name__)
 class MeteoLoader:
     """Manager class to query meteo data from multiple fields/stations and transform returned data to a consistent schema"""
 
-    def __init__(self, config: dict, et0_calculator: Optional[object] = None):
+    def __init__(
+        self, 
+        api_host: str,
+        query_template: str,
+        radiation_fallback_provider: str = 'province',
+        radiation_fallback_station: str = '09700MS',
+        request_timeout = 60
+        ):
         
-        self.radiation_fallback_provider = config.get("radiation_fallback_provider", "province")
-        self.radiation_fallback_station = config.get("radiation_fallback_station", "09700MS")
-        self.request_timeout = config.get("request_timeout", 60)
+        self.api_host = api_host
+        self.query_template = query_template
 
-        api_config = config["api"]
-        self.api_host = api_config["host"].rstrip("/")
-        self.query_template = api_config["query_template"].lstrip("/")
+        self.radiation_fallback_provider = radiation_fallback_provider
+        self.radiation_fallback_station = radiation_fallback_station
+        self.request_timeout = request_timeout
 
-        self.et0_calculator = et0_calculator
         self._session = requests.Session()
-
-        # Cache keyed by station_id with coverage window to avoid refetching.
-        # Structure: {station_id: {"station": Station, "start": Timestamp, "end": Timestamp, "metadata": dict}}
-        self.station_cache: dict[str, dict[str, Any]] = {}
 
     @staticmethod
     def _to_utc(ts: pd.Timestamp) -> pd.Timestamp:
@@ -42,46 +39,6 @@ class MeteoLoader:
         if ts.tzinfo is None:
             return ts.tz_localize("UTC")
         return ts.tz_convert("UTC")
-
-    @staticmethod
-    def _margin_from_resampler(resampler: MeteoResampler | None) -> pd.Timedelta:
-        """
-        Return a conservative margin equal to the resampler frequency to handle
-        APIs that are end-exclusive. Falls back to 0 if freq cannot be parsed.
-        """
-        if resampler is None or resampler.freq is None:
-            return pd.Timedelta(0)
-        try:
-            offset = pd.tseries.frequencies.to_offset(resampler.freq)
-            return pd.Timedelta(offset)
-        except Exception:
-            return pd.Timedelta(0)
-
-    @property
-    def output_schema(self) -> pa.DataFrameSchema:
-        """
-        Define the expected schema for meteorological data output.
-
-        Returns:
-            pa.DataFrameSchema: Schema for validating SBR output data
-        """
-        return pa.DataFrameSchema(
-            {
-                "station_id": pa.Column(str),
-                "tair_2m": pa.Column(float, nullable=True, required=False),
-                "relative_humidity": pa.Column(float, nullable=True, required=False),
-                "wind_speed": pa.Column(float, nullable=True, required=False),
-                "precipitation": pa.Column(float, nullable=True, required=False),
-                "air_pressure": pa.Column(float, nullable=True, required=False),
-                "sun_duration": pa.Column(float, nullable=True, required=False),
-                "solar_radiation": pa.Column(float, nullable=True, required=False),
-            },
-            index=pa.Index(pd.DatetimeTZDtype(tz="UTC")),
-            strict=False,  # Allow additional columns that might be added
-        )
-
-    def _validate(self, transformed_data: pd.DataFrame) -> pd.DataFrame:
-        return self.output_schema.validate(transformed_data)
 
     def _build_url(
         self,
@@ -122,11 +79,12 @@ class MeteoLoader:
             if "datetime" not in response_data.columns:
                 logger.error("Missing 'datetime' column in response from %s", url)
                 return pd.DataFrame(), None
-
             response_data["datetime"] = pd.to_datetime(response_data["datetime"], utc=True)
+
         except requests.exceptions.Timeout:
             logger.error("Request to %s timed out. Try a smaller temporal window.", url)
             return pd.DataFrame(), None
+
         except (requests.exceptions.RequestException, ValueError) as exc:
             logger.error("Error fetching data from %s: %s", url, exc)
             return pd.DataFrame(), None
@@ -207,15 +165,47 @@ class MeteoLoader:
         df["solar_radiation"] = fallback_series
         return df
 
-    def query(
+    def _query_station(
             self, 
             provider: str, 
             station_id: str, 
             start: datetime | str, 
             end: datetime | str, #non inclusive
-            resampler: MeteoResampler | None = None
         ) -> Optional[Station]:
         
+        try:
+            df, meta = self._get_data(provider, station_id, start, end)
+            metadata = meta or {}
+
+            if df.empty:
+                logger.warning("No data returned for station %s in window %s - %s", station_id, start, end)
+                return None
+            
+            df = self._fill_solar_radiation(df, start, end)
+            station = Station.create(
+                id = station_id,
+                elevation = metadata.get("elevation"),
+                y = metadata.get("latitude"),
+                x = metadata.get("longitude"),
+                data = df,
+                crs = 4326
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error("Unexpected error while fetching data for station %s: %s", station_id, exc)
+            return None
+
+        return station
+
+    def query(
+        self, 
+        provider: str, 
+        station_ids: list[str], 
+        start: datetime | str, 
+        end: datetime | str, #non inclusive
+    ):
+        if isinstance(station_ids, str):
+            station_ids = [station_ids]
+
         if isinstance(start, str):
             start = pd.to_datetime(start, dayfirst=True)
         if isinstance(end, str):
@@ -227,97 +217,18 @@ class MeteoLoader:
         if start >= end:
             raise ValueError("start must be before end")
 
-        cache_entry = self.station_cache.get(station_id)
-        cached_station = cache_entry["station"] if cache_entry else None
-        cached_start = self._to_utc(cache_entry["start"]) if cache_entry else None
-        cached_end = self._to_utc(cache_entry["end"]) if cache_entry else None
-        cached_metadata = cache_entry["metadata"] if cache_entry else {}
+        station_data = []
+        for station_id in station_ids:
+            station = self._query_station(
+                provider = provider, 
+                station_id = station_id, 
+                start = start, 
+                end = end, #non inclusive
+            )
+            if station is not None:
+                station_data.append(station)
 
-        margin = self._margin_from_resampler(resampler)
-
-        needs_before = cached_start is None or start < (cached_start - margin)
-        needs_after = cached_end is None or end > (cached_end + margin if cached_end is not None else end)
-
-        fetch_windows = []
-        if cached_station is None:
-            fetch_windows.append((start, end))
-        else:
-            if needs_before:
-                fetch_windows.append((start, cached_start))
-            if needs_after:
-                window_start = (cached_end + margin) if cached_end is not None else start
-                fetch_windows.append((window_start, end))
-
-        station = cached_station
-        metadata = cached_metadata
-
-        for window_start, window_end in fetch_windows:
-            if window_start is None or window_end is None or window_start >= window_end:
-                continue
-            try:
-                df, meta = self._get_data(provider, station_id, window_start, window_end)
-
-                if df.empty:
-                    logger.warning("No data returned for station %s in window %s - %s", station_id, window_start, window_end)
-                    continue
-
-                df = self._fill_solar_radiation(df, window_start, window_end)
-
-                validated_df = self._validate(df)
-                if resampler is not None:
-                    validated_df = resampler.resample(validated_df)
-
-                metadata = meta or metadata or {}
-
-                if station is None:
-                    station = Station(
-                        station_id,
-                        metadata.get("elevation"),
-                        metadata.get("latitude"),
-                        metadata.get("longitude"),
-                        validated_df,
-                    )
-                else:
-                    merged = pd.concat([station.data, validated_df]).sort_index()
-                    station.data = merged[~merged.index.duplicated(keep="last")]
-            except SchemaError as exc:
-                logger.error("Schema validation failed for station %s: %s", station_id, exc)
-                self.station_cache.pop(station_id, None)
-                return None
-            except Exception as exc:  # pragma: no cover - defensive logging
-                logger.error("Unexpected error while fetching data for station %s: %s", station_id, exc)
-                self.station_cache.pop(station_id, None)
-                return None
-
-        if station is None:
-            logger.warning("No data available for station %s", station_id)
-            return None
-
-        coverage_start = station.data.index.min()
-        coverage_end = station.data.index.max()
-        self.station_cache[station_id] = {
-            "station": station,
-            "start": coverage_start,
-            "end": coverage_end,
-            "metadata": metadata,
-        }
-
-        # Return a slice without mutating cached data
-        sliced_data = station.data.loc[(station.data.index >= start) & (station.data.index < end)].copy()
-        return Station(
-            station.id,
-            station.elevation,
-            station.latitude,
-            station.longitude,
-            sliced_data,
-        )
-
-    def calculate_et(self, stations, et_calculator, correct: bool = True):
-        """
-        Adds et0 or et values to the station data, depending on correct.
-        """
-        for station in stations:
-            station.data = station.data.join(et_calculator.calculate(station, correct))
+        return MeteoData.from_list(station_data)
 
 
 if __name__ == '__main__':
