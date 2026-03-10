@@ -1,150 +1,246 @@
-import pandas as pd
-
 from dataclasses import dataclass
+from datetime import timedelta
 import logging
-from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .field import FieldHandler
-from .irrigation import FieldIrrigation
-from .meteo import MeteoHandler
-from .resample import MeteoResampler
-from .et0.base import ET0Calculator
-from .et_correction import ETCorrection
-from .base_plot import BasePlot
+import pandas as pd
+
+from ..database.db import FarmDB
+from ..et.base import ET0Calculator
+from ..field import FieldContext
+from ..field_capacity import calculate_field_capacity
+from ..irrigation import FieldIrrigation
+from ..meteo.load import MeteoLoader
+from ..meteo.resample import MeteoResampler
+from ..meteo.station import Station
+from ..meteo.validate import MeteoValidator
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
-class RuntimeContext:
-    meteo_handler: MeteoHandler
-    resampler: MeteoResampler
-    et_calculator: ET0Calculator
-
 class WaterBalanceWorkflow:
+    db: FarmDB
+    meteo_loader: MeteoLoader
+    meteo_validator: MeteoValidator
+    et_calculator: ET0Calculator
+    timezone: ZoneInfo
+    meteo_resampler: MeteoResampler | None = None
+    min_sample_size: int = 1
 
-    def __init__(self, config, db):
-        self.config = config
-        tz_name = config.get("general", {}).get("timezone", "UTC")
-        self.tz = ZoneInfo(tz_name)
+    def get_cached_water_balance(
+        self,
+        field: FieldContext,
+        start: pd.Timestamp | None = None,
+        end: pd.Timestamp | None = None,
+    ) -> pd.DataFrame:
+        records = self.db.query_water_balance(
+            field_id=field.id,
+            start=start.date() if start is not None else None,
+            end=end.date() if end is not None else None,
+        )
+        if not records:
+            return pd.DataFrame()
 
-        local_now = datetime.now(self.tz)
-        self.year = local_now.year
+        dataframe = pd.DataFrame(
+            [
+                {
+                    "date": record.date,
+                    "precipitation": record.precipitation,
+                    "irrigation": record.irrigation,
+                    "evapotranspiration": record.evapotranspiration,
+                    "incoming": record.incoming,
+                    "net": record.net,
+                    "soil_storage": record.soil_storage,
+                    "field_capacity": record.field_capacity,
+                    "deficit": record.deficit,
+                    "readily_available_water": getattr(record, "readily_available_water", None),
+                    "below_raw": getattr(record, "below_raw", None),
+                    "field_id": record.field_id,
+                }
+                for record in records
+            ]
+        )
+        dataframe["date"] = pd.to_datetime(dataframe["date"], utc=True)
+        return dataframe.set_index("date").sort_index()
 
-        self.season_end_local = datetime(self.year + 1, 1, 1, tzinfo=self.tz)  # end-exclusive
-        self.season_end_utc = self.season_end_local.astimezone(ZoneInfo("UTC"))
+    def calculate_water_balance(
+        self,
+        field: FieldContext,
+        station_data: pd.DataFrame,
+        field_irrigation: FieldIrrigation | None = None,
+        initial_storage: float | None = None,
+    ) -> pd.DataFrame:
+        if station_data is None or station_data.empty:
+            raise ValueError("Station data cannot be empty when calculating the water balance.")
+        if not isinstance(station_data.index, pd.DatetimeIndex):
+            raise TypeError("Station data index must be a pandas DatetimeIndex.")
 
-        self.db = db
+        if field.field_capacity is None:
+            field.field_capacity = calculate_field_capacity(
+                soil_type=field.soil_type,
+                humus_pct=field.humus_pct,
+                root_depth_cm=field.root_depth_cm,
+            )
 
-        if ET0Calculator.get_calculator_by_name(config['evapotranspiration']['method']) is None:
-            raise ValueError(f"ET0 calculator {config['evapotranspiration']['method']} not found. Choose one of {ET0Calculator.registry.keys()}")
+        data = station_data.sort_index().copy()
+        if "precipitation" not in data.columns:
+            raise KeyError("Station data must contain a 'precipitation' column.")
 
-        self.fields = [FieldHandler(field) for field in db.get_all_fields()]
+        et_column = "et0_corrected" if "et0_corrected" in data.columns else "et0" if "et0" in data.columns else None
+        if et_column is None:
+            raise KeyError("Station data must contain either 'et0_corrected' or 'et0'.")
 
-        if len(self.fields) == 0:
-            logger.warning('No fields found in database.')
-            # logger.info('No fields configured in database. Terminating')
-            # sys.exit(1)
-
-        meteo = MeteoHandler(config['meteo'])
-        resampler = MeteoResampler(**config['resampling'])
-        et_corrector = ETCorrection(**config['evapotranspiration']['correction'])
-        et_calculator = ET0Calculator.get_calculator_by_name(config['evapotranspiration']['method'])(corrector = et_corrector)
-
-        self.runtime_context = RuntimeContext(
-            meteo_handler = meteo,
-            resampler = resampler,
-            et_calculator = et_calculator,
+        precip = data["precipitation"].fillna(0.0)
+        evap = data[et_column].fillna(0.0)
+        irrigation = (
+            pd.Series(0.0, index=data.index, dtype=float)
+            if field_irrigation is None
+            else field_irrigation.to_dataframe(data.index, fill_value=0.0)
         )
 
-        self.plot = BasePlot().create_base(subpanels=0, vertical_spacing=.1)
+        incoming = precip + irrigation
+        net = incoming - evap
+        capacity = field.field_capacity.nfk_total_mm
 
-        logger.info(f'Initialized WaterBalanceWorkflow with {len(self.fields)} fields for year {self.year}.')
+        storage: list[float] = []
+        current_storage = capacity if initial_storage is None else max(0.0, min(capacity, initial_storage))
+        for delta in net:
+            current_storage = max(0.0, min(capacity, current_storage + delta))
+            storage.append(current_storage)
 
-    def _plot_cached_water_balance(self, field, start_date):
-        try:
-            end_date = (self.season_end_utc - timedelta(days=1)).date()
-            wb_persisted = self.db.query_water_balance(field_id = field.id, start = start_date, end = end_date)
-            if wb_persisted:
-                wb_df = pd.DataFrame(
-                    [
-                        {
-                            "date": rec.date,
-                            "soil_storage": rec.soil_storage,
-                            "irrigation": getattr(rec, "irrigation", 0.0),
-                            "precipitation": getattr(rec, "precipitation", 0.0),
-                        }
-                        for rec in wb_persisted
-                    ]
+        water_balance = pd.DataFrame(
+            {
+                "precipitation": precip,
+                "irrigation": irrigation,
+                "evapotranspiration": evap,
+                "incoming": incoming,
+                "net": net,
+                "soil_storage": storage,
+            },
+            index=data.index,
+        )
+        water_balance["field_capacity"] = capacity
+        water_balance["deficit"] = capacity - water_balance["soil_storage"]
+        water_balance["field_id"] = field.id
+
+        if field.p_allowable:
+            raw = field.p_allowable * capacity
+            trigger_level = capacity - raw
+            water_balance["readily_available_water"] = raw
+            water_balance["below_raw"] = water_balance["soil_storage"] < trigger_level
+
+        field.water_balance = water_balance
+        field.results.metrics["current_soil_storage"] = float(water_balance["soil_storage"].iloc[-1])
+        field.results.metrics["current_deficit"] = float(water_balance["deficit"].iloc[-1])
+        return water_balance
+
+    def _prepare_station_data(self, station: Station) -> Station:
+        if self.meteo_resampler is None:
+            return station
+
+        resampled = self.meteo_resampler.apply_resampling(
+            station.data.reset_index(),
+            freq="D",
+            min_sample_size=self.min_sample_size,
+        )
+        resampled["datetime"] = pd.to_datetime(resampled["datetime"], utc=True)
+        resampled = resampled.set_index("datetime").sort_index()
+
+        return Station(
+            id=station.id,
+            x=station.x,
+            y=station.y,
+            crs=station.crs,
+            elevation=station.elevation,
+            data=resampled,
+        )
+
+    def run_field(
+        self,
+        field: FieldContext,
+        provider: str,
+        year: int,
+        season_end_utc: pd.Timestamp,
+        persist: bool = True,
+    ) -> pd.DataFrame | None:
+        
+        field_season_start = self.db.first_irrigation_event(field.id, year)
+        if field_season_start is None:
+            logger.info("No irrigation events found for field %s. Skipping", field.name)
+            return None
+
+        season_start_ts = pd.Timestamp(field_season_start.date, tz="UTC")
+        latest_balance = self.db.latest_water_balance(field.id)
+
+        if latest_balance:
+            next_ts = pd.Timestamp(latest_balance.date, tz="UTC") + timedelta(days=1)
+            start_ts = max(season_start_ts, next_ts)
+            initial_storage = latest_balance.soil_storage
+        else:
+            start_ts = season_start_ts
+            initial_storage = None
+
+        period_end = min(pd.Timestamp.now(tz=self.timezone).tz_convert("UTC"), season_end_utc)
+        if start_ts >= period_end:
+            cached = self.get_cached_water_balance(field, start=season_start_ts, end=period_end)
+            field.water_balance = cached if not cached.empty else None
+            return field.water_balance
+
+        meteo_data = self.meteo_loader.query(
+            provider=provider,
+            station_ids=[field.reference_station],
+            start=start_ts,
+            end=period_end,
+        )
+        meteo_data = self.meteo_validator.validate(meteo_data)
+        station = meteo_data.get_station_data(field.reference_station)
+        if station is None:
+            logger.warning("No meteo station data available for field %s", field.name)
+            return None
+
+        station = self._prepare_station_data(station)
+        et_data = self.et_calculator.calculate(station, correct=True)
+        station.data = station.data.join(et_data)
+
+        field.field_capacity = calculate_field_capacity(
+            soil_type=field.soil_type,
+            humus_pct=field.humus_pct,
+            root_depth_cm=field.root_depth_cm,
+        )
+        irrigation_events = self.db.query_irrigation_events(field_name=field.name, year=year) or []
+        field_irrigation = FieldIrrigation.from_list(irrigation_events)
+        water_balance = self.calculate_water_balance(
+            field=field,
+            station_data=station.data,
+            field_irrigation=field_irrigation,
+            initial_storage=initial_storage,
+        )
+
+        if persist:
+            self.db.add_water_balance(water_balance, field_id=field.id)
+            cached = self.get_cached_water_balance(field, start=season_start_ts, end=period_end)
+            field.water_balance = cached if not cached.empty else water_balance
+
+        return field.water_balance
+
+    def run(
+        self,
+        fields: list[FieldContext],
+        provider: str,
+        year: int,
+        season_end_utc: pd.Timestamp,
+        persist: bool = True,
+    ) -> list[FieldContext]:
+        for field in fields:
+            try:
+                self.run_field(
+                    field=field,
+                    provider=provider,
+                    year=year,
+                    season_end_utc=season_end_utc,
+                    persist=persist,
                 )
-                wb_df["date"] = pd.to_datetime(wb_df["date"]).dt.tz_localize("UTC")
-                wb_df["irrigation"] = wb_df["irrigation"].fillna(0.0)
-                wb_df["precipitation"] = wb_df["precipitation"].fillna(0.0)
-                wb_df = wb_df.set_index("date").sort_index()
-                self.plot.plot_waterbalance(wb_df, field_name=field.name, hover_units = 'mm')
-            else:
-                logger.info(f"No persisted water balance found for field {field.name}; nothing to plot.")
-        except Exception as e:
-            logger.error(f"Error plotting cached water balance for field {field.name}: {e}")
-
-    def run(self):
-
-        for field in self.fields:
-            field_season_start = self.db.first_irrigation_event(field.id, self.year)
-            if field_season_start is None:
-                logger.info(f"No irrigation events found for field {field.name}. Skipping")
-                continue
-
-            # 1. Setup Time Ranges
-            season_start_ts = pd.Timestamp(field_season_start.date, tz="UTC")
-            latest_balance = self.db.latest_water_balance(field.id)
-            
-            if latest_balance:
-                next_ts = pd.Timestamp(latest_balance.date, tz="UTC") + timedelta(days=1)
-                start_ts = max(season_start_ts, next_ts)
-                initial_storage = latest_balance.soil_storage
-            else:
-                start_ts = season_start_ts
-                initial_storage = None
-
-            period_end = min(pd.Timestamp.now(tz=self.tz).tz_convert('UTC'), self.season_end_utc)
-
-            # 2. Logic Branching
-            if start_ts >= period_end:
-                logger.info(f"No new data to compute for {field.name}.")
-                # Plot existing history
-                self._plot_cached_water_balance(field, season_start_ts.date())
-            else:
-                try:
-                    logger.info(f"Calculating {start_ts.date()} to {period_end.date()} for {field.name}")
-                    
-                    station = self.runtime_context.meteo_handler.query(
-                        provider="SBR", station_id=field.reference_station,
-                        start=start_ts, end=period_end,
-                        resampler=self.runtime_context.resampler
-                    )
-
-                    if station is None:
-                        logger.warning(f"Meteo query returned None for {field.name}.")
-                        self._plot_cached_water_balance(field, season_start_ts.date())
-                        continue
-
-                    # ET and Balance Calculation
-                    station.data = station.data.join(self.runtime_context.et_calculator.calculate(station, correct=True))
-                    field_capacity = field.get_field_capacity()
-                    field_irrigation = FieldIrrigation.from_list(self.db.query_irrigation_events(field.name, year=self.year))
-                    field_wb = field.calculate_water_balance(station.data, field_irrigation, initial_storage=initial_storage)
-                    
-                    # Persist
-                    self.db.add_water_balance(field_wb, field_id=field.id)
-                    
-                    # ALWAYS plot from the DB after a calculation to show the FULL season
-                    self._plot_cached_water_balance(field, season_start_ts.date())
-                    
-                    logger.info(f"Successfully updated water-balance for {field.name}")
-
-                except Exception as e:
-                    logger.error(f"Calculation failed for {field.name}: {e}", exc_info=True)
-                    # Fallback to whatever history we have
-                    self._plot_cached_water_balance(field, season_start_ts.date())
-            
+            except Exception:
+                logger.exception("Water balance calculation failed for field %s", field.name)
+        return fields
