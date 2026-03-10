@@ -13,7 +13,7 @@ from . import models
 logger = logging.getLogger(__name__)
 
 
-class IrrigDB:
+class FarmDB:
     def __init__(self, engine_url: str = 'sqlite:///database.db', **engine_kwargs) -> None:
         """
         Create a database engine and initialise ORM metadata.
@@ -488,7 +488,7 @@ if __name__ == '__main__':
     # config = load_config('config/config.yaml')
     # logging.config.dictConfig(config['logging'])
 
-    db = IrrigDB()
+    db = FarmDB()
 
     fields = db.get_all_fields()
 

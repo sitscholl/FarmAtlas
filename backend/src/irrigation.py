@@ -2,7 +2,7 @@ import pandas as pd
 
 from datetime import datetime
 
-from src.database.models import Irrigation
+from .database.models import Irrigation
 
 class FieldIrrigation:
     
