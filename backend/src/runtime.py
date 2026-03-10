@@ -10,7 +10,7 @@ from .meteo.validate import MeteoValidator
 from .field import FieldContext
 from .database.db import FarmDB
 from .meteo.resample import MeteoResampler
-from .et.base import ET0Calculator
+from .et import ET0Calculator
 from .et.et_correction import ETCorrection
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class RuntimeContext:
         logger.info("Initializing Runtime Context")
 
         ## Timezone
-        tz_name = config.get('api', {}).get('timezone', 'Europe/Rome')
+        tz_name = config.get('general', {}).get('timezone')
         self.timezone = ZoneInfo(tz_name)
 
         ## Meteo Handler
@@ -65,7 +65,7 @@ class RuntimeContext:
         self.meteo_validator = MeteoValidator(**config.get('meteo_validation', {}))
 
         ## Meteo Resampler
-        self.min_sample_size = config.get('resampling', {}).get('min_sample_size', {})
+        self.min_sample_size = config.get('resampling', {}).get('min_sample_size', 1)
         self.meteo_resampler = MeteoResampler(
             resample_colmap=config.get('resampling', {}).get('resample_colmap'),
         )
@@ -79,11 +79,12 @@ class RuntimeContext:
             logger.warning('No fields found in database.')
 
         ## Evapotranspiration
-        et_calculator = ET0Calculator.get_calculator_by_name(config['evapotranspiration']['method'])
-        if et_calculator is None:
+        et_calculator_cls = ET0Calculator.get_calculator_by_name(config['evapotranspiration']['method'])
+        if et_calculator_cls is None:
             raise ValueError(f"ET0 calculator {config['evapotranspiration']['method']} not found. Choose one of {ET0Calculator.registry.keys()}")
-        et_calculator.add_corrector(ETCorrection(**config['evapotranspiration']['correction']))
-        self.et_calculator = et_calculator
+        self.et_calculator = et_calculator_cls(
+            corrector=ETCorrection(**config['evapotranspiration']['correction'])
+        )
 
         ## Scheduler
 

@@ -11,7 +11,7 @@ meteo:
 
 resampling:
     freq: D
-    min_count: 20
+    min_sample_size: 20
 
 evapotranspiration:
     method: PenmanDaily
