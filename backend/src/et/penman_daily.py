@@ -32,6 +32,11 @@ class PenmanDailyCalculator(ET0Calculator):
         meteo_data = station.data
         self._validate_data(meteo_data)
 
+        required_cols = ['tair_2m', 'tair_2m_max', 'tair_2m_min', 'wind_speed', 'solar_radiation', 'relative_humidity']
+        missing_cols = [i for i in required_cols if i not in meteo_data.columns]
+        if missing_cols:
+            raise ValueError(f"The following parameters required for the PenmanDaily calculation are missing in the meteo data: {missing_cols}")
+
         et = pm_fao56(
             meteo_data.tair_2m, 
             meteo_data.wind_speed, 
