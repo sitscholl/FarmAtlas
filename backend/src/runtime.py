@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from .meteo.load import MeteoLoader
 from .meteo.validate import MeteoValidator
-from .field import FieldHandler
+from .field import FieldContext
 from .database.db import FarmDB
 from .meteo.resample import MeteoResampler
 from .et.base import ET0Calculator
@@ -74,7 +74,7 @@ class RuntimeContext:
         self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///database.db'))
        
         ## Fields
-        self.fields = [FieldHandler(field) for field in self.db.get_all_fields()]
+        self.fields = [FieldContext.from_model(field) for field in self.db.get_all_fields()]
         if len(self.fields) == 0:
             logger.warning('No fields found in database.')
 
@@ -84,6 +84,8 @@ class RuntimeContext:
             raise ValueError(f"ET0 calculator {config['evapotranspiration']['method']} not found. Choose one of {ET0Calculator.registry.keys()}")
         et_calculator.add_corrector(ETCorrection(**config['evapotranspiration']['correction']))
         self.et_calculator = et_calculator
+
+        ## Scheduler
 
     def update_runtime(self, config_file: str | Path):
         self.config_file = Path(config_file)
