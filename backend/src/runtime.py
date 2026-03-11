@@ -62,7 +62,11 @@ class RuntimeContext:
         self.meteo_loader = MeteoLoader(**config.get('meteo', {}))
         
         ## Meteo Validator
-        self.meteo_validator = MeteoValidator(**config.get('meteo_validation', {}))
+        validator_config = config.get('meteo_validation', {})
+        if 'timezone' in validator_config:
+            logger.warning(f"Found timezone key in validator config. This will be ignored and timezone is set to {self.timezone}")
+            validator_config = {i:j for i,j in validator_config.items() if i != 'timezone'}
+        self.meteo_validator = MeteoValidator(timezone = self.timezone, **validator_config)
 
         ## Meteo Resampler
         self.min_sample_size = config.get('resampling', {}).get('min_sample_size', 1)

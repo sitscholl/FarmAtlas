@@ -5,7 +5,7 @@ from .station import MeteoData, Station
 
 class MeteoValidator:
 
-    def __init__(self, timezone: str = 'UTC', allow_additional_columns: bool = True):
+    def __init__(self, timezone: str, allow_additional_columns: bool = True):
         self.timezone = timezone
         self.allow_additional_columns = allow_additional_columns
 
