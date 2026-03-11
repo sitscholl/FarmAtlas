@@ -387,13 +387,8 @@ class FarmDB:
             )
 
         df = df.rename_axis("date").reset_index()
-        # Ensure the series is in UTC before extracting the date
-        if df["date"].dt.tz is not None:
-            # If it's timezone-aware, convert to UTC
-            df["date"] = df["date"].dt.tz_convert("UTC")
-        else:
-            # If it's naive, assume it's UTC
-            df["date"] = df["date"].dt.tz_localize("UTC")
+        # Water-balance rows are daily aggregates keyed by calendar day, so preserve the
+        # existing day semantics instead of converting through UTC and shifting dates.
         df["date"] = pd.to_datetime(df["date"]).dt.date
         df = df[["date"] + required_cols + optional_cols]
 
