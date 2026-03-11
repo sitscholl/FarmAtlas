@@ -28,6 +28,54 @@ class WaterBalanceWorkflow:
     meteo_resampler: MeteoResampler | None = None
     min_sample_size: int = 1
 
+    def _get_field_run_context(
+        self,
+        field: FieldContext,
+        year: int,
+        period_end: pd.Timestamp,
+    ) -> dict[str, object] | None:
+        field_season_start = self.db.first_irrigation_event(field.id, year)
+        if field_season_start is None:
+            logger.info("No irrigation events found for field %s. Skipping", field.name)
+            return None
+
+        season_start_ts = pd.Timestamp(field_season_start.date, tz=self.timezone)
+        latest_balance = self.db.latest_water_balance(field.id)
+
+        if latest_balance:
+            next_ts = pd.Timestamp(latest_balance.date, tz=self.timezone) + timedelta(days=1)
+            start_ts = max(season_start_ts, next_ts)
+            initial_storage = latest_balance.soil_storage
+        else:
+            start_ts = season_start_ts
+            initial_storage = None
+
+        return {
+            "season_start_ts": season_start_ts,
+            "start_ts": start_ts,
+            "initial_storage": initial_storage,
+            "cache_end": period_end - pd.Timedelta(days=1),
+        }
+
+    def _build_station(self, station: Station, start: pd.Timestamp, end: pd.Timestamp) -> Station:
+        sliced = station.data.loc[(station.data.index >= start) & (station.data.index < end)].copy()
+        return Station(
+            id=station.id,
+            x=station.x,
+            y=station.y,
+            crs=station.crs,
+            elevation=station.elevation,
+            data=sliced,
+        )
+
+    def _normalize_period_end(self, season_end: pd.Timestamp) -> pd.Timestamp:
+        season_end = pd.Timestamp(season_end)
+        if season_end.tz is None:
+            season_end = season_end.tz_localize(self.timezone)
+        else:
+            season_end = season_end.tz_convert(self.timezone)
+        return min(pd.Timestamp.now(tz=self.timezone).floor("D"), season_end.floor("D"))
+
     def get_cached_water_balance(
         self,
         field: FieldContext,
@@ -163,59 +211,31 @@ class WaterBalanceWorkflow:
             data=resampled,
         )
 
-    def run_field(
+    def _run_field(
         self,
         field: FieldContext,
-        provider: str,
         year: int,
-        season_end: pd.Timestamp,
+        period_end: pd.Timestamp,
         persist: bool = True,
+        station: Station | None = None,
+        context: dict[str, object] | None = None,
     ) -> pd.DataFrame | None:
-
-        season_end = pd.Timestamp(season_end)
-        if season_end.tz is None:
-            season_end = pd.Timestamp(season_end).tz_localize(self.timezone)
-        else:
-            season_end = pd.Timestamp(season_end).tz_convert(self.timezone)
-        
-        field_season_start = self.db.first_irrigation_event(field.id, year)
-        if field_season_start is None:
-            logger.info("No irrigation events found for field %s. Skipping", field.name)
+        context = context or self._get_field_run_context(field, year, period_end)
+        if context is None:
             return None
 
-        season_start_ts = pd.Timestamp(field_season_start.date, tz=self.timezone)
-        latest_balance = self.db.latest_water_balance(field.id)
-
-        if latest_balance:
-            next_ts = pd.Timestamp(latest_balance.date, tz=self.timezone) + timedelta(days=1)
-            start_ts = max(season_start_ts, next_ts)
-            initial_storage = latest_balance.soil_storage
-        else:
-            start_ts = season_start_ts
-            initial_storage = None
-
-        period_end = min(pd.Timestamp.now(tz=self.timezone).floor("D"), pd.Timestamp(season_end).floor("D"))
-        cache_end = period_end - pd.Timedelta(days=1)
+        season_start_ts = context["season_start_ts"]
+        start_ts = context["start_ts"]
+        initial_storage = context["initial_storage"]
+        cache_end = context["cache_end"]
         if start_ts >= period_end:
             cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
             field.water_balance = cached if not cached.empty else None
             return field.water_balance
 
-        meteo_data = self.meteo_loader.query(
-            provider=provider,
-            station_ids=[field.reference_station],
-            start=start_ts,
-            end=period_end,
-        )
-        meteo_data = self.meteo_validator.validate(meteo_data)
-        station = meteo_data.get_station_data(field.reference_station)
         if station is None:
             logger.warning("No meteo station data available for field %s", field.name)
             return None
-
-        station = self._prepare_station_data(station)
-        et_data = self.et_calculator.calculate(station, correct=True)
-        station.data = station.data.join(et_data)
 
         field.field_capacity = calculate_field_capacity(
             soil_type=field.soil_type,
@@ -246,15 +266,66 @@ class WaterBalanceWorkflow:
         season_end: pd.Timestamp,
         persist: bool = True,
     ) -> list[FieldContext]:
+        period_end = self._normalize_period_end(season_end)
+
+        field_contexts: dict[int, dict[str, object]] = {}
+        fields_by_station: dict[str, list[FieldContext]] = {}
+
         for field in fields:
             try:
-                self.run_field(
-                    field=field,
-                    provider=provider,
-                    year=year,
-                    season_end=season_end,
-                    persist=persist,
-                )
+                context = self._get_field_run_context(field, year, period_end)
+                if context is None:
+                    continue
+                field_contexts[field.id] = context
+                if context["start_ts"] >= period_end:
+                    self._run_field(
+                        field=field,
+                        year=year,
+                        period_end=period_end,
+                        persist=persist,
+                        context=context,
+                    )
+                    continue
+
+                fields_by_station.setdefault(field.reference_station, []).append(field)
             except Exception:
                 logger.exception("Water balance calculation failed for field %s", field.name)
+
+        for station_id, station_fields in fields_by_station.items():
+            try:
+                station_start = min(field_contexts[field.id]["start_ts"] for field in station_fields)
+                meteo_data = self.meteo_loader.query(
+                    provider=provider,
+                    station_ids=[station_id],
+                    start=station_start,
+                    end=period_end,
+                )
+                meteo_data = self.meteo_validator.validate(meteo_data)
+                station = meteo_data.get_station_data(station_id)
+                if station is None:
+                    logger.warning("No meteo station data available for station %s", station_id)
+                    continue
+
+                station = self._prepare_station_data(station)
+                et_data = self.et_calculator.calculate(station, correct=True)
+                station.data = station.data.join(et_data)
+
+                for field in station_fields:
+                    context = field_contexts[field.id]
+                    field_station = self._build_station(
+                        station,
+                        start=context["start_ts"],
+                        end=period_end,
+                    )
+                    self._run_field(
+                        field=field,
+                        year=year,
+                        period_end=period_end,
+                        persist=persist,
+                        station=field_station,
+                        context=context,
+                    )
+            except Exception:
+                field_names = ", ".join(field.name for field in station_fields)
+                logger.exception("Water balance calculation failed for station %s (fields: %s)", station_id, field_names)
         return fields
