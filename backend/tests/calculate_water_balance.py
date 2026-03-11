@@ -88,13 +88,15 @@ def main() -> None:
 
     provider = os.getenv("METEO_PROVIDER", "province")
     station_id = os.getenv("METEO_STATION_ID", "09700MS")
-    now_utc = pd.Timestamp.now(tz="UTC")
-    year = now_utc.year
-    season_end_utc = now_utc.floor("D") + pd.Timedelta(days=1)
 
     with tempfile.TemporaryDirectory(prefix="irrigation_manager_wb_") as temp_dir:
         temp_db_path = Path(temp_dir) / "water_balance_test.sqlite"
         runtime = build_runtime(temp_db_path)
+
+        now = pd.Timestamp.now(tz=runtime.timezone)
+        year = now.year
+        season_end = now.floor("D") + pd.Timedelta(days=1)
+
         fields = seed_fields(runtime, station_id=station_id, year=year)
         workflow = build_workflow(runtime)
 
@@ -102,13 +104,13 @@ def main() -> None:
             "Running water-balance workflow for provider=%s station_id=%s season_end=%s",
             provider,
             station_id,
-            season_end_utc,
+            season_end,
         )
         populated_fields = workflow.run(
             fields=fields,
             provider=provider,
             year=year,
-            season_end_utc=season_end_utc,
+            season_end=season_end,
             persist=True,
         )
 

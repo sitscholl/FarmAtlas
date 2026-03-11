@@ -36,10 +36,10 @@ class WaterBalanceWorkflow:
     ) -> pd.DataFrame:
         if start is not None:
             start = pd.Timestamp(start)
-            start = start.tz_localize(self.timezone) if start.tzinfo is None else start.tz_convert(self.timezone)
+            start = start.tz_localize(self.timezone) if start.tz is None else start.tz_convert(self.timezone)
         if end is not None:
             end = pd.Timestamp(end)
-            end = end.tz_localize(self.timezone) if end.tzinfo is None else end.tz_convert(self.timezone)
+            end = end.tz_localize(self.timezone) if end.tz is None else end.tz_convert(self.timezone)
 
         records = self.db.query_water_balance(
             field_id=field.id,
@@ -78,7 +78,6 @@ class WaterBalanceWorkflow:
         field_irrigation: FieldIrrigation | None = None,
         initial_storage: float | None = None,
     ) -> pd.DataFrame:
-
         if station_data is None or station_data.empty:
             raise ValueError("Station data cannot be empty when calculating the water balance.")
         if not isinstance(station_data.index, pd.DatetimeIndex):
@@ -92,11 +91,6 @@ class WaterBalanceWorkflow:
             )
 
         data = station_data.sort_index().copy()
-        if data.index.tz is None:
-            raise ValueError("Calculating water balance requries timezone-aware datetimes.")
-        else:
-            data.index = data.index.tz_convert(self.timezone)
-            
         if "precipitation" not in data.columns:
             raise KeyError("Station data must contain a 'precipitation' column.")
 
@@ -149,7 +143,6 @@ class WaterBalanceWorkflow:
         return water_balance
 
     def _prepare_station_data(self, station: Station) -> Station:
-
         if self.meteo_resampler is None:
             return station
 
@@ -175,9 +168,15 @@ class WaterBalanceWorkflow:
         field: FieldContext,
         provider: str,
         year: int,
-        season_end_utc: pd.Timestamp,
+        season_end: pd.Timestamp,
         persist: bool = True,
     ) -> pd.DataFrame | None:
+
+        season_end = pd.Timestamp(season_end)
+        if season_end.tz is None:
+            season_end = pd.Timestamp(season_end).tz_localize(self.timezone)
+        else:
+            season_end = pd.Timestamp(season_end).tz_convert(self.timezone)
         
         field_season_start = self.db.first_irrigation_event(field.id, year)
         if field_season_start is None:
@@ -195,9 +194,7 @@ class WaterBalanceWorkflow:
             start_ts = season_start_ts
             initial_storage = None
 
-        season_end = pd.Timestamp(season_end_utc)
-        season_end = season_end.tz_localize(self.timezone) if season_end.tzinfo is None else season_end.tz_convert(self.timezone)
-        period_end = min(pd.Timestamp.now(tz=self.timezone).floor("D"), season_end.floor("D"))
+        period_end = min(pd.Timestamp.now(tz=self.timezone).floor("D"), pd.Timestamp(season_end).floor("D"))
         cache_end = period_end - pd.Timedelta(days=1)
         if start_ts >= period_end:
             cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
@@ -246,7 +243,7 @@ class WaterBalanceWorkflow:
         fields: list[FieldContext],
         provider: str,
         year: int,
-        season_end_utc: pd.Timestamp,
+        season_end: pd.Timestamp,
         persist: bool = True,
     ) -> list[FieldContext]:
         for field in fields:
@@ -255,7 +252,7 @@ class WaterBalanceWorkflow:
                     field=field,
                     provider=provider,
                     year=year,
-                    season_end_utc=season_end_utc,
+                    season_end=season_end,
                     persist=persist,
                 )
             except Exception:
