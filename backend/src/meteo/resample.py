@@ -136,6 +136,7 @@ class MeteoResampler:
         if not pd.api.types.is_datetime64_any_dtype(df[datetime_col]):
             df[datetime_col] = pd.to_datetime(df[datetime_col], errors="coerce")
         df = df.dropna(subset=[datetime_col])
+        df_timezone = df[datetime_col].dt.tz
 
         # 3. Build Named Aggregations
         value_cols = [c for c in df.columns if c not in required_cols]
@@ -167,6 +168,12 @@ class MeteoResampler:
         
         if 'tair_2m_mean' in resampled_prepared.columns:
             resampled_prepared = resampled_prepared.rename(columns = {'tair_2m_mean': 'tair_2m'})
+
+        resampled_prepared[datetime_col] = pd.to_datetime(resampled_prepared[datetime_col])
+        if resampled_prepared[datetime_col].dt.tz is None and df_timezone is not None:
+            resampled_prepared[datetime_col] = resampled_prepared[datetime_col].dt.tz_localize(df_timezone)
+        elif df_timezone is not None:
+            resampled_prepared[datetime_col] = resampled_prepared[datetime_col].dt.tz_convert(df_timezone)
 
         return resampled_prepared
 
