@@ -34,6 +34,13 @@ class WaterBalanceWorkflow:
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> pd.DataFrame:
+        if start is not None:
+            start = pd.Timestamp(start)
+            start = start.tz_localize(self.timezone) if start.tzinfo is None else start.tz_convert(self.timezone)
+        if end is not None:
+            end = pd.Timestamp(end)
+            end = end.tz_localize(self.timezone) if end.tzinfo is None else end.tz_convert(self.timezone)
+
         records = self.db.query_water_balance(
             field_id=field.id,
             start=start.date() if start is not None else None,
@@ -61,7 +68,7 @@ class WaterBalanceWorkflow:
                 for record in records
             ]
         )
-        dataframe["date"] = pd.to_datetime(dataframe["date"], utc=True)
+        dataframe["date"] = pd.to_datetime(dataframe["date"]).dt.tz_localize(self.timezone)
         return dataframe.set_index("date").sort_index()
 
     def calculate_water_balance(
@@ -71,6 +78,7 @@ class WaterBalanceWorkflow:
         field_irrigation: FieldIrrigation | None = None,
         initial_storage: float | None = None,
     ) -> pd.DataFrame:
+
         if station_data is None or station_data.empty:
             raise ValueError("Station data cannot be empty when calculating the water balance.")
         if not isinstance(station_data.index, pd.DatetimeIndex):
@@ -84,6 +92,11 @@ class WaterBalanceWorkflow:
             )
 
         data = station_data.sort_index().copy()
+        if data.index.tz is None:
+            raise ValueError("Calculating water balance requries timezone-aware datetimes.")
+        else:
+            data.index = data.index.tz_convert(self.timezone)
+            
         if "precipitation" not in data.columns:
             raise KeyError("Station data must contain a 'precipitation' column.")
 
@@ -136,6 +149,7 @@ class WaterBalanceWorkflow:
         return water_balance
 
     def _prepare_station_data(self, station: Station) -> Station:
+
         if self.meteo_resampler is None:
             return station
 
@@ -145,7 +159,6 @@ class WaterBalanceWorkflow:
             min_sample_size=self.min_sample_size,
             groupby_cols = ['station_id', 'model']
         )
-        resampled["datetime"] = pd.to_datetime(resampled["datetime"], utc=True)
         resampled = resampled.set_index("datetime").sort_index()
 
         return Station(
@@ -171,20 +184,23 @@ class WaterBalanceWorkflow:
             logger.info("No irrigation events found for field %s. Skipping", field.name)
             return None
 
-        season_start_ts = pd.Timestamp(field_season_start.date, tz="UTC")
+        season_start_ts = pd.Timestamp(field_season_start.date, tz=self.timezone)
         latest_balance = self.db.latest_water_balance(field.id)
 
         if latest_balance:
-            next_ts = pd.Timestamp(latest_balance.date, tz="UTC") + timedelta(days=1)
+            next_ts = pd.Timestamp(latest_balance.date, tz=self.timezone) + timedelta(days=1)
             start_ts = max(season_start_ts, next_ts)
             initial_storage = latest_balance.soil_storage
         else:
             start_ts = season_start_ts
             initial_storage = None
 
-        period_end = min(pd.Timestamp.now(tz=self.timezone).tz_convert("UTC"), season_end_utc)
+        season_end = pd.Timestamp(season_end_utc)
+        season_end = season_end.tz_localize(self.timezone) if season_end.tzinfo is None else season_end.tz_convert(self.timezone)
+        period_end = min(pd.Timestamp.now(tz=self.timezone).floor("D"), season_end.floor("D"))
+        cache_end = period_end - pd.Timedelta(days=1)
         if start_ts >= period_end:
-            cached = self.get_cached_water_balance(field, start=season_start_ts, end=period_end)
+            cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
             field.water_balance = cached if not cached.empty else None
             return field.water_balance
 
@@ -220,7 +236,7 @@ class WaterBalanceWorkflow:
 
         if persist:
             self.db.add_water_balance(water_balance, field_id=field.id)
-            cached = self.get_cached_water_balance(field, start=season_start_ts, end=period_end)
+            cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
             field.water_balance = cached if not cached.empty else water_balance
 
         return field.water_balance
