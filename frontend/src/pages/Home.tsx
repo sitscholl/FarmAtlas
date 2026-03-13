@@ -1,18 +1,46 @@
 import { useEffect, useState } from 'react'
 
 import api from '../api'
-import FieldBox from '../components/FieldBox'
-import { type FieldContainer } from '../components/FieldContainer'
+import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
+import { type FieldSummary } from '../types/field'
+
+function formatNumber(value: number, digits = 1) {
+  return new Intl.NumberFormat('de-DE', {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatOptionalNumber(
+  value: number | null,
+  suffix: string,
+  digits = 1,
+) {
+  if (value === null) {
+    return 'n/a'
+  }
+
+  return `${formatNumber(value, digits)} ${suffix}`.trim()
+}
+
+function buildFieldMetrics(field: FieldSummary): FieldBoxMetric[] {
+  return [
+    { label: 'Fläche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
+    { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
+    { label: 'Humusgehalt', value: `${formatNumber(field.humus_pct, 1)} %` },
+    { label: 'P allowable', value: formatNumber(field.p_allowable, 2) },
+  ]
+}
 
 export default function Home() {
-  const [fields, setFields] = useState<FieldContainer[]>([])
+  const [fields, setFields] = useState<FieldSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchFields = async () => {
       try {
-        const response = await api.get<FieldContainer[]>('/fields')
+        const response = await api.get<FieldSummary[]>('/fields')
         setFields(response.data)
       } catch (error) {
         console.error('Error fetching fields', error)
@@ -55,13 +83,10 @@ export default function Home() {
         {fields.map((field) => (
           <FieldBox
             key={field.id}
-            name={field.name}
-            referenceStation={field.reference_station}
-            soilType={field.soil_type}
-            areaHa={field.area_ha}
-            rootDepthCm={field.root_depth_cm}
-            humusPct={field.humus_pct}
-            pAllowable={field.p_allowable}
+            title={field.name}
+            badge={field.reference_station}
+            subtitle={`Soil type: ${field.soil_type}`}
+            metrics={buildFieldMetrics(field)}
           />
         ))}
       </div>
