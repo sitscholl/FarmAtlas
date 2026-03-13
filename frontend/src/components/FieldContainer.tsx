@@ -4,7 +4,7 @@ export type FieldContainer = {
   reference_station: string
   soil_type: string
   humus_pct: number
-  area_ha: number | null
+  area_ha: number
   root_depth_cm: number
-  p_allowable: number | null
+  p_allowable: number
 }
