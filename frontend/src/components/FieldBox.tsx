@@ -2,10 +2,10 @@ type FieldBoxProps = {
   name: string
   referenceStation: string
   soilType: string
-  areaHa: number | null
+  areaHa: number
   rootDepthCm: number
   humusPct: number
-  pAllowable: number | null
+  pAllowable: number
 }
 
 function formatNumber(value: number, digits = 1) {
@@ -15,11 +15,7 @@ function formatNumber(value: number, digits = 1) {
   }).format(value)
 }
 
-function formatNullableValue(value: number | null, suffix: string, digits = 1) {
-  if (value === null) {
-    return 'n/a'
-  }
-
+function formatValue(value: number, suffix: string, digits = 1) {
   return `${formatNumber(value, digits)} ${suffix}`.trim()
 }
 
@@ -33,34 +29,36 @@ export default function FieldBox({
   pAllowable,
 }: FieldBoxProps) {
   const metrics = [
-    { label: 'Area', value: formatNullableValue(areaHa, 'ha', 2) },
-    { label: 'Root depth', value: formatNullableValue(rootDepthCm, 'cm') },
-    { label: 'Humus', value: formatNullableValue(humusPct, '%', 1) },
-    { label: 'P allowable', value: formatNullableValue(pAllowable, '', 2) },
+    { label: 'Fläche', value: formatValue(areaHa, 'ha', 2) },
+    { label: 'Wurzeltiefe', value: formatValue(rootDepthCm, 'cm') },
+    { label: 'Humusgehalt', value: formatValue(humusPct, '%', 1) },
+    { label: 'P allowable', value: formatValue(pAllowable, '', 2) },
   ]
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/80 p-5 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+
       <div className="relative flex items-start justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
             Field
           </p>
           <h3 className="mt-2 text-lg font-semibold text-slate-900">{name}</h3>
-          <p className="mt-2 text-sm text-slate-500">{soilType} soil</p>
+          <p className="mt-2 text-sm text-slate-500">Bodentyp: {soilType}</p>
         </div>
-        <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-medium text-slate-700">
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
           {referenceStation}
         </span>
       </div>
 
-      <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="relative mt-3 space-y-1 border-t border-slate-100 pt-1">
         {metrics.map((metric) => (
-          <div key={metric.label} className="rounded-xl bg-slate-50 px-3 py-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              {metric.label}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
+          <div
+            key={metric.label}
+            className="flex items-baseline justify-between gap-1 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0"
+          >
+            <p className="text-sm text-slate-500">{metric.label}</p>
+            <p className="text-base font-semibold text-slate-900">
               {metric.value}
             </p>
           </div>
