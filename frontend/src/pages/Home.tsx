@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import api from '../api.js'
+import api from '../api'
 import FieldBox from '../components/FieldBox'
 import { type FieldContainer } from '../components/FieldContainer'
 
