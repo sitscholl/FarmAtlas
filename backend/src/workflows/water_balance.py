@@ -7,7 +7,7 @@ import pandas as pd
 
 from ..database.db import FarmDB
 from ..et.base import ET0Calculator
-from ..field import FieldContext
+from ..field import FieldState
 from ..field_capacity import calculate_field_capacity
 from ..irrigation import FieldIrrigation
 from ..meteo.load import MeteoLoader
@@ -30,7 +30,7 @@ class WaterBalanceWorkflow:
 
     def _get_field_run_context(
         self,
-        field: FieldContext,
+        field: FieldState,
         year: int,
         period_end: pd.Timestamp,
     ) -> dict[str, object] | None:
@@ -78,7 +78,7 @@ class WaterBalanceWorkflow:
 
     def get_cached_water_balance(
         self,
-        field: FieldContext,
+        field: FieldState,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> pd.DataFrame:
@@ -121,7 +121,7 @@ class WaterBalanceWorkflow:
 
     def calculate_water_balance(
         self,
-        field: FieldContext,
+        field: FieldState,
         station_data: pd.DataFrame,
         field_irrigation: FieldIrrigation | None = None,
         initial_storage: float | None = None,
@@ -186,8 +186,8 @@ class WaterBalanceWorkflow:
             water_balance["below_raw"] = water_balance["soil_storage"] < trigger_level
 
         field.water_balance = water_balance
-        field.results.metrics["current_soil_storage"] = float(water_balance["soil_storage"].iloc[-1])
-        field.results.metrics["current_deficit"] = float(water_balance["deficit"].iloc[-1])
+        field.metrics["current_soil_storage"] = float(water_balance["soil_storage"].iloc[-1])
+        field.metrics["current_deficit"] = float(water_balance["deficit"].iloc[-1])
         return water_balance
 
     def _prepare_station_data(self, station: Station) -> Station:
@@ -198,7 +198,7 @@ class WaterBalanceWorkflow:
             station.data.reset_index(),
             freq="D",
             min_sample_size=self.min_sample_size,
-            groupby_cols = ['station_id', 'model']
+            groupby_cols=['station_id', 'model'],
         )
         resampled = resampled.set_index("datetime").sort_index()
 
@@ -213,7 +213,7 @@ class WaterBalanceWorkflow:
 
     def _run_field(
         self,
-        field: FieldContext,
+        field: FieldState,
         year: int,
         period_end: pd.Timestamp,
         persist: bool = True,
@@ -260,16 +260,16 @@ class WaterBalanceWorkflow:
 
     def run(
         self,
-        fields: list[FieldContext],
+        fields: list[FieldState],
         provider: str,
         year: int,
         season_end: pd.Timestamp,
         persist: bool = True,
-    ) -> list[FieldContext]:
+    ) -> list[FieldState]:
         period_end = self._normalize_period_end(season_end)
 
         field_contexts: dict[int, dict[str, object]] = {}
-        fields_by_station: dict[str, list[FieldContext]] = {}
+        fields_by_station: dict[str, list[FieldState]] = {}
 
         for field in fields:
             try:

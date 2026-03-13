@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from .meteo.load import MeteoLoader
 from .meteo.validate import MeteoValidator
-from .field import FieldContext
+from .field import FieldContext, FieldState
 from .database.db import FarmDB
 from .meteo.resample import MeteoResampler
 from .et import ET0Calculator
@@ -96,6 +96,10 @@ class RuntimeContext:
         self.config_file = Path(config_file)
         self.config = load_config_file(self.config_file)
         self.initialize_runtime(self.config)
+
+    def create_field_states(self, fields: list[FieldContext] | None = None) -> list[FieldState]:
+        source_fields = self.fields if fields is None else fields
+        return [FieldState.from_context(field) for field in source_fields]
 
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG, force = True)

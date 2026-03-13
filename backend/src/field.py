@@ -23,7 +23,6 @@ class FieldContext:
     area_ha: float | None
     root_depth_cm: float
     p_allowable: float | None = None
-    results: FieldResults = field(default_factory=FieldResults)
 
     @classmethod
     def from_model(cls, field_model: Field) -> "FieldContext":
@@ -37,6 +36,52 @@ class FieldContext:
             root_depth_cm=field_model.root_depth_cm,
             p_allowable=field_model.p_allowable,
         )
+
+
+@dataclass
+class FieldState:
+    field: FieldContext
+    results: FieldResults = field(default_factory=FieldResults)
+
+    @classmethod
+    def from_context(cls, field_context: FieldContext) -> "FieldState":
+        return cls(field=field_context)
+
+    @property
+    def id(self) -> int:
+        return self.field.id
+
+    @property
+    def name(self) -> str:
+        return self.field.name
+
+    @property
+    def reference_station(self) -> str:
+        return self.field.reference_station
+
+    @property
+    def soil_type(self) -> str:
+        return self.field.soil_type
+
+    @property
+    def humus_pct(self) -> float:
+        return self.field.humus_pct
+
+    @property
+    def area_ha(self) -> float | None:
+        return self.field.area_ha
+
+    @property
+    def root_depth_cm(self) -> float:
+        return self.field.root_depth_cm
+
+    @property
+    def p_allowable(self) -> float | None:
+        return self.field.p_allowable
+
+    @property
+    def metrics(self) -> dict[str, object]:
+        return self.results.metrics
 
     @property
     def field_capacity(self) -> FieldCapacity | None:

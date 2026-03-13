@@ -98,6 +98,7 @@ def main() -> None:
         season_end = now.floor("D") + pd.Timedelta(days=1)
 
         fields = seed_fields(runtime, station_id=station_id, year=year)
+        field_states = runtime.create_field_states(fields)
         workflow = build_workflow(runtime)
 
         logger.info(
@@ -107,7 +108,7 @@ def main() -> None:
             season_end,
         )
         populated_fields = workflow.run(
-            fields=fields,
+            fields=field_states,
             provider=provider,
             year=year,
             season_end=season_end,
@@ -117,7 +118,7 @@ def main() -> None:
         for field in populated_fields:
             print(f"\n=== {field.name} ===")
             print("Field capacity:", field.field_capacity)
-            print("Metrics:", field.results.metrics)
+            print("Metrics:", field.metrics)
             if field.water_balance is None or field.water_balance.empty:
                 print("No water-balance output produced.")
                 continue
