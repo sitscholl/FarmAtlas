@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api_models import FieldContextResponse
+from .api_models import FieldSummaryResponse
 from .runtime import RuntimeContext
 
 logger = logging.getLogger(__name__)
@@ -45,10 +45,10 @@ async def health_check():
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
-@app.get("/api/fields", response_model=list[FieldContextResponse])
+@app.get("/api/fields", response_model=list[FieldSummaryResponse])
 async def get_fields():
     return [
-        FieldContextResponse(
+        FieldSummaryResponse(
             id=field.id,
             name=field.name,
             reference_station=field.reference_station,

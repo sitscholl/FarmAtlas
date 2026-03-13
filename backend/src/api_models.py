@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class FieldContextResponse(BaseModel):
+class FieldSummaryResponse(BaseModel):
     id: int
     name: str
     reference_station: str
