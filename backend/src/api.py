@@ -1,43 +1,49 @@
-"""
-FastAPI integration example for the MeteoDB timeseries database.
-This demonstrates how to expose the database via REST API for fast access to cached meteo data.
-"""
+from datetime import datetime
+import logging
 
 from fastapi import FastAPI, HTTPException
-
-from datetime import datetime
-import pytz
-import logging
+from fastapi.middleware.cors import CORSMiddleware
 
 from .api_models import FieldContextResponse
 from .runtime import RuntimeContext
-# from .utils import split_url_parameters
 
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
 app = FastAPI(
     title="Farm Explorer Backend API",
     description="Api of the farm explorer backend",
-    version="1.0.0"
+    version="1.0.0",
 )
 
-## Initialize runtime context
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 runtime = RuntimeContext.from_config_file("config/config.yaml")
+
 
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint."""
     try:
         fields = runtime.fields
         return {
             "status": "healthy",
             "field_count": len(fields),
-            "timestamp": datetime.now(runtime.timezone)
+            "timestamp": datetime.now(runtime.timezone),
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
+
 
 @app.get("/api/fields", response_model=list[FieldContextResponse])
 async def get_fields():
@@ -50,7 +56,7 @@ async def get_fields():
             humus_pct=field.humus_pct,
             area_ha=field.area_ha,
             root_depth_cm=field.root_depth_cm,
-            p_allowable=field.p_allowable
+            p_allowable=field.p_allowable,
         )
         for field in runtime.fields
     ]
