@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from .database.models import Field
-from .field_capacity import FieldCapacity
+from .workflows.field_capacity import FieldCapacity
 
 
 @dataclass
