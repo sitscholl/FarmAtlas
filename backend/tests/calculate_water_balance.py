@@ -14,9 +14,6 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from src.field import FieldContext
 from src.runtime import RuntimeContext, load_config_file
-from src.workflows.water_balance import WaterBalanceWorkflow
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -70,19 +67,6 @@ def seed_fields(runtime: RuntimeContext, station_id: str, year: int) -> list[Fie
     logger.info("Seeded %s synthetic field(s) for year %s", len(runtime.fields), year)
     return runtime.fields
 
-
-def build_workflow(runtime: RuntimeContext) -> WaterBalanceWorkflow:
-    return WaterBalanceWorkflow(
-        db=runtime.db,
-        meteo_loader=runtime.meteo_loader,
-        meteo_validator=runtime.meteo_validator,
-        et_calculator=runtime.et_calculator,
-        timezone=runtime.timezone,
-        meteo_resampler=runtime.meteo_resampler,
-        min_sample_size=int(runtime.min_sample_size),
-    )
-
-
 def main() -> None:
     logging.basicConfig(level=logging.INFO, force=True)
 
@@ -98,8 +82,6 @@ def main() -> None:
         season_end = now.floor("D") + pd.Timedelta(days=1)
 
         fields = seed_fields(runtime, station_id=station_id, year=year)
-        field_states = runtime.create_field_states(fields)
-        workflow = build_workflow(runtime)
 
         logger.info(
             "Running water-balance workflow for provider=%s station_id=%s season_end=%s",
@@ -107,8 +89,9 @@ def main() -> None:
             station_id,
             season_end,
         )
-        populated_fields = workflow.run(
-            fields=field_states,
+        populated_fields = runtime.run_workflow_for_fields(
+            workflow_name="water_balance",
+            field_ids=[field.id for field in fields],
             provider=provider,
             year=year,
             season_end=season_end,

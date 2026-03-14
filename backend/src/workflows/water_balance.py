@@ -8,7 +8,7 @@ import pandas as pd
 from ..database.db import FarmDB
 from ..et.base import ET0Calculator
 from ..field import FieldState
-from .field_capacity import calculate_field_capacity
+from ..field_capacity import calculate_field_capacity
 from ..irrigation import FieldIrrigation
 from ..meteo.load import MeteoLoader
 from ..meteo.resample import MeteoResampler
