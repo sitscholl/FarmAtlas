@@ -4,7 +4,11 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api_models import FieldSummaryResponse
+from .api_models import (
+    FieldOverviewResponse,
+    FieldSummaryResponse,
+    WaterBalanceSummaryResponse,
+)
 from .runtime import RuntimeContext
 
 logger = logging.getLogger(__name__)
@@ -59,4 +63,40 @@ async def get_fields():
             p_allowable=field.p_allowable,
         )
         for field in runtime.fields
+    ]
+
+
+@app.get("/api/fields/overview", response_model=list[FieldOverviewResponse])
+async def get_fields_overview():
+    summary_by_field_id = {
+        summary["field_id"]: summary
+        for summary in runtime.db.get_water_balance_summary()
+    }
+
+    return [
+        FieldOverviewResponse(
+            id=field.id,
+            name=field.name,
+            reference_station=field.reference_station,
+            soil_type=field.soil_type,
+            humus_pct=field.humus_pct,
+            area_ha=field.area_ha,
+            root_depth_cm=field.root_depth_cm,
+            p_allowable=field.p_allowable,
+            water_balance_as_of=summary_by_field_id.get(field.id, {}).get("as_of"),
+            current_deficit=summary_by_field_id.get(field.id, {}).get("current_deficit"),
+            current_soil_storage=summary_by_field_id.get(field.id, {}).get("current_soil_storage"),
+            field_capacity=summary_by_field_id.get(field.id, {}).get("field_capacity"),
+            readily_available_water=summary_by_field_id.get(field.id, {}).get("readily_available_water"),
+            below_raw=summary_by_field_id.get(field.id, {}).get("below_raw"),
+        )
+        for field in runtime.fields
+    ]
+
+
+@app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummaryResponse])
+async def get_water_balance_summary():
+    return [
+        WaterBalanceSummaryResponse(**summary)
+        for summary in runtime.db.get_water_balance_summary()
     ]

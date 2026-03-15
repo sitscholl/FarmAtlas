@@ -40,7 +40,7 @@ class WaterBalanceWorkflow:
             return None
 
         season_start_ts = pd.Timestamp(field_season_start.date, tz=self.timezone)
-        latest_balance = self.db.latest_water_balance(field.id)
+        latest_balance = self.db.get_latest_water_balance(field.id)
 
         if latest_balance:
             next_ts = pd.Timestamp(latest_balance.date, tz=self.timezone) + timedelta(days=1)
@@ -89,7 +89,7 @@ class WaterBalanceWorkflow:
             end = pd.Timestamp(end)
             end = end.tz_localize(self.timezone) if end.tz is None else end.tz_convert(self.timezone)
 
-        records = self.db.query_water_balance(
+        records = self.db.query_water_balance_series(
             field_id=field.id,
             start=start.date() if start is not None else None,
             end=end.date() if end is not None else None,

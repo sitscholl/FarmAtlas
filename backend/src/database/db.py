@@ -325,12 +325,52 @@ class FarmDB:
 
             return query.all()
 
+    def query_water_balance_series(
+        self,
+        field_name: str | None = None,
+        field_id: int | None = None,
+        start: datetime.date | None = None,
+        end: datetime.date | None = None,
+    ):
+        return self.query_water_balance(
+            field_name=field_name,
+            field_id=field_id,
+            start=start,
+            end=end,
+        )
+
     def latest_water_balance(self, field_id: int) -> Optional[models.WaterBalance]:
         """
         Return the latest water balance entry for a field, or None if absent.
         """
         with self.session_scope() as session:
             return self._get_latest_water_balance(session, field_id)
+
+    def get_latest_water_balance(self, field_id: int) -> Optional[models.WaterBalance]:
+        return self.latest_water_balance(field_id)
+
+    def get_water_balance_summary(self, field_ids: list[int] | None = None) -> list[dict[str, object]]:
+        with self.session_scope() as session:
+            field_query = session.query(models.Field).order_by(models.Field.name)
+            if field_ids is not None:
+                field_query = field_query.filter(models.Field.id.in_(field_ids))
+
+            summaries: list[dict[str, object]] = []
+            for field in field_query.all():
+                latest_balance = self._get_latest_water_balance(session, field.id)
+                summaries.append(
+                    {
+                        "field_id": field.id,
+                        "as_of": None if latest_balance is None else latest_balance.date,
+                        "current_deficit": None if latest_balance is None else latest_balance.deficit,
+                        "current_soil_storage": None if latest_balance is None else latest_balance.soil_storage,
+                        "field_capacity": None if latest_balance is None else latest_balance.field_capacity,
+                        "readily_available_water": None if latest_balance is None else latest_balance.readily_available_water,
+                        "below_raw": None if latest_balance is None else bool(latest_balance.below_raw),
+                    }
+                )
+
+            return summaries
 
     def first_irrigation_event(self, field_id: int, year: int):
         with self.session_scope() as session:
