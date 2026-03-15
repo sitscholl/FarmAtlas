@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 
 import api from '../api'
-import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
-import { type FieldSummary } from '../types/field'
+import FieldBox, {
+  type FieldBoxMetric,
+  type FieldBoxStatusBar,
+} from '../components/FieldBox'
+import { type FieldOverview } from '../types/field'
 
 function formatNumber(value: number, digits = 1) {
   return new Intl.NumberFormat('de-DE', {
@@ -23,24 +26,41 @@ function formatOptionalNumber(
   return `${formatNumber(value, digits)} ${suffix}`.trim()
 }
 
-function buildFieldMetrics(field: FieldSummary): FieldBoxMetric[] {
+function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   return [
-    { label: 'Fläche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
-    { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
-    { label: 'Humusgehalt', value: `${formatNumber(field.humus_pct, 1)} %` },
-    { label: 'P allowable', value: formatNumber(field.p_allowable, 2) },
+    { label: 'Area', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
+    { label: 'Root depth', value: `${formatNumber(field.root_depth_cm)} cm` },
+    { label: 'Humus', value: `${formatNumber(field.humus_pct, 1)} %` },
+    {
+      label: 'Deficit',
+      value: formatOptionalNumber(field.current_deficit, 'mm', 1),
+    },
   ]
 }
 
+function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined {
+  if (field.safe_ratio === null) {
+    return undefined
+  }
+
+  const ratioPercent = Math.round(field.safe_ratio * 100)
+  return {
+    label: 'Safe water',
+    value: `${ratioPercent}%`,
+    percentage: Math.max(0, Math.min(100, ratioPercent)),
+    isCritical: field.safe_ratio < 0,
+  }
+}
+
 export default function Home() {
-  const [fields, setFields] = useState<FieldSummary[]>([])
+  const [fields, setFields] = useState<FieldOverview[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchFields = async () => {
       try {
-        const response = await api.get<FieldSummary[]>('/fields')
+        const response = await api.get<FieldOverview[]>('/fields/overview')
         setFields(response.data)
       } catch (error) {
         console.error('Error fetching fields', error)
@@ -86,6 +106,7 @@ export default function Home() {
             title={field.name}
             badge={field.reference_station}
             subtitle={`Soil type: ${field.soil_type}`}
+            statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}
           />
         ))}
