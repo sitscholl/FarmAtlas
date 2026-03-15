@@ -110,6 +110,7 @@ class WaterBalanceWorkflow:
                     "field_capacity": record.field_capacity,
                     "deficit": record.deficit,
                     "readily_available_water": getattr(record, "readily_available_water", None),
+                    "safe_ratio": getattr(record, "safe_ratio", None),
                     "below_raw": getattr(record, "below_raw", None),
                     "field_id": record.field_id,
                 }
@@ -184,10 +185,18 @@ class WaterBalanceWorkflow:
             trigger_level = capacity - raw
             water_balance["readily_available_water"] = raw
             water_balance["below_raw"] = water_balance["soil_storage"] < trigger_level
+            water_balance["safe_ratio"] = (
+                water_balance["soil_storage"] - trigger_level
+            ) / raw
 
         field.water_balance = water_balance
         field.metrics["current_soil_storage"] = float(water_balance["soil_storage"].iloc[-1])
         field.metrics["current_deficit"] = float(water_balance["deficit"].iloc[-1])
+        field.metrics["safe_ratio"] = (
+            None
+            if "safe_ratio" not in water_balance.columns
+            else float(water_balance["safe_ratio"].iloc[-1])
+        )
         return water_balance
 
     def _prepare_station_data(self, station: Station) -> Station:

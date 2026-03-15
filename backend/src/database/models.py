@@ -62,6 +62,7 @@ class WaterBalance(Base):
     field_capacity = Column(Float, nullable=False)
     deficit = Column(Float, nullable=False)
     readily_available_water = Column(Float, nullable=True)
+    safe_ratio = Column(Float, nullable=True)
     below_raw = Column(Float, nullable=True)
 
     field = relationship('Field', back_populates='water_balance')

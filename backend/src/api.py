@@ -89,6 +89,7 @@ async def get_fields_overview():
             field_capacity=summary_by_field_id.get(field.id, {}).get("field_capacity"),
             readily_available_water=summary_by_field_id.get(field.id, {}).get("readily_available_water"),
             below_raw=summary_by_field_id.get(field.id, {}).get("below_raw"),
+            safe_ratio=summary_by_field_id.get(field.id, {}).get("safe_ratio"),
         )
         for field in runtime.fields
     ]

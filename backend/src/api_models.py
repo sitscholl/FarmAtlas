@@ -9,7 +9,7 @@ class FieldSummaryResponse(BaseModel):
     reference_station: str
     soil_type: str
     humus_pct: float
-    area_ha: float | None
+    area_ha: float
     root_depth_cm: float
     p_allowable: float
 
@@ -20,7 +20,7 @@ class FieldOverviewResponse(BaseModel):
     reference_station: str
     soil_type: str
     humus_pct: float
-    area_ha: float | None
+    area_ha: float
     root_depth_cm: float
     p_allowable: float
     water_balance_as_of: date | None
@@ -29,6 +29,7 @@ class FieldOverviewResponse(BaseModel):
     field_capacity: float | None
     readily_available_water: float | None
     below_raw: bool | None
+    safe_ratio: float | None
 
 
 class WaterBalanceSummaryResponse(BaseModel):
@@ -39,3 +40,4 @@ class WaterBalanceSummaryResponse(BaseModel):
     field_capacity: float | None
     readily_available_water: float | None
     below_raw: bool | None
+    safe_ratio: float | None

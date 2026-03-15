@@ -367,6 +367,7 @@ class FarmDB:
                         "field_capacity": None if latest_balance is None else latest_balance.field_capacity,
                         "readily_available_water": None if latest_balance is None else latest_balance.readily_available_water,
                         "below_raw": None if latest_balance is None else bool(latest_balance.below_raw),
+                        "safe_ratio": None if latest_balance is None else latest_balance.safe_ratio,
                     }
                 )
 
@@ -396,7 +397,7 @@ class FarmDB:
             'field_capacity',
             'deficit',
         ]
-        optional_cols = ['readily_available_water', 'below_raw']
+        optional_cols = ['readily_available_water', 'safe_ratio', 'below_raw']
 
         missing_required = [col for col in required_cols if col not in df.columns]
         if missing_required:
