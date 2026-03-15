@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api_models import (
     FieldOverviewResponse,
     FieldSummaryResponse,
+    WaterBalanceSeriesPointResponse,
     WaterBalanceSummaryResponse,
 )
 from .runtime import RuntimeContext
@@ -95,9 +96,68 @@ async def get_fields_overview():
     ]
 
 
+@app.get("/api/fields/{field_id}/overview", response_model=FieldOverviewResponse)
+async def get_field_overview(field_id: int):
+    try:
+        field = runtime.get_field(field_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    summary_by_field_id = {
+        summary["field_id"]: summary
+        for summary in runtime.db.get_water_balance_summary(field_ids=[field_id])
+    }
+    summary = summary_by_field_id.get(field_id, {})
+
+    return FieldOverviewResponse(
+        id=field.id,
+        name=field.name,
+        reference_station=field.reference_station,
+        soil_type=field.soil_type,
+        humus_pct=field.humus_pct,
+        area_ha=field.area_ha,
+        root_depth_cm=field.root_depth_cm,
+        p_allowable=field.p_allowable,
+        water_balance_as_of=summary.get("as_of"),
+        current_deficit=summary.get("current_deficit"),
+        current_soil_storage=summary.get("current_soil_storage"),
+        field_capacity=summary.get("field_capacity"),
+        readily_available_water=summary.get("readily_available_water"),
+        below_raw=summary.get("below_raw"),
+        safe_ratio=summary.get("safe_ratio"),
+    )
+
+
 @app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummaryResponse])
 async def get_water_balance_summary():
     return [
         WaterBalanceSummaryResponse(**summary)
         for summary in runtime.db.get_water_balance_summary()
+    ]
+
+
+@app.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPointResponse])
+async def get_field_water_balance_series(field_id: int):
+    try:
+        runtime.get_field(field_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    records = runtime.db.query_water_balance_series(field_id=field_id)
+    return [
+        WaterBalanceSeriesPointResponse(
+            date=record.date,
+            precipitation=record.precipitation,
+            irrigation=record.irrigation,
+            evapotranspiration=record.evapotranspiration,
+            incoming=record.incoming,
+            net=record.net,
+            soil_storage=record.soil_storage,
+            field_capacity=record.field_capacity,
+            deficit=record.deficit,
+            readily_available_water=record.readily_available_water,
+            safe_ratio=record.safe_ratio,
+            below_raw=None if record.below_raw is None else bool(record.below_raw),
+        )
+        for record in records
     ]

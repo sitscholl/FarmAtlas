@@ -41,3 +41,18 @@ class WaterBalanceSummaryResponse(BaseModel):
     readily_available_water: float | None
     below_raw: bool | None
     safe_ratio: float | None
+
+
+class WaterBalanceSeriesPointResponse(BaseModel):
+    date: date
+    precipitation: float
+    irrigation: float
+    evapotranspiration: float
+    incoming: float
+    net: float
+    soil_storage: float
+    field_capacity: float
+    deficit: float
+    readily_available_water: float | None
+    safe_ratio: float | None
+    below_raw: bool | None
