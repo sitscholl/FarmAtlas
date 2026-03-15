@@ -28,11 +28,11 @@ function formatOptionalNumber(
 
 function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   return [
-    { label: 'Area', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
-    { label: 'Root depth', value: `${formatNumber(field.root_depth_cm)} cm` },
-    { label: 'Humus', value: `${formatNumber(field.humus_pct, 1)} %` },
+    { label: 'Fläche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
+    { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
+    { label: 'Humusgehalt', value: `${formatNumber(field.humus_pct, 1)} %` },
     {
-      label: 'Deficit',
+      label: 'Wasserdefizit',
       value: formatOptionalNumber(field.current_deficit, 'mm', 1),
     },
   ]
@@ -45,7 +45,7 @@ function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined 
 
   const ratioPercent = Math.round(field.safe_ratio * 100)
   return {
-    label: 'Safe water',
+    label: 'Wasserbilanz',
     value: `${ratioPercent}%`,
     percentage: Math.max(0, Math.min(100, ratioPercent)),
     isCritical: field.safe_ratio < 0,
@@ -105,7 +105,7 @@ export default function Home() {
             key={field.id}
             title={field.name}
             badge={field.reference_station}
-            subtitle={`Soil type: ${field.soil_type}`}
+            subtitle={`Bodenart: ${field.soil_type}`}
             statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}
           />
@@ -119,7 +119,7 @@ export default function Home() {
       <div className="relative rounded-3xl border border-slate-200/70 bg-white/70 p-8 shadow-xl backdrop-blur">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-            Anlagen Uebersicht
+            Anlagen Übersicht
           </p>
           <h1 className="mt-4 text-4xl font-semibold text-slate-900 sm:text-5xl">
             Oberlenghof
