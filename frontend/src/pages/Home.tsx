@@ -108,6 +108,7 @@ export default function Home() {
             subtitle={`Bodenart: ${field.soil_type}`}
             statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}
+            to={`/fields/${field.id}`}
           />
         ))}
       </div>

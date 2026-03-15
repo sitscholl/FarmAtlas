@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export type FieldBoxMetric = {
   label: string
   value: string
@@ -16,15 +18,16 @@ type FieldBoxProps = {
   subtitle?: string
   metrics: FieldBoxMetric[]
   statusBar?: FieldBoxStatusBar
+  to?: string
 }
 
-export default function FieldBox({
+function FieldBoxContent({
   title,
   badge,
   subtitle,
   metrics,
   statusBar,
-}: FieldBoxProps) {
+}: Omit<FieldBoxProps, 'to'>) {
   const statusBarClasses = statusBar?.isCritical
     ? 'from-rose-500 via-orange-500 to-red-500'
     : 'from-sky-500 via-cyan-400 to-blue-400'
@@ -84,5 +87,34 @@ export default function FieldBox({
         ))}
       </div>
     </div>
+  )
+}
+
+export default function FieldBox(props: FieldBoxProps) {
+  if (props.to) {
+    return (
+      <Link
+        to={props.to}
+        className="block rounded-[1.75rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4"
+      >
+        <FieldBoxContent
+          title={props.title}
+          badge={props.badge}
+          subtitle={props.subtitle}
+          metrics={props.metrics}
+          statusBar={props.statusBar}
+        />
+      </Link>
+    )
+  }
+
+  return (
+    <FieldBoxContent
+      title={props.title}
+      badge={props.badge}
+      subtitle={props.subtitle}
+      metrics={props.metrics}
+      statusBar={props.statusBar}
+    />
   )
 }

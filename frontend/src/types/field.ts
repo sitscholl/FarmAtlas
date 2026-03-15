@@ -26,3 +26,18 @@ export type FieldOverview = {
   below_raw: boolean | null
   safe_ratio: number | null
 }
+
+export type WaterBalanceSeriesPoint = {
+  date: string
+  precipitation: number
+  irrigation: number
+  evapotranspiration: number
+  incoming: number
+  net: number
+  soil_storage: number
+  field_capacity: number
+  deficit: number
+  readily_available_water: number | null
+  safe_ratio: number | null
+  below_raw: boolean | null
+}
