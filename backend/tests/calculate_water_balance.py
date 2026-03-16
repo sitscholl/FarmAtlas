@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 import tempfile
-from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -23,10 +22,11 @@ def build_runtime(temp_db_path: Path) -> RuntimeContext:
     return RuntimeContext(config=config)
 
 
-def seed_fields(runtime: RuntimeContext, station_id: str, year: int) -> list[FieldContext]:
+def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: int) -> list[FieldContext]:
     field_specs = [
         {
             "name": "Synthetic Field A",
+            "reference_provider": provider,
             "reference_station": station_id,
             "soil_type": "sandiger lehm",
             "humus_pct": 2.2,
@@ -36,6 +36,7 @@ def seed_fields(runtime: RuntimeContext, station_id: str, year: int) -> list[Fie
         },
         {
             "name": "Synthetic Field B",
+            "reference_provider": provider,
             "reference_station": station_id,
             "soil_type": "lehm",
             "humus_pct": 1.8,
@@ -77,24 +78,20 @@ def main() -> None:
         temp_db_path = Path(temp_dir) / "water_balance_test.sqlite"
         runtime = build_runtime(temp_db_path)
 
-        now = pd.Timestamp.now(tz=runtime.timezone)
-        year = now.year
-        season_end = now.floor("D") + pd.Timedelta(days=1)
+        year = pd.Timestamp.now(tz=runtime.timezone).year
 
-        fields = seed_fields(runtime, station_id=station_id, year=year)
+        fields = seed_fields(runtime, provider=provider, station_id=station_id, year=year)
 
         logger.info(
-            "Running water-balance workflow for provider=%s station_id=%s season_end=%s",
+            "Running water-balance workflow for provider=%s station_id=%s year=%s",
             provider,
             station_id,
-            season_end,
+            year,
         )
         populated_fields = runtime.run_workflow_for_fields(
             workflow_name="water_balance",
             field_ids=[field.id for field in fields],
-            provider=provider,
             year=year,
-            season_end=season_end,
             persist=True,
         )
 

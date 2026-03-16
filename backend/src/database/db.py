@@ -141,6 +141,7 @@ class FarmDB:
     def add_field(
         self,
         name: str,
+        reference_provider: str,
         reference_station: str,
         soil_type: str,
         humus_pct: float,
@@ -152,6 +153,7 @@ class FarmDB:
         """
         Add a new field or update an existing one.
         """
+        reference_provider = str(reference_provider)
         reference_station = str(reference_station)
         soil_type = str(soil_type)
         humus_pct = float(humus_pct)
@@ -168,6 +170,7 @@ class FarmDB:
                     logger.debug("Adding new field %s to database", name)
                     field = models.Field(
                         name=name,
+                        reference_provider=reference_provider,
                         reference_station=reference_station,
                         soil_type=soil_type,
                         humus_pct=humus_pct,
@@ -177,6 +180,9 @@ class FarmDB:
                     )
                     session.add(field)
                 else:
+                    if field.reference_provider != reference_provider:
+                        field.reference_provider = reference_provider
+                        updated = True
                     if field.reference_station != reference_station:
                         field.reference_station = reference_station
                         updated = True

@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 FIELD_SPECS = [
     {
         "name": "Parleng",
+        "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "sandiger lehm",
         "humus_pct": 2.4,
@@ -29,6 +30,7 @@ FIELD_SPECS = [
     },
     {
         "name": "Gansacker",
+        "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "lehm",
         "humus_pct": 2.0,
@@ -40,6 +42,7 @@ FIELD_SPECS = [
     },
     {
         "name": "Gasslwiese",
+        "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "lehmiger schluff",
         "humus_pct": 1.7,
@@ -51,6 +54,7 @@ FIELD_SPECS = [
     },
     {
         "name": "Steinacker",
+        "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "sand",
         "humus_pct": 1.2,

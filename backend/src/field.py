@@ -17,6 +17,7 @@ class FieldResults:
 class FieldContext:
     id: int
     name: str
+    reference_provider: str
     reference_station: str
     soil_type: str
     humus_pct: float
@@ -29,6 +30,7 @@ class FieldContext:
         return cls(
             id=field_model.id,
             name=field_model.name,
+            reference_provider=field_model.reference_provider,
             reference_station=field_model.reference_station,
             soil_type=field_model.soil_type,
             humus_pct=field_model.humus_pct,
@@ -58,6 +60,10 @@ class FieldState:
     @property
     def reference_station(self) -> str:
         return self.field.reference_station
+
+    @property
+    def reference_provider(self) -> str:
+        return self.field.reference_provider
 
     @property
     def soil_type(self) -> str:

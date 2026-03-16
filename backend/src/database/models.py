@@ -9,6 +9,7 @@ class Field(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
+    reference_provider = Column(String, nullable=False)
     reference_station = Column(String, nullable=False)
     area_ha = Column(Float, nullable=False)
 

@@ -68,13 +68,10 @@ class WaterBalanceWorkflow:
             data=sliced,
         )
 
-    def _normalize_period_end(self, season_end: pd.Timestamp) -> pd.Timestamp:
-        season_end = pd.Timestamp(season_end)
-        if season_end.tz is None:
-            season_end = season_end.tz_localize(self.timezone)
-        else:
-            season_end = season_end.tz_convert(self.timezone)
-        return min(pd.Timestamp.now(tz=self.timezone).floor("D"), season_end.floor("D"))
+    def _resolve_period_end(self, year: int) -> pd.Timestamp:
+        end_of_year = pd.Timestamp(year=year + 1, month=1, day=1, tz=self.timezone)
+        next_day = pd.Timestamp.now(tz=self.timezone).floor("D") + pd.Timedelta(days=1)
+        return min(end_of_year, next_day)
 
     def get_cached_water_balance(
         self,
@@ -270,12 +267,13 @@ class WaterBalanceWorkflow:
     def run(
         self,
         fields: list[FieldState],
-        provider: str,
-        year: int,
-        season_end: pd.Timestamp,
+        year: int | None = None,
         persist: bool = True,
     ) -> list[FieldState]:
-        period_end = self._normalize_period_end(season_end)
+
+        if year is None:
+            year = pd.Timestamp.now(tz=self.timezone).year
+        period_end = self._resolve_period_end(year)
 
         field_contexts: dict[int, dict[str, object]] = {}
         fields_by_station: dict[str, list[FieldState]] = {}
@@ -296,11 +294,11 @@ class WaterBalanceWorkflow:
                     )
                     continue
 
-                fields_by_station.setdefault(field.reference_station, []).append(field)
+                fields_by_station.setdefault((field.reference_provider, field.reference_station), []).append(field)
             except Exception:
                 logger.exception("Water balance calculation failed for field %s", field.name)
 
-        for station_id, station_fields in fields_by_station.items():
+        for (provider, station_id), station_fields in fields_by_station.items():
             try:
                 station_start = min(field_contexts[field.id]["start_ts"] for field in station_fields)
                 meteo_data = self.meteo_loader.query(
