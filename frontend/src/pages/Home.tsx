@@ -52,6 +52,10 @@ function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined 
   }
 }
 
+function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
+  return `${field.reference_provider}: ${field.reference_station}`
+}
+
 export default function Home() {
   const [fields, setFields] = useState<FieldOverview[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -104,7 +108,7 @@ export default function Home() {
           <FieldBox
             key={field.id}
             title={field.name}
-            badge={field.reference_station}
+            badge={formatReference(field)}
             subtitle={`Bodenart: ${field.soil_type}`}
             statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}

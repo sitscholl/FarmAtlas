@@ -1,6 +1,7 @@
 export type FieldSummary = {
   id: number
   name: string
+  reference_provider: string
   reference_station: string
   soil_type: string
   humus_pct: number
@@ -12,6 +13,7 @@ export type FieldSummary = {
 export type FieldOverview = {
   id: number
   name: string
+  reference_provider: string
   reference_station: string
   soil_type: string
   humus_pct: number

@@ -1,6 +1,5 @@
 general:
     timezone: Europe/Rome
-    season_start: "01-04-2025"
     season_end: "01-10-2025"
 
 meteo:

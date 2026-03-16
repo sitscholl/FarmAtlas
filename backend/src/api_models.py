@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class FieldSummaryResponse(BaseModel):
     id: int
     name: str
+    reference_provider: str
     reference_station: str
     soil_type: str
     humus_pct: float
@@ -17,6 +18,7 @@ class FieldSummaryResponse(BaseModel):
 class FieldOverviewResponse(BaseModel):
     id: int
     name: str
+    reference_provider: str
     reference_station: str
     soil_type: str
     humus_pct: float

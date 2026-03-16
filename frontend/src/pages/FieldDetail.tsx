@@ -16,6 +16,10 @@ function formatNumber(value: number | null, digits = 1) {
   }).format(value)
 }
 
+function formatReference(provider: string, stationId: string) {
+  return `${provider}: ${stationId}`
+}
+
 export default function FieldDetail() {
   const { fieldId } = useParams()
   const [field, setField] = useState<FieldOverview | null>(null)
@@ -84,7 +88,7 @@ export default function FieldDetail() {
               {field.name}
             </h1>
             <p className="mt-3 text-sm text-slate-500">
-              Bodentyp: {field.soil_type}, Referenzstation: {field.reference_station}
+              Bodentyp: {field.soil_type}, Referenzstation: {formatReference(field.reference_provider, field.reference_station)}
             </p>
           </div>
 

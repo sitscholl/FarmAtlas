@@ -56,6 +56,7 @@ async def get_fields():
         FieldSummaryResponse(
             id=field.id,
             name=field.name,
+            reference_provider=field.reference_provider,
             reference_station=field.reference_station,
             soil_type=field.soil_type,
             humus_pct=field.humus_pct,
@@ -78,6 +79,7 @@ async def get_fields_overview():
         FieldOverviewResponse(
             id=field.id,
             name=field.name,
+            reference_provider=field.reference_provider,
             reference_station=field.reference_station,
             soil_type=field.soil_type,
             humus_pct=field.humus_pct,
@@ -112,6 +114,7 @@ async def get_field_overview(field_id: int):
     return FieldOverviewResponse(
         id=field.id,
         name=field.name,
+        reference_provider=field.reference_provider,
         reference_station=field.reference_station,
         soil_type=field.soil_type,
         humus_pct=field.humus_pct,

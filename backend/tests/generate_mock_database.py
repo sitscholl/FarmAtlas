@@ -139,6 +139,7 @@ def seed_mock_database(database_path: Path) -> None:
         for spec in FIELD_SPECS:
             field, _ = db.add_field(
                 name=spec["name"],
+                reference_provider=spec["reference_provider"],
                 reference_station=spec["reference_station"],
                 soil_type=spec["soil_type"],
                 humus_pct=spec["humus_pct"],
