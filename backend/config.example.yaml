@@ -22,6 +22,15 @@ evapotranspiration:
             {"name": "Kc_end", "value": 0.65, "start": "01-07-2025"}
         ]
 
+workflows:
+  water_balance:
+    enabled: true
+    schedule:
+      freq: D  # examples: D, W-MON, 6H, MS
+      time: "05:00"
+    run:
+      #year: 2025
+
 logging:
     version: 1
     disable_existing_loggers: false

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 
@@ -11,13 +12,30 @@ from .api_models import (
     WaterBalanceSummaryResponse,
 )
 from .runtime import RuntimeContext
+from .scheduler import WorkflowScheduler
 
 logger = logging.getLogger(__name__)
+
+runtime = RuntimeContext.from_config_file("config/config.yaml")
+scheduler = WorkflowScheduler(runtime=runtime)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.runtime = runtime
+    app.state.scheduler = scheduler
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.stop()
+
 
 app = FastAPI(
     title="Farm Explorer Backend API",
     description="Api of the farm explorer backend",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 origins = [
@@ -32,8 +50,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-runtime = RuntimeContext.from_config_file("config/config.yaml")
 
 
 @app.get("/api/health")
