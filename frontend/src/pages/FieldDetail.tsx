@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 
 import api from '../api'
 import WaterBalanceChart from '../components/WaterBalanceChart'
+import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/field'
 
 function formatNumber(value: number | null, digits = 1) {
@@ -42,6 +43,7 @@ export default function FieldDetail() {
         ])
         setField(overviewResponse.data)
         setSeries(seriesResponse.data)
+        setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching field detail', error)
         setErrorMessage('Field details could not be loaded.')
@@ -51,6 +53,14 @@ export default function FieldDetail() {
     }
 
     void fetchDetail()
+
+    const handleDataChanged = () => {
+      setIsLoading(true)
+      void fetchDetail()
+    }
+
+    window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged)
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [fieldId])
 
   if (isLoading) {

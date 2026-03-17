@@ -5,6 +5,7 @@ import FieldBox, {
   type FieldBoxMetric,
   type FieldBoxStatusBar,
 } from '../components/FieldBox'
+import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import { type FieldOverview } from '../types/field'
 
 function formatNumber(value: number, digits = 1) {
@@ -66,6 +67,7 @@ export default function Home() {
       try {
         const response = await api.get<FieldOverview[]>('/fields/overview')
         setFields(response.data)
+        setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching fields', error)
         setErrorMessage('Fields could not be loaded.')
@@ -75,6 +77,14 @@ export default function Home() {
     }
 
     void fetchFields()
+
+    const handleDataChanged = () => {
+      setIsLoading(true)
+      void fetchFields()
+    }
+
+    window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged)
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [])
 
   const content = (() => {
