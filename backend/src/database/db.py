@@ -47,6 +47,14 @@ class FarmDB:
         finally:
             session.close()
 
+    def close(self) -> None:
+        """
+        Dispose of the database engine connection pool.
+        """
+        if self.engine:
+            self.engine.dispose()
+            logger.debug("Database engine disposed.")
+
     ## Fields
     def _get_field(self, session: Session, id: int) -> Optional[models.Field]:
         return (
@@ -181,7 +189,7 @@ class FarmDB:
 
             return query.all()
 
-    def first_irrigation_event(self, field_id: int, year: int) -> Optional[models.Irrigation]:
+    def get_first_irrigation_event(self, field_id: int, year: int) -> Optional[models.Irrigation]:
         with self.session_scope() as session:
             return (
                 session.query(models.Irrigation)
@@ -244,7 +252,7 @@ class FarmDB:
 
                     if field_key == 'date':
                         new_value = pd.Timestamp(new_value).date()
-                        
+
                     setattr(existing_event, field_key, new_value)
                     updated = True
 
@@ -271,9 +279,39 @@ class FarmDB:
             return True
 
     ## Water Balance
+    def get_water_balance(
+        self, 
+        field_id: int,
+        start: datetime.date | None = None, 
+        end: datetime.date | None = None
+        ) -> list[models.WaterBalance]:
+
+        if start is not None:
+            start = pd.Timestamp(start).date()
+        if end is not None:
+            end = pd.Timestamp(end).date()
+        
+        with self.session_scope() as session:
+            field = self._get_field(session, id = field_id)
+            if field is None:
+                raise ValueError(f"No field with id {field_id} found. Cannot query water balance")
+            query = session.query(models.WaterBalance).filter(models.WaterBalance.field_id == field.id)
+
+            if start is not None:
+                query = query.filter(models.WaterBalance.date >= start)
+            if end is not None:
+                query = query.filter(models.WaterBalance.date < end)
+
+            return query.all()
+
     def _get_latest_water_balance(
         self, session: Session, field_id: int
     ) -> Optional[models.WaterBalance]:
+
+        field = self._get_field(session, id = field_id)
+        if field is None:
+            raise ValueError(f"No field with id {field_id} found. Cannot query latest water balance")
+
         return (
             session.query(models.WaterBalance)
             .filter(models.WaterBalance.field_id == field_id)
@@ -282,61 +320,9 @@ class FarmDB:
             .one_or_none()
         )
 
-    def query_water_balance(
-        self, 
-        field_name: str | None = None,
-        field_id: int | None = None,
-        start: datetime.date | None = None, 
-        end: datetime.date | None = None
-        ):
-
-        if field_name is not None and field_id is not None:
-            raise ValueError("Cannot specify both field_name and field_id")
-        
+    def get_latest_water_balance(self, field_id: int) -> models.WaterBalance | None:
         with self.session_scope() as session:
-            query = session.query(models.WaterBalance)
-
-            if field_name is not None:
-                field = self._get_field(session, name = field_name)
-                if field is None:
-                    logger.warning("Field %s does not exist. Cannot query water balance", field_name)
-                    return []
-                query = query.filter(models.WaterBalance.field_id == field.id)
-
-            if field_id is not None:
-                query = query.filter(models.WaterBalance.field_id == field_id)
-
-            if start is not None:
-                query = query.filter(models.WaterBalance.date >= start)
-
-            if end is not None:
-                query = query.filter(models.WaterBalance.date <= end)
-
-            return query.all()
-
-    def query_water_balance_series(
-        self,
-        field_name: str | None = None,
-        field_id: int | None = None,
-        start: datetime.date | None = None,
-        end: datetime.date | None = None,
-    ):
-        return self.query_water_balance(
-            field_name=field_name,
-            field_id=field_id,
-            start=start,
-            end=end,
-        )
-
-    def latest_water_balance(self, field_id: int) -> Optional[models.WaterBalance]:
-        """
-        Return the latest water balance entry for a field, or None if absent.
-        """
-        with self.session_scope() as session:
-            return self._get_latest_water_balance(session, field_id)
-
-    def get_latest_water_balance(self, field_id: int) -> Optional[models.WaterBalance]:
-        return self.latest_water_balance(field_id)
+            return self._get_latest_water_balance(session = session, field_id = field_id)
 
     def get_water_balance_summary(self, field_ids: list[int] | None = None) -> list[dict[str, object]]:
         with self.session_scope() as session:
@@ -362,7 +348,7 @@ class FarmDB:
 
             return summaries
 
-    def add_water_balance(self, water_balance: pd.DataFrame, field_id: int | None = None):
+    def add_water_balance(self, water_balance: pd.DataFrame, field_id: int | None = None) -> int:
         """
         Upsert water balance records from a dataframe.
         Returns the number of rows inserted/updated.
@@ -370,6 +356,17 @@ class FarmDB:
         df = water_balance.copy()
         if field_id is not None:
             df["field_id"] = field_id
+        else:
+            field_id = df['field_id'].unique()
+            if len(field_id) > 1:
+                raise ValueError(f"Found multiple field_ids for add_water_balance: {field_id}")
+            field_id = field_id.item()
+
+        if field_id is None:
+            raise ValueError("Field id not provided as argument to add_water_balance and not via dataframe.")
+        field = self.get_field(id = field_id)
+        if field is None:
+            raise ValueError(f"Cannot find any field with id {field_id}: Cannot add_water_balance.")
 
         required_cols = [
             'field_id',
@@ -445,13 +442,13 @@ class FarmDB:
                 session.merge(models.WaterBalance(**record))
             return len(records)
 
-    def _clear_water_balance(self, session: Session, field_id: int):
+    def _clear_water_balance(self, session: Session, field_id: int) -> int:
         query = session.query(models.WaterBalance).filter(models.WaterBalance.field_id == field_id)
         deleted = query.delete(synchronize_session=False)
         logger.info(f"Cleared {deleted} water balance rows for field {field_id}")
         return deleted
 
-    def clear_water_balance(self, field_ids: list[int] | None = None) -> int:
+    def clear_water_balance(self, field_ids: list[int] | int | None = None) -> int:
         """
         Delete water balance entries. If field_ids provided, only delete those.
         Returns number of rows deleted.
@@ -473,15 +470,6 @@ class FarmDB:
                 deleted = self._clear_water_balance(session, field_id)
                 deleted_total += deleted
         return deleted_total
-
-    def close(self) -> None:
-        """
-        Dispose of the database engine connection pool.
-        """
-        if self.engine:
-            self.engine.dispose()
-            logger.debug("Database engine disposed.")
-
 
 if __name__ == '__main__':
     import logging.config
