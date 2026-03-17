@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from .api_models import (
     FieldOverviewResponse,
     FieldPost,
+    FieldPut,
     FieldSummaryResponse,
     IrrigationResponse,
     IrrigationPost,
@@ -130,6 +131,34 @@ async def create_field(field: FieldPost):
     except Exception as e:
         logger.exception(f"Adding field failed: {e}")
         _raise_write_http_error(e)
+
+@app.put("/api/fields/{field_id}", response_model=FieldSummaryResponse)
+async def update_field(field_id: int, field: FieldPut):
+    _validate_field_id(field_id)
+    try:
+        updated_field = runtime.db.update_field(
+            id=field_id,
+            updates={
+                "name": field.name,
+                "reference_provider": field.reference_provider,
+                "reference_station": field.reference_station,
+                "soil_type": field.soil_type,
+                "humus_pct": field.humus_pct,
+                "area_ha": field.area_ha,
+                "root_depth_cm": field.root_depth_cm,
+                "p_allowable": field.p_allowable,
+            },
+        )
+        return _serialize_field(updated_field)
+    except Exception as e:
+        logger.exception(f"Updating field {field_id} failed: {e}")
+        _raise_write_http_error(e, not_found_prefixes=("Could not find any field with id",))
+
+@app.delete("/api/fields/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_field(field_id: int):
+    deleted = runtime.db.delete_field(field_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Could not find any field with id {field_id}")
 
 @app.get("/api/fields/overview", response_model=list[FieldOverviewResponse])
 async def get_fields_overview():
