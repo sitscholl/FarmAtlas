@@ -482,17 +482,17 @@ if __name__ == '__main__':
 
     db = FarmDB()
 
-    fields = db.get_all_fields()
+    fields = db.list_fields()
 
     for date in pd.date_range("04-01-2025", "10-01-2025", freq = "2W"):
         for field in fields:
-            db.add_irrigation_event(
+            db.create_irrigation_event(
                 field_name=field.name,
                 date=date.date(),
                 method='drip',
             )
 
     print('Fields in database:')
-    print(db.get_all_fields())
+    print(db.list_fields())
 
     db.close()

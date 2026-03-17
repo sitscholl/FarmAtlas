@@ -34,7 +34,7 @@ class WaterBalanceWorkflow:
         year: int,
         period_end: pd.Timestamp,
     ) -> dict[str, object] | None:
-        field_season_start = self.db.first_irrigation_event(field.id, year)
+        field_season_start = self.db.get_first_irrigation_event(field.id, year)
         if field_season_start is None:
             logger.info("No irrigation events found for field %s. Skipping", field.name)
             return None
@@ -86,7 +86,7 @@ class WaterBalanceWorkflow:
             end = pd.Timestamp(end)
             end = end.tz_localize(self.timezone) if end.tz is None else end.tz_convert(self.timezone)
 
-        records = self.db.query_water_balance_series(
+        records = self.db.get_water_balance(
             field_id=field.id,
             start=start.date() if start is not None else None,
             end=end.date() if end is not None else None,
@@ -248,7 +248,7 @@ class WaterBalanceWorkflow:
             humus_pct=field.humus_pct,
             root_depth_cm=field.root_depth_cm,
         )
-        irrigation_events = self.db.query_irrigation_events(field_name=field.name, year=year) or []
+        irrigation_events = self.db.list_irrigation_events(field_id=field.id, year=year) or []
         field_irrigation = FieldIrrigation.from_list(irrigation_events)
         water_balance = self.calculate_water_balance(
             field=field,

@@ -137,7 +137,7 @@ def seed_mock_database(database_path: Path) -> None:
 
     try:
         for spec in FIELD_SPECS:
-            field, _ = db.add_field(
+            field = db.create_field(
                 name=spec["name"],
                 reference_provider=spec["reference_provider"],
                 reference_station=spec["reference_station"],
@@ -153,8 +153,8 @@ def seed_mock_database(database_path: Path) -> None:
             irrigation_dates = [end_date.date() - pd.Timedelta(days=9), end_date.date() - pd.Timedelta(days=4)]
             irrigation_amounts = [14.0, 18.0] if spec["target_safe_ratio"] >= 0 else [8.0, 10.0]
             for irrigation_date, amount in zip(irrigation_dates, irrigation_amounts):
-                db.add_irrigation_event(
-                    field_name=spec["name"],
+                db.create_irrigation_event(
+                    field_id=field.id,
                     date=irrigation_date,
                     method="drip",
                     amount=amount,

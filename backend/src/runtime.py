@@ -93,7 +93,7 @@ class RuntimeContext:
         self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///database.db'))
        
         ## Fields
-        self.fields = [FieldContext.from_model(field) for field in self.db.get_all_fields()]
+        self.fields = [FieldContext.from_model(field) for field in self.db.list_fields()]
         if len(self.fields) == 0:
             logger.warning('No fields found in database.')
 

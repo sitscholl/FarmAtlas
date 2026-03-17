@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from datetime import timedelta
 
 import pandas as pd
 
@@ -50,21 +51,21 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
     follow_up_date = start_date + timedelta(days=4)
 
     for spec in field_specs:
-        runtime.db.add_field(**spec)
-        runtime.db.add_irrigation_event(
-            field_name=spec["name"],
+        field_model = runtime.db.create_field(**spec)
+        runtime.db.create_irrigation_event(
+            field_id=field_model.id,
             date=start_date,
             method="drip",
             amount=18.0,
         )
-        runtime.db.add_irrigation_event(
-            field_name=spec["name"],
+        runtime.db.create_irrigation_event(
+            field_id=field_model.id,
             date=follow_up_date,
             method="drip",
             amount=10.0,
         )
 
-    runtime.fields = [FieldContext.from_model(field) for field in runtime.db.get_all_fields()]
+    runtime.fields = [FieldContext.from_model(field) for field in runtime.db.list_fields()]
     logger.info("Seeded %s synthetic field(s) for year %s", len(runtime.fields), year)
     return runtime.fields
 
