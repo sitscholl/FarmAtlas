@@ -2,12 +2,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import IntegrityError
 
 from .api_models import (
     FieldOverviewResponse,
+    FieldPost,
     FieldSummaryResponse,
+    IrrigationResponse,
+    IrrigationPost,
     WaterBalanceSeriesPointResponse,
     WaterBalanceSummaryResponse,
 )
@@ -51,6 +55,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def _validate_field_id(field_id: int):
+    try:
+        field = runtime.get_field(field_id)
+        return field
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+def _serialize_field(field) -> FieldSummaryResponse:
+    return FieldSummaryResponse(
+        id=field.id,
+        name=field.name,
+        reference_provider=field.reference_provider,
+        reference_station=field.reference_station,
+        soil_type=field.soil_type,
+        humus_pct=field.humus_pct,
+        area_ha=field.area_ha,
+        root_depth_cm=field.root_depth_cm,
+        p_allowable=field.p_allowable,
+    )
+
+def _serialize_irrigation_event(event) -> IrrigationResponse:
+    return IrrigationResponse(
+        id=event.id,
+        field_id=event.field_id,
+        date=event.date,
+        method=event.method,
+        amount=event.amount,
+    )
+
+def _raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...] = ()) -> None:
+    if isinstance(exc, HTTPException):
+        raise exc
+    if isinstance(exc, IntegrityError):
+        raise HTTPException(status_code=409, detail="Resource already exists or violates a uniqueness constraint.") from exc
+    if isinstance(exc, ValueError):
+        detail = str(exc)
+        status_code = 404 if any(detail.startswith(prefix) for prefix in not_found_prefixes) else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    raise HTTPException(status_code=500, detail="Unexpected server error.") from exc
 
 @app.get("/api/health")
 async def health_check():
@@ -62,27 +105,31 @@ async def health_check():
             "timestamp": datetime.now(runtime.timezone),
         }
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.exception(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
 @app.get("/api/fields", response_model=list[FieldSummaryResponse])
-async def get_fields():
-    return [
-        FieldSummaryResponse(
-            id=field.id,
-            name=field.name,
-            reference_provider=field.reference_provider,
-            reference_station=field.reference_station,
-            soil_type=field.soil_type,
-            humus_pct=field.humus_pct,
-            area_ha=field.area_ha,
-            root_depth_cm=field.root_depth_cm,
-            p_allowable=field.p_allowable,
-        )
-        for field in runtime.fields
-    ]
+async def list_fields():
+    return [_serialize_field(field) for field in runtime.fields]
 
+@app.post("/api/fields", response_model=FieldSummaryResponse, status_code=status.HTTP_201_CREATED)
+async def create_field(field: FieldPost):
+    try: 
+        new_field = runtime.db.create_field(
+            name = field.name,
+            reference_provider = field.reference_provider,
+            reference_station = field.reference_station,
+            soil_type = field.soil_type,
+            humus_pct = field.humus_pct,
+            area_ha = field.area_ha,
+            root_depth_cm = field.root_depth_cm,
+            p_allowable = field.p_allowable,
+        )
+        return _serialize_field(new_field)
+    except Exception as e:
+        logger.exception(f"Adding field failed: {e}")
+        _raise_write_http_error(e)
 
 @app.get("/api/fields/overview", response_model=list[FieldOverviewResponse])
 async def get_fields_overview():
@@ -113,13 +160,9 @@ async def get_fields_overview():
         for field in runtime.fields
     ]
 
-
 @app.get("/api/fields/{field_id}/overview", response_model=FieldOverviewResponse)
 async def get_field_overview(field_id: int):
-    try:
-        field = runtime.get_field(field_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    field = _validate_field_id(field_id)
 
     summary_by_field_id = {
         summary["field_id"]: summary
@@ -146,6 +189,27 @@ async def get_field_overview(field_id: int):
         safe_ratio=summary.get("safe_ratio"),
     )
 
+@app.get("/api/fields/{field_id}/irrigation", response_model = list[IrrigationResponse])
+async def list_irrigation_events(field_id: int):
+    _validate_field_id(field_id)
+    
+    events = runtime.db.list_irrigation_events(field_id = field_id)
+    return [_serialize_irrigation_event(event) for event in events]
+
+@app.post("/api/fields/{field_id}/irrigation", response_model=IrrigationResponse, status_code=status.HTTP_201_CREATED)
+async def create_irrigation_event(field_id: int, irrigation_event: IrrigationPost):
+    _validate_field_id(field_id)
+    try: 
+        new_event = runtime.db.create_irrigation_event(
+            field_id = field_id,
+            date = irrigation_event.date,
+            method= irrigation_event.method,
+            amount = irrigation_event.amount,
+        ) 
+        return _serialize_irrigation_event(new_event)
+    except Exception as e:
+        logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
+        _raise_write_http_error(e, not_found_prefixes=("No field with id", "Could not find any irrigation event with id"))
 
 @app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummaryResponse])
 async def get_water_balance_summary():
@@ -154,15 +218,11 @@ async def get_water_balance_summary():
         for summary in runtime.db.get_water_balance_summary()
     ]
 
-
 @app.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPointResponse])
 async def get_field_water_balance_series(field_id: int):
-    try:
-        runtime.get_field(field_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    _validate_field_id(field_id)
 
-    records = runtime.db.query_water_balance_series(field_id=field_id)
+    records = runtime.db.get_water_balance(field_id=field_id)
     return [
         WaterBalanceSeriesPointResponse(
             date=record.date,

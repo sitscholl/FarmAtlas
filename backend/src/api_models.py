@@ -14,6 +14,15 @@ class FieldSummaryResponse(BaseModel):
     root_depth_cm: float
     p_allowable: float
 
+class FieldPost(BaseModel):
+    name: str
+    reference_provider: str
+    reference_station: str
+    soil_type: str
+    humus_pct: float
+    area_ha: float
+    root_depth_cm: float
+    p_allowable: float
 
 class FieldOverviewResponse(BaseModel):
     id: int
@@ -33,6 +42,17 @@ class FieldOverviewResponse(BaseModel):
     below_raw: bool | None
     safe_ratio: float | None
 
+class IrrigationResponse(BaseModel):
+    id: int
+    field_id: int
+    date: date
+    method: str
+    amount: float = 100
+
+class IrrigationPost(BaseModel):
+    date: date
+    method: str
+    amount: float = 100
 
 class WaterBalanceSummaryResponse(BaseModel):
     field_id: int
