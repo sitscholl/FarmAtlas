@@ -93,7 +93,6 @@ class RuntimeContext:
         self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///database.db'))
        
         ## Fields
-        self.fields = [FieldContext.from_model(field) for field in self.db.list_fields()]
         if len(self.fields) == 0:
             logger.warning('No fields found in database.')
 
@@ -125,11 +124,15 @@ class RuntimeContext:
         self.config = load_config_file(self.config_file)
         self.initialize_runtime(self.config)
 
+    @property
+    def fields(self) -> list[FieldContext]:
+        return [FieldContext.from_model(field) for field in self.db.list_fields()]
+
     def get_field(self, field_id: int) -> FieldContext:
-        for field in self.fields:
-            if field.id == field_id:
-                return field
-        raise ValueError(f"Unknown field id: {field_id}")
+        field_model = self.db.get_field(field_id)
+        if field_model is None:
+            raise ValueError(f"Unknown field id: {field_id}")
+        return FieldContext.from_model(field_model)
 
     def get_fields_by_ids(self, field_ids: list[int] | None = None) -> list[FieldContext]:
         if field_ids is None:

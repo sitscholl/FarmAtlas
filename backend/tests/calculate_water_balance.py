@@ -65,7 +65,6 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             amount=10.0,
         )
 
-    runtime.fields = [FieldContext.from_model(field) for field in runtime.db.list_fields()]
     logger.info("Seeded %s synthetic field(s) for year %s", len(runtime.fields), year)
     return runtime.fields
 
