@@ -1,7 +1,7 @@
 import datetime
 import logging
 from contextlib import contextmanager
-from typing import Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class FarmDB:
+
+    _UPDATE_FIELD_ALLOWLIST = {"name", "reference_provider", "reference_station", "soil_type", "humus_pct", "area_ha", "root_depth_cm", "p_allowable"}
+
     def __init__(self, engine_url: str = 'sqlite:///database.db', **engine_kwargs) -> None:
         """
         Create a database engine and initialise ORM metadata.
@@ -43,32 +46,112 @@ class FarmDB:
         finally:
             session.close()
 
-    def _query_field(self, session: Session, name: str | None = None, id: int | None = None) -> Optional[models.Field]:
+    ## Fields
+    def _get_field(self, session: Session, id: int) -> Optional[models.Field]:
+        return (
+            session.query(models.Field)
+            .filter(models.Field.id == id)
+            .one_or_none()
+        )
 
-        if name is None and id is None:
-            raise ValueError('Cannot query field when id and name are both None')
-        if name is not None and id is not None:
-            raise ValueError('Cannot query field when both id and name are provided')
-
-        if name is not None:
-            return (
-                session.query(models.Field)
-                .filter(models.Field.name == name)
-                .one_or_none()
-            )
-        elif id is not None:
+    def get_field(self, id: int) -> models.Field | None:
+        """
+        Retrieve a field by its unique name or its id.
+        """
+        with self.session_scope() as session:
             return (
                 session.query(models.Field)
                 .filter(models.Field.id == id)
                 .one_or_none()
             )
 
-    def _get_field_by_id(self, session: Session, id: int) -> Optional[models.Field]:
-        return (
-            session.query(models.Field)
-            .filter(models.Field.id == id)
-            .one_or_none()
-        )
+    def list_fields(self) -> List[models.Field]:
+        """
+        Return the distinct field names sorted alphabetically.
+        """
+        with self.session_scope() as session:
+            fields = (
+                session.query(models.Field)
+                .order_by(models.Field.id)
+                .all()
+            )
+        return fields
+
+    def create_field(
+        self,
+        name: str,
+        reference_provider: str,
+        reference_station: str,
+        soil_type: str,
+        humus_pct: float,
+        area_ha: float,
+        root_depth_cm: float,
+        p_allowable: float,
+    ) -> models.Field:
+
+        reference_provider = str(reference_provider)
+        reference_station = str(reference_station)
+        soil_type = str(soil_type)
+        humus_pct = float(humus_pct)
+        root_depth_cm = float(root_depth_cm)
+        area_ha_value = float(area_ha)
+        p_allowable_value = float(p_allowable)
+
+        with self.session_scope() as session:
+            field = models.Field(
+                name=name,
+                reference_provider=reference_provider,
+                reference_station=reference_station,
+                soil_type=soil_type,
+                humus_pct=humus_pct,
+                root_depth_cm=root_depth_cm,
+                area_ha=area_ha_value,
+                p_allowable=p_allowable_value,
+            )
+            session.add(field)
+            session.flush()  # ensure primary key is populated for new records
+            logger.debug(f"Added new field {field} to database")
+        return field
+
+    def update_field(
+        self,
+        id: int,
+        updates: dict[str, Any]
+    ) -> models.Field:
+
+        updated = False
+        with self.session_scope() as session:
+            existing_field = self._get_field(session = session, id = id)
+            if existing_field is None:
+                raise ValueError(f"Could not find any field with id {id}")
+
+            for field_key, new_value in updates.items():
+                if field_key not in self._UPDATE_FIELD_ALLOWLIST:
+                    raise ValueError(f"Invalid key {field_key} in update_field. Choose one of {self._UPDATE_FIELD_ALLOWLIST}")
+
+                if getattr(existing_field, field_key) != new_value and new_value is not None:
+                    setattr(existing_field, field_key, new_value)
+                    updated = True
+
+            if not updated:
+                logger.debug(f"No changes for field {existing_field}; skipping update")
+                return existing_field
+            else:
+                logger.info(f"Updated field {existing_field}. Deleting existing water-balance cache")
+                _ = self._clear_water_balance(session, field_id = existing_field.id)
+
+            session.flush()  # ensure primary key is populated for new records
+        return existing_field
+
+    def delete_field(self, id: int) -> bool:
+        with self.session_scope() as session:
+            field = self._get_field(session = session, id = id)
+            if not field:
+                return False
+            session.delete(field)
+        return True
+
+    ## Irrigation
 
     def _get_latest_water_balance(
         self, session: Session, field_id: int
@@ -113,110 +196,8 @@ class FarmDB:
 
         return query.all()
 
-
-    def get_all_fields(self) -> List[str]:
-        """
-        Return the distinct field names sorted alphabetically.
-        """
-        with self.session_scope() as session:
-            fields = (
-                session.query(models.Field)
-                .order_by(models.Field.name)
-                .all()
-            )
-        return fields
-
-    def query_field(self, name: str | None = None, id: int | None = None) -> Optional[models.Field]:
-        """
-        Retrieve a field by its unique name or its id.
-        """
-        if name is None and id is None:
-            raise ValueError('Cannot query field when id and name are both None')
-        if name is not None and id is not None:
-            raise ValueError('Cannot query field when both id and name are provided')
-
-        with self.session_scope() as session:
-            return self._query_field(session, name = name, id = id)
-
-    def add_field(
-        self,
-        name: str,
-        reference_provider: str,
-        reference_station: str,
-        soil_type: str,
-        humus_pct: float,
-        root_depth_cm: float = 30,
-        area_ha: float | None = None,
-        p_allowable: float | None = 0,
-        **kwargs #swallow id when created via dashboard
-    ) -> Tuple[Optional[models.Field], bool]:
-        """
-        Add a new field or update an existing one.
-        """
-        reference_provider = str(reference_provider)
-        reference_station = str(reference_station)
-        soil_type = str(soil_type)
-        humus_pct = float(humus_pct)
-        root_depth_cm = float(root_depth_cm)
-        area_ha_value = float(area_ha) if area_ha is not None else None
-        p_allowable_value = float(p_allowable) if p_allowable is not None else 0
-
-        updated = False
-        try:
-            with self.session_scope() as session:
-                field = self._query_field(session, name = name)
-
-                if field is None:
-                    logger.debug("Adding new field %s to database", name)
-                    field = models.Field(
-                        name=name,
-                        reference_provider=reference_provider,
-                        reference_station=reference_station,
-                        soil_type=soil_type,
-                        humus_pct=humus_pct,
-                        root_depth_cm=root_depth_cm,
-                        area_ha=area_ha_value,
-                        p_allowable=p_allowable_value,
-                    )
-                    session.add(field)
-                else:
-                    if field.reference_provider != reference_provider:
-                        field.reference_provider = reference_provider
-                        updated = True
-                    if field.reference_station != reference_station:
-                        field.reference_station = reference_station
-                        updated = True
-                    if field.soil_type != soil_type:
-                        field.soil_type = soil_type
-                        updated = True
-                    if field.humus_pct != humus_pct:
-                        field.humus_pct = humus_pct
-                        updated = True
-                    if field.root_depth_cm != root_depth_cm:
-                        field.root_depth_cm = root_depth_cm
-                        updated = True
-                    if field.area_ha != area_ha_value:
-                        field.area_ha = area_ha_value
-                        updated = True
-                    if field.p_allowable != p_allowable_value:
-                        field.p_allowable = p_allowable_value
-                        updated = True
-
-                    if not updated:
-                        logger.debug("No changes for field %s; skipping update", name)
-                        return (field, updated)
-                    else:
-                        logger.info(f"Updated field {field.name}. Deleting existing water-balance cache")
-                        deleted = self._clear_water_balance(session, field_id = field.id)
-
-                session.flush()  # ensure primary key is populated for new records
-                return (field, updated)
-        except Exception:
-            logger.exception("Failed to persist field %s", name)
-            return (None, updated)
-
     def query_irrigation_events(
-        self, field_name: str | None = None, date: datetime.date | None = None, year: int | None = None
+        self, field_id: int, date: datetime.date | None = None, year: int | None = None
     ) -> Optional[models.Irrigation]:
         """
         Retrieve an irrigation event by field name and (optional) date.
@@ -227,23 +208,19 @@ class FarmDB:
             )
 
         with self.session_scope() as session:
-            if field_name is not None:
-                field = self._query_field(session, name = field_name)
-                if field is None:
-                    logger.warning(
-                        "Field %s does not exist. Cannot query irrigation event",
-                        field_name,
-                    )
-                    return None
-                field_id = field.id
-            else:
-                field_id = None
+            field = self._query_field(session, id = field_id)
+            if field is None:
+                logger.warning(
+                    "No field with id %s found. Cannot query irrigation event",
+                    field_id,
+                )
+                return None
 
             return self._get_irrigation_events(session, field_id, date, year)
 
     def add_irrigation_event(
         self,
-        field_name: str,
+        field_id: int,
         date: datetime.date,
         method: str,
         amount: float = 100,
@@ -254,9 +231,9 @@ class FarmDB:
             date = pd.to_datetime(date).date()
 
         with self.session_scope() as session:
-            field = self._query_field(session, name = field_name)
+            field = self._query_field(session, id = field_id)
             if field is None:
-                raise ValueError(f"Field '{field_name}' not found")
+                raise ValueError(f"No field with id '{field_id}' found")
 
             # Logic: If ID is provided, update that specific row.
             # If no ID, try to find by date/field (legacy logic) or create new.
@@ -494,14 +471,6 @@ class FarmDB:
                 deleted = self._clear_water_balance(session, field_id)
                 deleted_total += deleted
         return deleted_total
-
-    def delete_field(self, field_id: int) -> bool:
-        with self.session_scope() as session:
-            field = session.get(models.Field, field_id)
-            if not field:
-                return False
-            session.delete(field)
-            return True
 
     def delete_irrigation_event(self, event_id: int) -> bool:
         with self.session_scope() as session:
