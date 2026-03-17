@@ -41,6 +41,7 @@ export type CreateActionConfig = {
   title: string
   submitLabel: string
   endpoint: string
+  method?: 'post' | 'put'
   fields: CreateActionField[]
   buildPayload: (values: Record<string, string>) => FieldCreatePayload | IrrigationCreatePayload
 }

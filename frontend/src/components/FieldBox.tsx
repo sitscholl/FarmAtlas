@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 export type FieldBoxMetric = {
@@ -19,6 +20,7 @@ type FieldBoxProps = {
   metrics: FieldBoxMetric[]
   statusBar?: FieldBoxStatusBar
   to?: string
+  actions?: ReactNode
 }
 
 function FieldBoxContent({
@@ -27,14 +29,25 @@ function FieldBoxContent({
   subtitle,
   metrics,
   statusBar,
-}: Omit<FieldBoxProps, 'to'>) {
+  to,
+  actions,
+}: FieldBoxProps) {
   const statusBarClasses = statusBar?.isCritical
     ? 'from-rose-500 via-orange-500 to-red-500'
     : 'from-sky-500 via-cyan-400 to-blue-400'
+  const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
 
   return (
     <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="relative flex items-start justify-between">
+      {to ? (
+        <Link
+          to={to}
+          aria-label={`${title} oeffnen`}
+          className="absolute inset-0 rounded-[1.75rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4"
+        />
+      ) : null}
+
+      <div className={`${contentClasses} flex items-start justify-between gap-4`}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
             Field
@@ -49,8 +62,14 @@ function FieldBoxContent({
         </span>
       </div>
 
+      {actions ? (
+        <div className="relative z-20 mt-4 flex justify-end gap-2 pointer-events-auto">
+          {actions}
+        </div>
+      ) : null}
+
       {statusBar ? (
-        <div className="relative mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+        <div className={`${contentClasses} mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3`}>
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
               {statusBar.label}
@@ -73,7 +92,7 @@ function FieldBoxContent({
         </div>
       ) : null}
 
-      <div className="relative mt-3 space-y-1 border-t border-slate-100 pt-1">
+      <div className={`${contentClasses} mt-3 space-y-1 border-t border-slate-100 pt-1`}>
         {metrics.map((metric) => (
           <div
             key={metric.label}
@@ -91,30 +110,5 @@ function FieldBoxContent({
 }
 
 export default function FieldBox(props: FieldBoxProps) {
-  if (props.to) {
-    return (
-      <Link
-        to={props.to}
-        className="block rounded-[1.75rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4"
-      >
-        <FieldBoxContent
-          title={props.title}
-          badge={props.badge}
-          subtitle={props.subtitle}
-          metrics={props.metrics}
-          statusBar={props.statusBar}
-        />
-      </Link>
-    )
-  }
-
-  return (
-    <FieldBoxContent
-      title={props.title}
-      badge={props.badge}
-      subtitle={props.subtitle}
-      metrics={props.metrics}
-      statusBar={props.statusBar}
-    />
-  )
+  return <FieldBoxContent {...props} />
 }

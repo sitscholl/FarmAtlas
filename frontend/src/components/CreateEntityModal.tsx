@@ -12,24 +12,31 @@ import {
 type CreateEntityModalProps = {
   action: CreateActionConfig | null
   isOpen: boolean
+  initialValues?: Record<string, string>
   onClose: () => void
 }
 
-function buildInitialValues(action: CreateActionConfig | null) {
+function buildInitialValues(
+  action: CreateActionConfig | null,
+  initialValues?: Record<string, string>,
+) {
   if (action === null) {
     return {}
   }
 
-  return Object.fromEntries(
-    action.fields.map((field) => {
-      if (field.type === 'date') {
-        const today = new Date().toISOString().slice(0, 10)
-        return [field.id, String(field.defaultValue ?? today)]
-      }
+  return {
+    ...Object.fromEntries(
+      action.fields.map((field) => {
+        if (field.type === 'date') {
+          const today = new Date().toISOString().slice(0, 10)
+          return [field.id, String(field.defaultValue ?? today)]
+        }
 
-      return [field.id, String(field.defaultValue ?? '')]
-    }),
-  )
+        return [field.id, String(field.defaultValue ?? '')]
+      }),
+    ),
+    ...initialValues,
+  }
 }
 
 function buildFieldOptions(fields: FieldSummary[]): FieldOption[] {
@@ -42,6 +49,7 @@ function buildFieldOptions(fields: FieldSummary[]): FieldOption[] {
 export default function CreateEntityModal({
   action,
   isOpen,
+  initialValues,
   onClose,
 }: CreateEntityModalProps) {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -59,9 +67,9 @@ export default function CreateEntityModal({
       return
     }
 
-    setValues(buildInitialValues(action))
+    setValues(buildInitialValues(action, initialValues))
     setErrorMessage(null)
-  }, [action, isOpen])
+  }, [action, initialValues, isOpen])
 
   useEffect(() => {
     if (!isOpen || !needsFieldOptions) {
@@ -81,7 +89,7 @@ export default function CreateEntityModal({
         })
       } catch (error) {
         console.error('Error loading field options', error)
-        setErrorMessage('Die verfügbaren Anlagen konnten nicht geladen werden.')
+        setErrorMessage('Die verfuegbaren Anlagen konnten nicht geladen werden.')
       }
     }
 
@@ -108,11 +116,15 @@ export default function CreateEntityModal({
           ? `/fields/${(payload as { field_id: number }).field_id}/irrigation`
           : action.endpoint
 
-      await api.post(endpoint, payload)
+      await api.request({
+        method: action.method ?? 'post',
+        url: endpoint,
+        data: payload,
+      })
       notifyDataChanged()
       onClose()
     } catch (error) {
-      console.error(`Error creating ${action.id}`, error)
+      console.error(`Error saving ${action.id}`, error)
       setErrorMessage('Die Daten konnten nicht gespeichert werden.')
     } finally {
       setIsSubmitting(false)
@@ -161,7 +173,7 @@ export default function CreateEntityModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
-              Neuer Eintrag
+              {action.method === 'put' ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
             </p>
             <h2 className="mt-3 text-3xl font-semibold text-slate-900">
               {action.title}
@@ -172,7 +184,7 @@ export default function CreateEntityModal({
             onClick={onClose}
             className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
           >
-            Schließen
+            Schliessen
           </button>
         </div>
 
