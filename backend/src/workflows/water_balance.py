@@ -248,7 +248,7 @@ class WaterBalanceWorkflow:
             humus_pct=field.humus_pct,
             root_depth_cm=field.root_depth_cm,
         )
-        irrigation_events = self.db.list_irrigation_events(field_id=field.id, year=year) or []
+        irrigation_events = self.db.list_irrigation_events(field_id=field.id, start=pd.Timestamp(f"{year}-1-1").date()) or []
         field_irrigation = FieldIrrigation.from_list(irrigation_events)
         water_balance = self.calculate_water_balance(
             field=field,
