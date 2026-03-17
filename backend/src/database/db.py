@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 class FarmDB:
 
     _UPDATE_FIELD_ALLOWLIST = {"name", "reference_provider", "reference_station", "soil_type", "humus_pct", "area_ha", "root_depth_cm", "p_allowable"}
+    _UPDATE_IRRIGATION_ALLOWLIST = {"field_id", "date", "method", "amount"}
 
     def __init__(self, engine_url: str = 'sqlite:///database.db', **engine_kwargs) -> None:
         """
@@ -152,7 +153,124 @@ class FarmDB:
         return True
 
     ## Irrigation
+    def list_irrigation_events(
+        self, 
+        field_id: int | None = None, 
+        start: datetime.date = None, 
+        end: datetime.date = None
+        ) -> list[models.Irrigation] | None:
+        if start is not None:
+            start = pd.Timestamp(start).date()
+        if end is not None:
+            end = pd.Timestamp(end).date()
 
+        with self.session_scope() as session:
+            query = session.query(models.Irrigation)
+            if field_id is not None:
+                field = self._get_field(session, id = field_id)
+                if field is None:
+                    raise ValueError(
+                       f"No field with id {field_id} found. Cannot query irrigation event",
+                    )
+                query = query.filter(models.Irrigation.field_id == field_id)
+
+            if start is not None:
+                query = query.filter(models.Irrigation.date >= start)
+            if end is not None:
+                query = query.filter(models.Irrigation.date < end)
+
+            return query.all()
+
+    def first_irrigation_event(self, field_id: int, year: int) -> Optional[models.Irrigation]:
+        with self.session_scope() as session:
+            return (
+                session.query(models.Irrigation)
+                .filter(models.Irrigation.field_id == field_id)
+                .filter(models.Irrigation.date >= datetime.date(year, 1, 1), models.Irrigation.date < datetime.date(year+1, 1, 1))
+                .order_by(models.Irrigation.date.asc())
+                .limit(1)
+                .one_or_none()
+            )
+
+    def create_irrigation_event(
+        self,
+        field_id: int,
+        date: datetime.date,
+        method: str,
+        amount: float,
+    ) -> models.Irrigation:
+        
+        if isinstance(date, str):
+            date = pd.Timestamp(date).date()
+
+        with self.session_scope() as session:
+            field = self._get_field(session, id = field_id)
+            if field is None:
+                raise ValueError(f"No field with id '{field_id}' found")
+
+            event = models.Irrigation(
+                field_id=field.id,
+                date=date,
+                method=method,
+                amount=amount,
+            )
+            session.add(event)
+            session.flush()
+            logger.debug(f"Created new irrigation event for field {field}")
+
+            self._clear_water_balance(session, field_id = field.id)
+
+        return event
+
+    def update_irrigation_event(self, event_id: int, updates: dict[str, Any]) -> models.Irrigation:
+        updated = False
+        with self.session_scope() as session:
+            existing_event = session.query(models.Irrigation).filter(models.Irrigation.id == event_id).one_or_none()
+            if existing_event is None:
+                raise ValueError(f"Could not find any irrigation event with id {event_id}")
+
+            old_field_id = None
+            for field_key, new_value in updates.items():
+                if field_key not in self._UPDATE_IRRIGATION_ALLOWLIST:
+                    raise ValueError(f"Invalid key {field_key} in update_irriation_event. Choose one of {self._UPDATE_IRRIGATION_ALLOWLIST}")
+
+                if getattr(existing_event, field_key) != new_value and new_value is not None:
+
+                    if field_key == 'field_id':
+                        new_field = self._get_field(session = session, id = new_value)
+                        if new_field is None:
+                            raise ValueError(f"Invalid new field id {new_value} in update_irrigation_event.")
+                        old_field_id = existing_event.field_id
+
+                    if field_key == 'date':
+                        new_value = pd.Timestamp(new_value).date()
+                        
+                    setattr(existing_event, field_key, new_value)
+                    updated = True
+
+            if not updated:
+                logger.debug(f"No changes for irrigation_event {existing_event}; skipping update")
+                return existing_event
+            else:
+                logger.info(f"Updated irrigation event {existing_event}. Deleting existing water-balance cache")
+                _ = self._clear_water_balance(session, field_id = existing_event.field_id)
+                
+                if old_field_id:
+                    self._clear_water_balance(session, field_id=old_field_id)
+
+            session.flush()  # ensure primary key is populated for new records
+        return existing_event
+
+    def delete_irrigation_event(self, event_id: int) -> bool:
+        with self.session_scope() as session:
+            event = session.get(models.Irrigation, event_id)
+            if not event:
+                return False
+            session.delete(event)
+            self._clear_water_balance(session, field_id = event.field_id)
+            return True
+
+    ## Water Balance
     def _get_latest_water_balance(
         self, session: Session, field_id: int
     ) -> Optional[models.WaterBalance]:
@@ -163,118 +281,6 @@ class FarmDB:
             .limit(1)
             .one_or_none()
         )
-
-    def _get_first_irrigation_event(
-        self, session: Session, field_id: int, year: int
-    ) -> Optional[models.Irrigation]:
-        return (
-            session.query(models.Irrigation)
-            .filter(models.Irrigation.field_id == field_id)
-            .filter(models.Irrigation.date >= datetime.date(year, 1, 1), models.Irrigation.date < datetime.date(year+1, 1, 1))
-            .order_by(models.Irrigation.date.asc())
-            .limit(1)
-            .one_or_none()
-        )
-
-    def _get_irrigation_events(
-        self, session: Session, field_id: int | None = None, date: datetime.date | None = None, year: int | None = None
-    ) -> Optional[models.Irrigation]:
-
-        if date is not None and year is not None:
-            logger.warning("Both date and year passed to query_irrigation_events. Ignoring year")
-            year = None
-
-        query = session.query(models.Irrigation)
-        if field_id is not None:
-            query = query.filter(models.Irrigation.field_id == field_id)
-
-        if date is not None:
-            query = query.filter(models.Irrigation.date == date)
-
-        if year is not None:
-            query = query.filter(models.Irrigation.date >= datetime.date(year, 1, 1), models.Irrigation.date < datetime.date(year+1, 1, 1))
-
-        return query.all()
-
-    def query_irrigation_events(
-        self, field_id: int, date: datetime.date | None = None, year: int | None = None
-    ) -> Optional[models.Irrigation]:
-        """
-        Retrieve an irrigation event by field name and (optional) date.
-        """
-        if date is not None and isinstance(date, datetime.datetime):
-            raise NotImplementedError(
-                'Only datetime.date objects are allowed in irrigation database'
-            )
-
-        with self.session_scope() as session:
-            field = self._query_field(session, id = field_id)
-            if field is None:
-                logger.warning(
-                    "No field with id %s found. Cannot query irrigation event",
-                    field_id,
-                )
-                return None
-
-            return self._get_irrigation_events(session, field_id, date, year)
-
-    def add_irrigation_event(
-        self,
-        field_id: int,
-        date: datetime.date,
-        method: str,
-        amount: float = 100,
-        id: int | None = None,
-    ) -> models.Irrigation:
-        
-        if isinstance(date, str):
-            date = pd.to_datetime(date).date()
-
-        with self.session_scope() as session:
-            field = self._query_field(session, id = field_id)
-            if field is None:
-                raise ValueError(f"No field with id '{field_id}' found")
-
-            # Logic: If ID is provided, update that specific row.
-            # If no ID, try to find by date/field (legacy logic) or create new.
-            event = None
-            
-            if id is not None:
-                event = session.get(models.Irrigation, id)
-                if not event:
-                     raise ValueError(f"Irrigation event {id} not found")
-            
-            # If no ID provided, check if one exists for this date/field (prevent duplicates)
-            if event is None:
-                existing = self._get_irrigation_events(session, field.id, date)
-                if existing:
-                    event = existing[0]
-            old_field_id = event.field_id if event else None
-
-            if event:
-                logger.debug("Updating irrigation event %s", event.id)
-                event.field_id = field.id 
-                event.date = date
-                event.method = method
-                event.amount = amount
-            else:
-                logger.debug("Creating new irrigation event")
-                event = models.Irrigation(
-                    field_id=field.id,
-                    date=date,
-                    method=method,
-                    amount=amount,
-                )
-                session.add(event)
-
-            self._clear_water_balance(session, field_id = field.id)
-            if old_field_id and old_field_id != field.id:
-                self._clear_water_balance(session, field_id=old_field_id)
-
-            session.flush()
-            # Refresh to ensure we have the ID available if we need to return it
-            session.refresh(event) 
-            return event
 
     def query_water_balance(
         self, 
@@ -291,7 +297,7 @@ class FarmDB:
             query = session.query(models.WaterBalance)
 
             if field_name is not None:
-                field = self._query_field(session, name = field_name)
+                field = self._get_field(session, name = field_name)
                 if field is None:
                     logger.warning("Field %s does not exist. Cannot query water balance", field_name)
                     return []
@@ -355,10 +361,6 @@ class FarmDB:
                 )
 
             return summaries
-
-    def first_irrigation_event(self, field_id: int, year: int):
-        with self.session_scope() as session:
-            return self._get_first_irrigation_event(session, field_id, year)
 
     def add_water_balance(self, water_balance: pd.DataFrame, field_id: int | None = None):
         """
@@ -471,15 +473,6 @@ class FarmDB:
                 deleted = self._clear_water_balance(session, field_id)
                 deleted_total += deleted
         return deleted_total
-
-    def delete_irrigation_event(self, event_id: int) -> bool:
-        with self.session_scope() as session:
-            event = session.get(models.Irrigation, event_id)
-            if not event:
-                return False
-            session.delete(event)
-            self._clear_water_balance(session, field_id = event.field_id)
-            return True
 
     def close(self) -> None:
         """
