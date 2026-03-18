@@ -92,7 +92,7 @@ function FieldBoxContent({
         </div>
       ) : null}
 
-      <div className={`${contentClasses} mt-3 space-y-1 border-t border-slate-100 pt-1`}>
+      <div className={`${contentClasses} mt-2 space-y-1 border-t border-black/30 border-slate-100 pt-1`}>
         {metrics.map((metric) => (
           <div
             key={metric.label}

@@ -133,7 +133,7 @@ export default function CreateEntityModal({
 
   const renderField = (field: CreateActionField) => {
     const commonClasses =
-      'mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
+      'mt-2 w-full border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 
     if (field.type === 'select') {
       const options = field.optionsSource === 'fields' ? fieldOptions : (field.options ?? [])
