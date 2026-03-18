@@ -17,7 +17,6 @@ COPY backend/pyproject.toml ./pyproject.toml
 COPY backend/uv.lock ./uv.lock
 COPY backend/main.py ./main.py
 COPY backend/src ./src
-COPY backend/config ./config
 
 RUN pip install --upgrade pip && pip install .
 
