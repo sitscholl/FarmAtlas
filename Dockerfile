@@ -1,52 +1,37 @@
-# First, build the application in the `/app` directory
-FROM ghcr.io/astral-sh/uv:bookworm-slim AS builder
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+FROM node:22-alpine AS frontend-builder
+WORKDIR /app/frontend
 
-# Omit development dependencies
-ENV UV_NO_DEV=1
+COPY frontend/package*.json ./
+RUN npm ci
 
-# Configure the Python directory so it is consistent
-ENV UV_PYTHON_INSTALL_DIR=/python
+COPY frontend/ ./
+RUN npm run build
 
-# Only use the managed Python version
-ENV UV_PYTHON_PREFERENCE=only-managed
+FROM python:3.13-slim AS backend-builder
+WORKDIR /app/backend
 
-# Install Python before the project for caching
-RUN uv python install 3.13
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-WORKDIR /app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project
-COPY . /app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked
+COPY backend/pyproject.toml ./pyproject.toml
+COPY backend/uv.lock ./uv.lock
+COPY backend/main.py ./main.py
+COPY backend/src ./src
+COPY backend/config ./config
 
-# Then, use a final image without uv
-FROM debian:bookworm-slim
+RUN pip install --upgrade pip && pip install .
 
-# Setup a non-root user
-RUN groupadd --system --gid 999 nonroot \
- && useradd --system --gid 999 --uid 999 --create-home nonroot
-
-# Copy the Python version
-COPY --from=builder --chown=python:python /python /python
-
-# Copy the application from the builder
-COPY --from=builder --chown=nonroot:nonroot /app /app
-
-# Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
-
-# NiceGUI default port
-EXPOSE 8080
-
-# Use the non-root user to run our application
-# USER nonroot
-
-# Use `/app` as the working directory
+FROM python:3.13-slim AS runtime
 WORKDIR /app
 
-# Run the FastAPI application by default
-CMD ["python", "app.py"]
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY --from=backend-builder /usr/local /usr/local
+COPY backend/ /app/backend/
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
+
+EXPOSE 8000
+
+WORKDIR /app/backend
+CMD ["python", "main.py"]
