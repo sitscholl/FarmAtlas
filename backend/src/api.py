@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError
 
@@ -125,7 +125,7 @@ async def list_fields():
     return [_serialize_field(field) for field in runtime.fields]
 
 @app.post("/api/fields", response_model=FieldSummaryResponse, status_code=status.HTTP_201_CREATED)
-async def create_field(field: FieldPost):
+async def create_field(background_tasks: BackgroundTasks, field: FieldPost):
     try: 
         new_field = runtime.db.create_field(
             name = field.name,
@@ -147,14 +147,15 @@ async def create_field(field: FieldPost):
             herbicide_free = field.herbicide_free,
             active = field.active,
         )
+        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", new_field.id)
         return _serialize_field(new_field)
     except Exception as e:
         logger.exception(f"Adding field failed: {e}")
         _raise_write_http_error(e)
 
 @app.put("/api/fields/{field_id}", response_model=FieldSummaryResponse)
-async def update_field(field_id: int, field: FieldPut):
-    _validate_field_id(field_id)
+async def update_field(background_tasks: BackgroundTasks, field_id: int, field: FieldPut):
+    existing_field = _validate_field_id(field_id)
     try:
         updated_field = runtime.db.update_field(
             id=field_id,
@@ -179,6 +180,12 @@ async def update_field(field_id: int, field: FieldPut):
                 "active": field.active,
             },
         )
+
+        if any(
+            getattr(existing_field, attr) != getattr(updated_field, attr)
+            for attr in runtime.db.WATER_BALANCE_TRIGGER_FIELDS
+        ):
+            background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
         return _serialize_field(updated_field)
     except Exception as e:
         logger.exception(f"Updating field {field_id} failed: {e}")
@@ -276,7 +283,7 @@ async def list_irrigation_events(field_id: int):
     return [_serialize_irrigation_event(event) for event in events]
 
 @app.post("/api/fields/{field_id}/irrigation", response_model=IrrigationResponse, status_code=status.HTTP_201_CREATED)
-async def create_irrigation_event(field_id: int, irrigation_event: IrrigationPost):
+async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: int, irrigation_event: IrrigationPost):
     _validate_field_id(field_id)
     try: 
         new_event = runtime.db.create_irrigation_event(
@@ -284,7 +291,8 @@ async def create_irrigation_event(field_id: int, irrigation_event: IrrigationPos
             date = irrigation_event.date,
             method= irrigation_event.method,
             amount = irrigation_event.amount,
-        ) 
+        )
+        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
         return _serialize_irrigation_event(new_event)
     except Exception as e:
         logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")

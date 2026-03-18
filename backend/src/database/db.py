@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class FarmDB:
+    WATER_BALANCE_TRIGGER_FIELDS = {
+        "soil_type",
+        "humus_pct",
+        "root_depth_cm",
+        "p_allowable",
+        "reference_provider",
+        "reference_station",
+    }
 
     _UPDATE_FIELD_ALLOWLIST = {
         "name",
@@ -178,6 +186,7 @@ class FarmDB:
     ) -> models.Field:
 
         updated = False
+        changed_keys: set[str] = set()
         with self.session_scope() as session:
             existing_field = self._get_field(session = session, id = id)
             if existing_field is None:
@@ -190,11 +199,12 @@ class FarmDB:
                 if getattr(existing_field, field_key) != new_value:
                     setattr(existing_field, field_key, new_value)
                     updated = True
+                    changed_keys.add(field_key)
 
             if not updated:
                 logger.debug(f"No changes for field {existing_field}; skipping update")
                 return existing_field
-            else:
+            elif changed_keys & self.WATER_BALANCE_TRIGGER_FIELDS:
                 logger.info(f"Updated field {existing_field}. Deleting existing water-balance cache")
                 _ = self._clear_water_balance(session, field_id = existing_field.id)
 
