@@ -5,6 +5,8 @@ import { createActions } from '../config/createActions'
 import type { CreateActionConfig } from '../types/createActions'
 import CreateEntityModal from './CreateEntityModal'
 
+import { IoMdAdd } from "react-icons/io";
+
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [activeAction, setActiveAction] = useState<CreateActionConfig | null>(null)
@@ -33,14 +35,14 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
-              className="flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
+              className="flex h-8 w-8 items-center justify-center border border-slate-200 rounded-full z-50 text-slate-700 shadow-sm transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
               aria-label="Eintrag hinzufügen"
             >
-              +
+              <IoMdAdd />
             </button>
 
             {isMenuOpen ? (
-              <div className="absolute right-0 top-11 w-64 overflow-hidden rounded-3xl border border-slate-200 bg-white p-2 shadow-xl">
+              <div className="absolute right-0 top-11 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                 {createActions.map((action) => (
                   <button
                     key={action.id}
@@ -49,7 +51,7 @@ export default function Navbar() {
                       setActiveAction(action)
                       setIsMenuOpen(false)
                     }}
-                    className="block bg-white w-full px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-sky-700"
+                    className="block bg-white w-full px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:bg-sky-50 hover:text-sky-700"
                   >
                     {action.label}
                   </button>

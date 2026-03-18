@@ -11,6 +11,9 @@ import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import type { CreateActionConfig } from '../types/createActions'
 import { type FieldOverview } from '../types/field'
 
+import { PiTrashBold } from "react-icons/pi";
+import { GoPencil } from "react-icons/go";
+
 function formatNumber(value: number, digits = 1) {
   return new Intl.NumberFormat('de-DE', {
     maximumFractionDigits: digits,
@@ -58,26 +61,6 @@ function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined 
 
 function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
   return `${field.reference_provider}: ${field.reference_station}`
-}
-
-function PencilIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 3.487a2.25 2.25 0 1 1 3.182 3.182L8.25 18.463 4 20l1.537-4.25L16.862 3.487Z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5.25 18.75 9" />
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 7.5h15" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.75h4.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l.818 10.227A2.25 2.25 0 0 0 9.81 19.5h4.38a2.25 2.25 0 0 0 2.242-1.773L17.25 7.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 10.5v5.25M13.5 10.5v5.25" />
-    </svg>
-  )
 }
 
 export default function Home() {
@@ -201,7 +184,7 @@ export default function Home() {
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
                   aria-label={`${field.name} bearbeiten`}
                 >
-                  <PencilIcon />
+                  <GoPencil />
                 </button>
                 <button
                   type="button"
@@ -209,7 +192,7 @@ export default function Home() {
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
                   aria-label={`${field.name} loeschen`}
                 >
-                  <TrashIcon />
+                  <PiTrashBold />
                 </button>
               </>
             }
