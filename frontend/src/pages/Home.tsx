@@ -60,7 +60,7 @@ function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined 
 }
 
 function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
-  return `${field.reference_provider}: ${field.reference_station}`
+  return `${field.reference_station}`
 }
 
 export default function Home() {
@@ -181,7 +181,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setEditingField(field)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
+                  className="inline-flex w-6 h-6 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
                   aria-label={`${field.name} bearbeiten`}
                 >
                   <GoPencil />
@@ -189,7 +189,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => void handleDeleteField(field)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
+                  className="inline-flex w-6 h-6 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
                   aria-label={`${field.name} loeschen`}
                 >
                   <PiTrashBold />

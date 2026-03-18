@@ -48,24 +48,21 @@ function FieldBoxContent({
       ) : null}
 
       <div className={`${contentClasses} flex items-start justify-between gap-4`}>
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Field
-          </p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">{title}</h3>
-          {subtitle ? (
-            <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
+        <div className="min-w-0 flex-1">
+          {actions ? (
+            <div className="z-20 flex justify-left gap-2 pointer-events-auto">
+              {actions}
+            </div>
           ) : null}
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">{title}</h3>
         </div>
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+        <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
           {badge}
         </span>
       </div>
 
-      {actions ? (
-        <div className="relative z-20 mt-4 flex justify-end gap-2 pointer-events-auto">
-          {actions}
-        </div>
+      {subtitle ? (
+        <p className={`${contentClasses} mt-2 text-sm text-slate-500`}>{subtitle}</p>
       ) : null}
 
       {statusBar ? (
