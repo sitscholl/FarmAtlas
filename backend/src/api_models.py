@@ -6,6 +6,16 @@ from pydantic import BaseModel
 class FieldSummaryResponse(BaseModel):
     id: int
     name: str
+    section: str | None
+    variety: str
+    planting_year: int
+    tree_count: int | None
+    tree_height: int | None
+    row_distance: float | None
+    tree_distance: float | None
+    running_metre: float | None
+    herbicide_free: bool | None
+    active: bool
     reference_provider: str
     reference_station: str
     soil_type: str
@@ -16,6 +26,16 @@ class FieldSummaryResponse(BaseModel):
 
 class FieldPost(BaseModel):
     name: str
+    section: str | None = None
+    variety: str
+    planting_year: int
+    tree_count: int | None = None
+    tree_height: int | None = None
+    row_distance: float | None = None
+    tree_distance: float | None = None
+    running_metre: float | None = None
+    herbicide_free: bool | None = None
+    active: bool = True
     reference_provider: str
     reference_station: str
     soil_type: str
@@ -26,6 +46,16 @@ class FieldPost(BaseModel):
 
 class FieldPut(BaseModel):
     name: str
+    section: str | None = None
+    variety: str
+    planting_year: int
+    tree_count: int | None = None
+    tree_height: int | None = None
+    row_distance: float | None = None
+    tree_distance: float | None = None
+    running_metre: float | None = None
+    herbicide_free: bool | None = None
+    active: bool = True
     reference_provider: str
     reference_station: str
     soil_type: str
@@ -37,6 +67,16 @@ class FieldPut(BaseModel):
 class FieldOverviewResponse(BaseModel):
     id: int
     name: str
+    section: str | None
+    variety: str
+    planting_year: int
+    tree_count: int | None
+    tree_height: int | None
+    row_distance: float | None
+    tree_distance: float | None
+    running_metre: float | None
+    herbicide_free: bool | None
+    active: bool
     reference_provider: str
     reference_station: str
     soil_type: str

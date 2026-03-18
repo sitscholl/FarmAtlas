@@ -17,6 +17,16 @@ class FieldResults:
 class FieldContext:
     id: int
     name: str
+    section: str | None
+    variety: str
+    planting_year: int
+    tree_count: int | None
+    tree_height: int | None
+    row_distance: float | None
+    tree_distance: float | None
+    running_metre: float | None
+    herbicide_free: bool | None
+    active: bool
     reference_provider: str
     reference_station: str
     soil_type: str
@@ -30,6 +40,16 @@ class FieldContext:
         return cls(
             id=field_model.id,
             name=field_model.name,
+            section=field_model.section,
+            variety=field_model.variety,
+            planting_year=field_model.planting_year,
+            tree_count=field_model.tree_count,
+            tree_height=field_model.tree_height,
+            row_distance=field_model.row_distance,
+            tree_distance=field_model.tree_distance,
+            running_metre=field_model.running_metre,
+            herbicide_free=field_model.herbicide_free,
+            active=field_model.active,
             reference_provider=field_model.reference_provider,
             reference_station=field_model.reference_station,
             soil_type=field_model.soil_type,

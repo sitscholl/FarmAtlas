@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Date, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, Date, Float, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -6,17 +6,39 @@ Base = declarative_base()
 
 class Field(Base):
     __tablename__ = 'fields'
+    ## Unique constraint so no duplicated name where active=true can exist
+    __table_args__ = (
+        Index(
+            'uq_fields_active_name',
+            'name',
+            unique=True,
+            sqlite_where=text('active = 1'),
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False, unique=True)
+    name = Column(String, nullable=False)
+    section = Column(String, nullable=True)
+
+    variety = Column(String, nullable=False)
+    planting_year = Column(Integer, nullable=False)
+    area_ha = Column(Float, nullable=False)
+    tree_count = Column(Integer, nullable=True)
+    tree_height = Column(Integer, nullable=True)
+    row_distance = Column(Float, nullable=True)
+    tree_distance = Column(Float, nullable=True)
+    running_metre = Column(Float, nullable = True)
+    herbicide_free = Column(Boolean, nullable=True)
+
     reference_provider = Column(String, nullable=False)
     reference_station = Column(String, nullable=False)
-    area_ha = Column(Float, nullable=False)
 
     soil_type = Column(String, nullable=False)
     humus_pct = Column(Float, nullable = False)
     root_depth_cm = Column(Float, nullable=False)
     p_allowable = Column(Float, nullable=False, default=0)
+
+    active = Column(Boolean, nullable=False, default=True)
 
     irrigation_events = relationship(
         'Irrigation',

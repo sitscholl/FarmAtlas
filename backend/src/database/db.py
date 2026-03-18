@@ -15,7 +15,26 @@ logger = logging.getLogger(__name__)
 
 class FarmDB:
 
-    _UPDATE_FIELD_ALLOWLIST = {"name", "reference_provider", "reference_station", "soil_type", "humus_pct", "area_ha", "root_depth_cm", "p_allowable"}
+    _UPDATE_FIELD_ALLOWLIST = {
+        "name",
+        "section",
+        "variety",
+        "planting_year",
+        "area_ha",
+        "tree_count",
+        "tree_height",
+        "row_distance",
+        "tree_distance",
+        "running_metre",
+        "herbicide_free",
+        "active",
+        "reference_provider",
+        "reference_station",
+        "soil_type",
+        "humus_pct",
+        "root_depth_cm",
+        "p_allowable",
+    }
     _UPDATE_IRRIGATION_ALLOWLIST = {"field_id", "date", "method", "amount"}
 
     def __init__(self, engine_url: str = 'sqlite:///database.db', **engine_kwargs) -> None:
@@ -89,6 +108,9 @@ class FarmDB:
     def create_field(
         self,
         name: str,
+        section: str | None,
+        variety: str,
+        planting_year: int,
         reference_provider: str,
         reference_station: str,
         soil_type: str,
@@ -96,8 +118,18 @@ class FarmDB:
         area_ha: float,
         root_depth_cm: float,
         p_allowable: float,
+        tree_count: int | None = None,
+        tree_height: int | None = None,
+        row_distance: float | None = None,
+        tree_distance: float | None = None,
+        running_metre: float | None = None,
+        herbicide_free: bool | None = None,
+        active: bool = True,
     ) -> models.Field:
 
+        section = None if section in (None, "") else str(section)
+        variety = str(variety)
+        planting_year = int(planting_year)
         reference_provider = str(reference_provider)
         reference_station = str(reference_station)
         soil_type = str(soil_type)
@@ -105,10 +137,27 @@ class FarmDB:
         root_depth_cm = float(root_depth_cm)
         area_ha_value = float(area_ha)
         p_allowable_value = float(p_allowable)
+        tree_count_value = None if tree_count is None else int(tree_count)
+        tree_height_value = None if tree_height is None else int(tree_height)
+        row_distance_value = None if row_distance is None else float(row_distance)
+        tree_distance_value = None if tree_distance is None else float(tree_distance)
+        running_metre_value = None if running_metre is None else float(running_metre)
+        herbicide_free_value = None if herbicide_free is None else bool(herbicide_free)
+        active_value = bool(active)
 
         with self.session_scope() as session:
             field = models.Field(
                 name=name,
+                section=section,
+                variety=variety,
+                planting_year=planting_year,
+                tree_count=tree_count_value,
+                tree_height=tree_height_value,
+                row_distance=row_distance_value,
+                tree_distance=tree_distance_value,
+                running_metre=running_metre_value,
+                herbicide_free=herbicide_free_value,
+                active=active_value,
                 reference_provider=reference_provider,
                 reference_station=reference_station,
                 soil_type=soil_type,
@@ -138,7 +187,7 @@ class FarmDB:
                 if field_key not in self._UPDATE_FIELD_ALLOWLIST:
                     raise ValueError(f"Invalid key {field_key} in update_field. Choose one of {self._UPDATE_FIELD_ALLOWLIST}")
 
-                if getattr(existing_field, field_key) != new_value and new_value is not None:
+                if getattr(existing_field, field_key) != new_value:
                     setattr(existing_field, field_key, new_value)
                     updated = True
 
