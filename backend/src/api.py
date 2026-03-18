@@ -1,9 +1,12 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from .api_models import (
@@ -55,6 +58,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+frontend_dist_dir = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+frontend_assets_dir = frontend_dist_dir / "assets"
+
+if frontend_assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_assets_dir), name="assets")
 
 def _validate_field_id(field_id: int):
     try:
@@ -327,3 +336,27 @@ async def get_field_water_balance_series(field_id: int):
         )
         for record in records
     ]
+
+
+@app.get("/", include_in_schema=False)
+async def serve_frontend_index():
+    index_file = frontend_dist_dir / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=404, detail="Frontend build not found.")
+    return FileResponse(index_file)
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_frontend_app(full_path: str):
+    if full_path.startswith("api"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    requested_path = frontend_dist_dir / full_path
+    if requested_path.is_file():
+        return FileResponse(requested_path)
+
+    index_file = frontend_dist_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+
+    raise HTTPException(status_code=404, detail="Frontend build not found.")
