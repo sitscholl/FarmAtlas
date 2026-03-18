@@ -200,6 +200,11 @@ export default function Home() {
             subtitle={buildSubtitle(field)}
             statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}
+            borderClassName={
+              field.herbicide_free === true
+                ? 'border-emerald-500/80 hover:border-sky-500'
+                : undefined
+            }
             to={`/fields/${field.id}`}
             actions={
               <>

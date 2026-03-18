@@ -21,6 +21,7 @@ type FieldBoxProps = {
   statusBar?: FieldBoxStatusBar
   to?: string
   actions?: ReactNode
+  borderClassName?: string
 }
 
 function FieldBoxContent({
@@ -31,14 +32,16 @@ function FieldBoxContent({
   statusBar,
   to,
   actions,
+  borderClassName,
 }: FieldBoxProps) {
   const statusBarClasses = statusBar?.isCritical
     ? 'from-rose-500 via-orange-500 to-red-500'
     : 'from-sky-500 via-cyan-400 to-blue-400'
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
+  const cardClasses = borderClassName ?? 'border-slate-200/80 hover:border-sky-500'
 
   return (
-    <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-sky-500">
+    <div className={`group relative overflow-hidden rounded-[1.75rem] border p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg ${cardClasses}`}>
       {to ? (
         <Link
           to={to}
