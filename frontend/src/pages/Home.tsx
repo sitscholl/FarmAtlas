@@ -37,7 +37,6 @@ function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   return [
     { label: 'Flaeche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
     { label: 'Pflanzjahr', value: String(field.planting_year) },
-    { label: 'Sorte', value: field.variety },
     { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
     {
       label: 'Baumzahl',
@@ -69,13 +68,13 @@ function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'refe
 }
 
 function buildSubtitle(field: FieldOverview) {
-  const parts = [
+  return [
     field.section ? `Abschnitt: ${field.section}` : null,
+    `Sorte: ${field.variety}`,
     `Bodenart: ${field.soil_type}`,
-    field.active ? 'Aktiv' : 'Inaktiv',
   ]
-
-  return parts.filter(Boolean).join(' | ')
+    .filter((part): part is string => part !== null)
+    .join('\n')
 }
 
 export default function Home() {
@@ -230,14 +229,14 @@ export default function Home() {
 
   return (
     <section className="relative max-w-5xl">
-      <div className="relative rounded-3xl border border-slate-200/70 bg-white/70 p-8 shadow-xl backdrop-blur">
+      <div className="relative p-8">
         <div className="mx-auto max-w-2xl text-center">
+          <h1 className="mb-4 text-4xl font-semibold text-slate-900 sm:text-5xl">
+            Oberlenghof
+          </h1>
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
             Anlagen Uebersicht
           </p>
-          <h1 className="mt-4 text-4xl font-semibold text-slate-900 sm:text-5xl">
-            Oberlenghof
-          </h1>
         </div>
 
         {content}

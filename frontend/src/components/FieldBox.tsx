@@ -38,7 +38,7 @@ function FieldBoxContent({
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
 
   return (
-    <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-sky-500">
       {to ? (
         <Link
           to={to}
@@ -62,7 +62,7 @@ function FieldBoxContent({
       </div>
 
       {subtitle ? (
-        <p className={`${contentClasses} mt-2 text-sm text-slate-500`}>{subtitle}</p>
+        <p className={`${contentClasses} mt-2 text-sm text-slate-500 whitespace-pre-line`}>{subtitle}</p>
       ) : null}
 
       {statusBar ? (
@@ -93,7 +93,7 @@ function FieldBoxContent({
         {metrics.map((metric) => (
           <div
             key={metric.label}
-            className="flex items-baseline justify-between gap-1 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0"
+            className="flex items-baseline justify-between gap-1"
           >
             <p className="text-sm text-slate-500">{metric.label}</p>
             <p className="text-base font-semibold text-slate-900">
