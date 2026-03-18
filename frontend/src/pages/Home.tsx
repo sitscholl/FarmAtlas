@@ -36,8 +36,13 @@ function formatOptionalNumber(
 function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   return [
     { label: 'Flaeche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
+    { label: 'Pflanzjahr', value: String(field.planting_year) },
+    { label: 'Sorte', value: field.variety },
     { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
-    { label: 'Humusgehalt', value: `${formatNumber(field.humus_pct, 1)} %` },
+    {
+      label: 'Baumzahl',
+      value: field.tree_count === null ? 'n/a' : formatNumber(field.tree_count, 0),
+    },
     {
       label: 'Wasserdefizit',
       value: formatOptionalNumber(field.current_deficit, 'mm', 1),
@@ -61,6 +66,16 @@ function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined 
 
 function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
   return `${field.reference_station}`
+}
+
+function buildSubtitle(field: FieldOverview) {
+  const parts = [
+    field.section ? `Abschnitt: ${field.section}` : null,
+    `Bodenart: ${field.soil_type}`,
+    field.active ? 'Aktiv' : 'Inaktiv',
+  ]
+
+  return parts.filter(Boolean).join(' | ')
 }
 
 export default function Home() {
@@ -115,6 +130,17 @@ export default function Home() {
 
     return {
       name: editingField.name,
+      section: editingField.section ?? '',
+      variety: editingField.variety,
+      planting_year: String(editingField.planting_year),
+      tree_count: String(editingField.tree_count ?? ''),
+      tree_height: String(editingField.tree_height ?? ''),
+      row_distance: String(editingField.row_distance ?? ''),
+      tree_distance: String(editingField.tree_distance ?? ''),
+      running_metre: String(editingField.running_metre ?? ''),
+      herbicide_free:
+        editingField.herbicide_free === null ? '' : String(editingField.herbicide_free),
+      active: String(editingField.active),
       reference_provider: editingField.reference_provider,
       reference_station: editingField.reference_station,
       area_ha: String(editingField.area_ha ?? ''),
@@ -172,7 +198,7 @@ export default function Home() {
             key={field.id}
             title={field.name}
             badge={formatReference(field)}
-            subtitle={`Bodenart: ${field.soil_type}`}
+            subtitle={buildSubtitle(field)}
             statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}
             to={`/fields/${field.id}`}

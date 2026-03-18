@@ -1,5 +1,22 @@
 import { type CreateActionConfig } from '../types/createActions'
 
+function toOptionalNumber(value: string) {
+  return value.trim() === '' ? null : Number(value)
+}
+
+function toOptionalText(value: string) {
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
+
+function toOptionalBoolean(value: string) {
+  if (value === '') {
+    return null
+  }
+
+  return value === 'true'
+}
+
 export const fieldCreateAction: CreateActionConfig = {
   id: 'field',
   label: 'Anlage hinzufuegen',
@@ -9,9 +26,39 @@ export const fieldCreateAction: CreateActionConfig = {
   method: 'post',
   fields: [
     { id: 'name', label: 'Name', type: 'text', placeholder: 'Parzellenname', required: true },
+    { id: 'section', label: 'Abschnitt', type: 'text', placeholder: 'Nord', required: false },
+    { id: 'variety', label: 'Sorte', type: 'text', placeholder: 'Gala', required: true },
+    { id: 'area_ha', label: 'Flaeche (ha)', type: 'number', placeholder: '1', step: '0.1', required: true },
+    { id: 'planting_year', label: 'Pflanzjahr', type: 'number', placeholder: '2018', step: '1', required: true },
+    { id: 'tree_count', label: 'Baumzahl', type: 'number', placeholder: '250', step: '1', required: false },
+    { id: 'tree_height', label: 'Baumhoehe (m)', type: 'number', placeholder: '3', step: '0.1', required: false },
+    { id: 'row_distance', label: 'Reihenabstand (m)', type: 'number', placeholder: '3.5', step: '0.1', required: false },
+    { id: 'tree_distance', label: 'Pflanzabstand (m)', type: 'number', placeholder: '1.2', step: '0.1', required: false },
+    { id: 'running_metre', label: 'Laufmeter (m)', type: 'number', placeholder: '450', step: '0.1', required: false },
+    {
+      id: 'herbicide_free',
+      label: 'Herbizidfrei',
+      type: 'select',
+      options: [
+        { value: '', label: 'Keine Angabe' },
+        { value: 'true', label: 'Ja' },
+        { value: 'false', label: 'Nein' },
+      ],
+      required: false,
+    },
+    {
+      id: 'active',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'true', label: 'Aktiv' },
+        { value: 'false', label: 'Inaktiv' },
+      ],
+      defaultValue: 'true',
+      required: true,
+    },
     { id: 'reference_provider', label: 'Provider', type: 'text', defaultValue: 'sbr', required: true },
     { id: 'reference_station', label: 'Referenzstation', type: 'text', defaultValue: '103', required: true },
-    { id: 'area_ha', label: 'Flaeche (ha)', type: 'number', placeholder: '1', step: '0.1', required: true },
     { id: 'soil_type', label: 'Bodenart', type: 'text', placeholder: 'lehm', required: true },
     { id: 'humus_pct', label: 'Humusgehalt (%)', type: 'number', placeholder: '3', step: '0.1', required: true },
     { id: 'root_depth_cm', label: 'Wurzeltiefe (cm)', type: 'number', defaultValue: 30, step: '1', required: true },
@@ -19,6 +66,16 @@ export const fieldCreateAction: CreateActionConfig = {
   ],
   buildPayload: (values) => ({
     name: values.name.trim(),
+    section: toOptionalText(values.section),
+    variety: values.variety.trim(),
+    planting_year: Number(values.planting_year),
+    tree_count: toOptionalNumber(values.tree_count),
+    tree_height: toOptionalNumber(values.tree_height),
+    row_distance: toOptionalNumber(values.row_distance),
+    tree_distance: toOptionalNumber(values.tree_distance),
+    running_metre: toOptionalNumber(values.running_metre),
+    herbicide_free: toOptionalBoolean(values.herbicide_free),
+    active: values.active === 'true',
     reference_provider: values.reference_provider.trim(),
     reference_station: values.reference_station.trim(),
     soil_type: values.soil_type.trim(),

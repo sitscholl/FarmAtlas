@@ -1,5 +1,15 @@
 export type FieldCreatePayload = {
   name: string
+  section: string | null
+  variety: string
+  planting_year: number
+  tree_count: number | null
+  tree_height: number | null
+  row_distance: number | null
+  tree_distance: number | null
+  running_metre: number | null
+  herbicide_free: boolean | null
+  active: boolean
   reference_provider: string
   reference_station: string
   soil_type: string
@@ -27,10 +37,11 @@ export type CreateActionField =
       required?: boolean
     }
   | {
-      id: keyof IrrigationCreatePayload
+      id: keyof FieldCreatePayload | keyof IrrigationCreatePayload
       label: string
       type: 'select'
-      optionsSource: 'fields'
+      optionsSource?: 'fields'
+      options?: FieldOption[]
       defaultValue?: string | number
       required?: boolean
     }

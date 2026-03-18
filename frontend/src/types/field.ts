@@ -1,6 +1,16 @@
 export type FieldSummary = {
   id: number
   name: string
+  section: string | null
+  variety: string
+  planting_year: number
+  tree_count: number | null
+  tree_height: number | null
+  row_distance: number | null
+  tree_distance: number | null
+  running_metre: number | null
+  herbicide_free: boolean | null
+  active: boolean
   reference_provider: string
   reference_station: string
   soil_type: string
@@ -13,6 +23,16 @@ export type FieldSummary = {
 export type FieldOverview = {
   id: number
   name: string
+  section: string | null
+  variety: string
+  planting_year: number
+  tree_count: number | null
+  tree_height: number | null
+  row_distance: number | null
+  tree_distance: number | null
+  running_metre: number | null
+  herbicide_free: boolean | null
+  active: boolean
   reference_provider: string
   reference_station: string
   soil_type: string

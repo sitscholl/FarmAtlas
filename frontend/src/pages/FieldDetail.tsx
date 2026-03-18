@@ -21,6 +21,14 @@ function formatReference(provider: string, stationId: string) {
   return `${provider}: ${stationId}`
 }
 
+function formatBoolean(value: boolean | null) {
+  if (value === null) {
+    return 'n/a'
+  }
+
+  return value ? 'Ja' : 'Nein'
+}
+
 export default function FieldDetail() {
   const { fieldId } = useParams()
   const [field, setField] = useState<FieldOverview | null>(null)
@@ -98,7 +106,8 @@ export default function FieldDetail() {
               {field.name}
             </h1>
             <p className="mt-3 text-sm text-slate-500">
-              Bodentyp: {field.soil_type}, Referenzstation: {formatReference(field.reference_provider, field.reference_station)}
+              {field.section ? `Abschnitt: ${field.section}, ` : ''}
+              Sorte: {field.variety}, Bodentyp: {field.soil_type}, Referenzstation: {formatReference(field.reference_provider, field.reference_station)}
             </p>
           </div>
 
@@ -157,6 +166,70 @@ export default function FieldDetail() {
             </p>
             <p className="mt-1 text-base font-semibold text-slate-900">
               {field.water_balance_as_of ?? 'n/a'}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Planting year
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {field.planting_year}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Tree count
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {formatNumber(field.tree_count, 0)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Tree height
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {formatNumber(field.tree_height, 0)} cm
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Herbicide free
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {formatBoolean(field.herbicide_free)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Row distance
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {formatNumber(field.row_distance, 1)} m
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Tree distance
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {formatNumber(field.tree_distance, 1)} m
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Running metre
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {formatNumber(field.running_metre, 1)} m
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              Status
+            </p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {field.active ? 'Aktiv' : 'Inaktiv'}
             </p>
           </div>
         </div>

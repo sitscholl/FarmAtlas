@@ -136,6 +136,8 @@ export default function CreateEntityModal({
       'mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 
     if (field.type === 'select') {
+      const options = field.optionsSource === 'fields' ? fieldOptions : (field.options ?? [])
+
       return (
         <select
           id={String(field.id)}
@@ -144,7 +146,7 @@ export default function CreateEntityModal({
           className={commonClasses}
           required={field.required ?? true}
         >
-          {fieldOptions.map((option) => (
+          {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -168,9 +170,9 @@ export default function CreateEntityModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-8 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[2rem] border border-slate-200 bg-white p-8 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-4 backdrop-blur-sm">
+      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
+        <div className="flex shrink-0 items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
               {action.method === 'put' ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
@@ -179,30 +181,28 @@ export default function CreateEntityModal({
               {action.title}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
-          >
-            Schliessen
-          </button>
         </div>
 
-        <form className="mt-8 grid gap-5 sm:grid-cols-2" onSubmit={handleSubmit}>
+        <form
+          className="mt-6 overflow-y-auto pr-1"
+          onSubmit={handleSubmit}
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
           {action.fields.map((field) => (
             <label key={String(field.id)} htmlFor={String(field.id)} className="block">
               <span className="text-sm font-medium text-slate-700">{field.label}</span>
               {renderField(field)}
             </label>
           ))}
+          </div>
 
           {errorMessage ? (
-            <div className="sm:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {errorMessage}
             </div>
           ) : null}
 
-          <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
+          <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
             <button
               type="button"
               onClick={onClose}
