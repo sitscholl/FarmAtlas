@@ -86,7 +86,7 @@ function FieldBoxContent({
           </div>
           {statusBar.isCritical ? (
             <p className="mt-2 text-xs font-medium text-rose-600">
-              Below RAW threshold
+              Unterhalb Grenzwert!
             </p>
           ) : null}
         </div>

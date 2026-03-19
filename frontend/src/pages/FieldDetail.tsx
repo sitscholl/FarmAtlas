@@ -17,16 +17,26 @@ function formatNumber(value: number | null, digits = 1) {
   }).format(value)
 }
 
-function formatReference(provider: string, stationId: string) {
-  return `${provider}: ${stationId}`
-}
-
 function formatBoolean(value: boolean | null) {
   if (value === null) {
     return 'n/a'
   }
 
   return value ? 'Ja' : 'Nein'
+}
+
+function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
+  return `${field.reference_station}`
+}
+
+function buildSubtitle(field: FieldOverview) {
+  return [
+    field.section ? `Abschnitt: ${field.section}` : null,
+    `Sorte: ${field.variety}`,
+    `Bodenart: ${field.soil_type}`,
+  ]
+    .filter((part): part is string => part !== null)
+    .join('\n')
 }
 
 export default function FieldDetail() {
@@ -105,31 +115,24 @@ export default function FieldDetail() {
             <h1 className="mt-3 text-4xl font-semibold text-slate-900">
               {field.name}
             </h1>
-            <p className="mt-3 text-sm text-slate-500">
-              {field.section ? `Abschnitt: ${field.section}, ` : ''}
-              Sorte: {field.variety}, Bodentyp: {field.soil_type}, Referenzstation: {formatReference(field.reference_provider, field.reference_station)}
-            </p>
+            <p className="relative mt-2 text-sm text-slate-500 whitespace-pre-line">{ buildSubtitle(field) }</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Safe ratio
+                Provider
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
-                {formatNumber(
-                  field.safe_ratio === null ? null : field.safe_ratio * 100,
-                  0,
-                )}
-                %
+                {field.reference_provider.toUpperCase()}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Current deficit
+                Station
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
-                {formatNumber(field.current_deficit, 1)} mm
+                {field.reference_station}
               </p>
             </div>
           </div>
