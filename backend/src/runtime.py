@@ -90,7 +90,7 @@ class RuntimeContext:
         )
 
         ## Database
-        self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///database.db'))
+        self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///db/database.db'))
        
         ## Fields
         if len(self.fields) == 0:

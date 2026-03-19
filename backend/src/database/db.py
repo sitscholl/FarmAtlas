@@ -1,6 +1,7 @@
 import datetime
 import logging
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Generator, List, Optional, Any
 
 from sqlalchemy import create_engine
@@ -47,10 +48,25 @@ class FarmDB:
     }
     _UPDATE_IRRIGATION_ALLOWLIST = {"field_id", "date", "method", "amount"}
 
-    def __init__(self, engine_url: str = 'sqlite:///database.db', **engine_kwargs) -> None:
+    @staticmethod
+    def _ensure_sqlite_directory(engine_url: str) -> None:
+        if not engine_url.startswith("sqlite:///") or engine_url == "sqlite:///:memory:":
+            return
+
+        sqlite_path = engine_url.removeprefix("sqlite:///")
+        if not sqlite_path:
+            return
+
+        database_path = Path(sqlite_path)
+        parent_dir = database_path.parent
+        if str(parent_dir) not in ("", "."):
+            parent_dir.mkdir(parents=True, exist_ok=True)
+
+    def __init__(self, engine_url: str = 'sqlite:///db/database.db', **engine_kwargs) -> None:
         """
         Create a database engine and initialise ORM metadata.
         """
+        self._ensure_sqlite_directory(engine_url)
         self.engine = create_engine(engine_url, future=True, **engine_kwargs)
         models.Base.metadata.create_all(self.engine)
         self._session_factory = sessionmaker(
