@@ -87,11 +87,15 @@ export default function Home() {
     const fetchFields = async () => {
       try {
         const response = await api.get<FieldOverview[]>('/fields/overview')
+        if (!Array.isArray(response.data)) {
+          throw new TypeError('Expected /fields/overview to return an array.')
+        }
         setFields(response.data)
         setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching fields', error)
         setErrorMessage('Fields could not be loaded.')
+        setFields([])
       } finally {
         setIsLoading(false)
       }
