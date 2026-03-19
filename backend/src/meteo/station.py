@@ -10,7 +10,6 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass(frozen=True)
 class StationMetadata:
     id: str
@@ -73,9 +72,10 @@ class Station:
 
         if metadata.elevation is None and resolve_elevation:
             try:
+                logger.debug("Resolving elevation for station %s", metadata.id)
                 elevation = cls.fetch_elevation(metadata.x, metadata.y, client=client)
             except Exception as exc:
-                logger.warning("Fetching elevation for station %s failed with error: %s", id, exc)
+                logger.warning("Fetching elevation for station %s failed with error: %s", metadata.id, exc)
                 elevation = None
         else:
             elevation = metadata.elevation
@@ -98,19 +98,37 @@ class Station:
         return self.x
 
     @staticmethod
-    def fetch_elevation(x: float, y: float, client: Optional[httpx.Client] = None) -> float:
+    def fetch_elevation(
+        x: float,
+        y: float,
+        client: Optional[httpx.Client] = None,
+        timeout: float = 30.0,
+    ) -> float:
         api_template = "https://api.opentopodata.org/v1/eudem25m?locations={lat},{lon}"
         url = api_template.format(lat=y, lon=x)
+        logger.debug(f"Requesting elevation from url: {url}")
+
+        def _extract_elevation(response: httpx.Response) -> float:
+            response.raise_for_status()
+            logger.debug("Parsing elevation response payload from %s", url)
+            payload = response.json()
+            results = payload.get("results")
+            if not isinstance(results, list) or len(results) == 0:
+                raise ValueError("Elevation API returned no results.")
+
+            elevation = results[0].get("elevation")
+            if elevation is None:
+                raise ValueError("Elevation API returned no elevation value.")
+            logger.debug("Elevation payload parsed successfully from %s", url)
+            return elevation
 
         if client is None:
-            with httpx.Client() as temp_client:
+            with httpx.Client(timeout=timeout) as temp_client:
                 response = temp_client.get(url)
-                response.raise_for_status()
-                return response.json()["results"][0]["elevation"]
+                return _extract_elevation(response)
 
-        response = client.get(url)
-        response.raise_for_status()
-        return response.json()["results"][0]["elevation"]
+        response = client.get(url, timeout=timeout)
+        return _extract_elevation(response)
 
 @dataclass
 class MeteoData:

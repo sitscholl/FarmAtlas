@@ -52,6 +52,9 @@ class PenmanDailyCalculator(ET0Calculator):
         if missing_cols:
             raise ValueError(f"The following parameters required for the PenmanDaily calculation are missing in the meteo data: {missing_cols}")
 
+        if station.elevation is None:
+            raise ValueError(f"Elevation for station {station.id} is none but has to be provided to calculate evapotranspiration.")
+
         et = pm_fao56(
             meteo_data.tair_2m, 
             meteo_data.wind_speed, 

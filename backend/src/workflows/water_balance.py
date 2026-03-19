@@ -307,14 +307,18 @@ class WaterBalanceWorkflow:
                     start=station_start,
                     end=period_end,
                 )
+                logger.debug("Meteo query completed for station %s", station_id)
                 meteo_data = self.meteo_validator.validate(meteo_data)
+                logger.debug("Meteo validation completed for station %s", station_id)
                 station = meteo_data.get_station_data(station_id)
                 if station is None:
                     logger.warning("No meteo station data available for station %s", station_id)
                     continue
 
                 station = self._prepare_station_data(station)
+                logger.debug("Station preparation completed for station %s", station_id)
                 et_data = self.et_calculator.calculate(station, correct=True)
+                logger.debug("ET calculation completed for station %s", station_id)
                 station.data = station.data.join(et_data)
 
                 for field in station_fields:

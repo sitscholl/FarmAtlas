@@ -20,7 +20,7 @@ class MeteoLoader:
         radiation_fallback_provider: str = 'province',
         radiation_fallback_station: str = '09700MS',
         request_timeout: int = 60,
-        fetch_missing_elevation: bool = False,
+        fetch_missing_elevation: bool = True,
         convert_solar_radiation_from_watts: bool = True,
         ):
 
@@ -185,6 +185,7 @@ class MeteoLoader:
             if df.empty:
                 logger.warning("No data returned for station %s in window %s - %s", station_id, start, end)
                 return None
+            logger.debug(f"Loaded {len(df)} rows of data for station {station_id}")
             
             df = self._fill_solar_radiation(df, start, end)
             station = Station.create(
