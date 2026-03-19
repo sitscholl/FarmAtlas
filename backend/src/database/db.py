@@ -116,7 +116,6 @@ class FarmDB:
     def create_field(
         self,
         name: str,
-        section: str | None,
         variety: str,
         planting_year: int,
         reference_provider: str,
@@ -126,6 +125,7 @@ class FarmDB:
         area_ha: float,
         root_depth_cm: float,
         p_allowable: float,
+        section: str | None = None,
         tree_count: int | None = None,
         tree_height: float | None = None,
         row_distance: float | None = None,
