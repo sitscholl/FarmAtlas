@@ -36,7 +36,7 @@ class Field(Base):
     soil_type = Column(String, nullable=False)
     humus_pct = Column(Float, nullable = False)
     root_depth_cm = Column(Float, nullable=False)
-    p_allowable = Column(Float, nullable=False, default=0)
+    p_allowable = Column(Float, nullable=False) #fraction of water that can be depleted before stress/irrigation trigger
 
     active = Column(Boolean, nullable=False, default=True)
 
