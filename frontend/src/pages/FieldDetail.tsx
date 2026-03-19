@@ -72,27 +72,27 @@ function MetricSection({
   metrics: DetailMetric[]
 }) {
   return (
-    <section className="rounded-[1.5rem] border border-slate-200/80 bg-slate-50/80 p-5">
-      <div className="flex items-center justify-between gap-3 pb-3">
+    <section className="rounded-[1.5rem] bg-white border border-slate-200/80 bg-slate-50/80 p-5">
+      <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
           {title}
         </h2>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-2 grid sm:grid-cols-2">
         {metrics.map((metric) => (
           <div
             key={metric.label}
             className={
               metric.accent
                 ? 'rounded-2xl border border-slate-200 px-4 py-3 shadow-sm'
-                : 'rounded-2xl border border-transparent px-4 py-3'
+                : 'rounded-2xl border border-transparent py-1'
             }
           >
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               {metric.label}
             </p>
-            <p className="mt-2 text-lg font-semibold text-slate-900">
+            <p className="text-lg font-semibold text-slate-900">
               {metric.value}
             </p>
           </div>
@@ -204,14 +204,18 @@ export default function FieldDetail() {
           </div>
         </div>
 
+        <div className="mt-10">
+          <WaterBalanceChart data={series} />
+        </div>
+
+        <h1 className="mt-12 text-4xl font-semibold text-slate-900">
+          Detailinfo
+        </h1>
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
           <MetricSection title="Anlage" metrics={fieldMetrics} />
           <MetricSection title="Wasserhaushalt" metrics={waterMetrics} />
         </div>
 
-        <div className="mt-10">
-          <WaterBalanceChart data={series} />
-        </div>
       </div>
     </section>
   )
