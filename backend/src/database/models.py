@@ -24,7 +24,7 @@ class Field(Base):
     planting_year = Column(Integer, nullable=False)
     area_ha = Column(Float, nullable=False)
     tree_count = Column(Integer, nullable=True)
-    tree_height = Column(Integer, nullable=True)
+    tree_height = Column(Float, nullable=True)
     row_distance = Column(Float, nullable=True)
     tree_distance = Column(Float, nullable=True)
     running_metre = Column(Float, nullable = True)

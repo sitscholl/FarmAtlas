@@ -10,7 +10,7 @@ class FieldSummaryResponse(BaseModel):
     variety: str
     planting_year: int
     tree_count: int | None
-    tree_height: int | None
+    tree_height: float | None
     row_distance: float | None
     tree_distance: float | None
     running_metre: float | None
@@ -30,7 +30,7 @@ class FieldPost(BaseModel):
     variety: str
     planting_year: int
     tree_count: int | None = None
-    tree_height: int | None = None
+    tree_height: float | None = None
     row_distance: float | None = None
     tree_distance: float | None = None
     running_metre: float | None = None
@@ -50,7 +50,7 @@ class FieldPut(BaseModel):
     variety: str
     planting_year: int
     tree_count: int | None = None
-    tree_height: int | None = None
+    tree_height: float | None = None
     row_distance: float | None = None
     tree_distance: float | None = None
     running_metre: float | None = None
@@ -71,7 +71,7 @@ class FieldOverviewResponse(BaseModel):
     variety: str
     planting_year: int
     tree_count: int | None
-    tree_height: int | None
+    tree_height: float | None
     row_distance: float | None
     tree_distance: float | None
     running_metre: float | None

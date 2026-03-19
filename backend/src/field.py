@@ -21,7 +21,7 @@ class FieldContext:
     variety: str
     planting_year: int
     tree_count: int | None
-    tree_height: int | None
+    tree_height: float | None
     row_distance: float | None
     tree_distance: float | None
     running_metre: float | None

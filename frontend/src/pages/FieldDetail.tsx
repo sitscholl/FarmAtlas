@@ -189,7 +189,7 @@ export default function FieldDetail() {
               Tree height
             </p>
             <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.tree_height, 0)} cm
+              {formatNumber(field.tree_height, 1)} cm
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
