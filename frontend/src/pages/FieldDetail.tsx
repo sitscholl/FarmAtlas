@@ -6,6 +6,12 @@ import WaterBalanceChart from '../components/WaterBalanceChart'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/field'
 
+type DetailMetric = {
+  label: string
+  value: string
+  accent?: boolean
+}
+
 function formatNumber(value: number | null, digits = 1) {
   if (value === null) {
     return 'n/a'
@@ -25,10 +31,6 @@ function formatBoolean(value: boolean | null) {
   return value ? 'Ja' : 'Nein'
 }
 
-function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
-  return `${field.reference_station}`
-}
-
 function buildSubtitle(field: FieldOverview) {
   return [
     field.section ? `Abschnitt: ${field.section}` : null,
@@ -37,6 +39,67 @@ function buildSubtitle(field: FieldOverview) {
   ]
     .filter((part): part is string => part !== null)
     .join('\n')
+}
+
+function buildFieldMetrics(field: FieldOverview): DetailMetric[] {
+  return [
+    { label: 'Flaeche', value: `${formatNumber(field.area_ha, 2)} ha` },
+    { label: 'Pflanzjahr', value: String(field.planting_year) },
+    { label: 'Baumzahl', value: formatNumber(field.tree_count, 0) },
+    { label: 'Baumhoehe', value: `${formatNumber(field.tree_height, 1)} cm` },
+    { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
+    { label: 'Reihenabstand', value: `${formatNumber(field.row_distance, 1)} m` },
+    { label: 'Baumabstand', value: `${formatNumber(field.tree_distance, 1)} m` },
+    { label: 'Laufmeter', value: `${formatNumber(field.running_metre, 1)} m` },
+    { label: 'Herbizidfrei', value: formatBoolean(field.herbicide_free) },
+    { label: 'Status', value: field.active ? 'Aktiv' : 'Inaktiv' },
+  ]
+}
+
+function buildWaterMetrics(field: FieldOverview): DetailMetric[] {
+  return [
+    { label: 'Feldkapazitaet', value: `${formatNumber(field.field_capacity, 1)} mm` },
+    { label: 'Wasserdefizit', value: `${formatNumber(field.current_deficit, 1)} mm` },
+    { label: 'Letzte Aktualisierung', value: field.water_balance_as_of ?? 'n/a' },
+  ]
+}
+
+function MetricSection({
+  title,
+  metrics,
+}: {
+  title: string
+  metrics: DetailMetric[]
+}) {
+  return (
+    <section className="rounded-[1.5rem] border border-slate-200/80 bg-slate-50/80 p-5">
+      <div className="flex items-center justify-between gap-3 pb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          {title}
+        </h2>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {metrics.map((metric) => (
+          <div
+            key={metric.label}
+            className={
+              metric.accent
+                ? 'rounded-2xl border border-slate-200 px-4 py-3 shadow-sm'
+                : 'rounded-2xl border border-transparent px-4 py-3'
+            }
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              {metric.label}
+            </p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {metric.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 export default function FieldDetail() {
@@ -97,6 +160,9 @@ export default function FieldDetail() {
     )
   }
 
+  const fieldMetrics = buildFieldMetrics(field)
+  const waterMetrics = buildWaterMetrics(field)
+
   return (
     <section className="w-full max-w-6xl">
       <div className="p-8">
@@ -138,103 +204,9 @@ export default function FieldDetail() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Area
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.area_ha, 2)} ha
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Root depth
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.root_depth_cm)} cm
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Field capacity
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.field_capacity, 1)} mm
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Updated
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {field.water_balance_as_of ?? 'n/a'}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Planting year
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {field.planting_year}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Tree count
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.tree_count, 0)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Tree height
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.tree_height, 1)} cm
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Herbicide free
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatBoolean(field.herbicide_free)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Row distance
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.row_distance, 1)} m
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Tree distance
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.tree_distance, 1)} m
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Running metre
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {formatNumber(field.running_metre, 1)} m
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Status
-            </p>
-            <p className="mt-1 text-base font-semibold text-slate-900">
-              {field.active ? 'Aktiv' : 'Inaktiv'}
-            </p>
-          </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+          <MetricSection title="Anlage" metrics={fieldMetrics} />
+          <MetricSection title="Wasserhaushalt" metrics={waterMetrics} />
         </div>
 
         <div className="mt-10">
