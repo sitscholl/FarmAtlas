@@ -4,6 +4,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,6 +19,7 @@ type WaterBalanceChartProps = {
 
 type ChartRow = WaterBalanceSeriesPoint & {
   raw_threshold: number | null
+  evapotranspiration_negative: number | null
 }
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -38,6 +40,10 @@ function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
       point.readily_available_water === null
         ? null
         : point.field_capacity - point.readily_available_water,
+    evapotranspiration_negative:
+      point.evapotranspiration === null || point.evapotranspiration === undefined
+        ? null
+        : -Math.abs(point.evapotranspiration),
   }))
 }
 
@@ -54,7 +60,16 @@ function TooltipContent({
     return null
   }
 
-  const rows = payload.filter((entry) => entry.value !== undefined)
+  const rows = payload.filter(
+    (entry) =>
+      entry.value !== undefined &&
+      entry.dataKey !== 'field_capacity' &&
+      entry.dataKey !== 'raw_threshold',
+  )
+
+  if (rows.length === 0) {
+    return null
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg">
@@ -70,7 +85,11 @@ function TooltipContent({
               {entry.name}
             </span>
             <span className="font-medium text-slate-900">
-              {formatNumber(entry.value)} mm
+              {formatNumber(
+                entry.dataKey === 'evapotranspiration_negative'
+                  ? Math.abs(entry.value ?? 0)
+                  : entry.value,
+              )} mm
             </span>
           </div>
         ))}
@@ -89,6 +108,9 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
   }
 
   const chartData = buildChartData(data)
+  const hasEvapotranspiration = chartData.some(
+    (point) => point.evapotranspiration_negative !== null,
+  )
 
   return (
     <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
@@ -105,7 +127,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
           <ComposedChart
             data={chartData}
             margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
-            barCategoryGap="70%"
+            barCategoryGap="80%"
           >
             <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
             <XAxis
@@ -113,16 +135,26 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               tick={{ fill: '#64748b', fontSize: 12 }}
               tickLine={{ fill: '#64748b' }}
               axisLine={{ stroke: '#cbd5e1' }}
-              label={{ value: 'Date', position: 'insideBottom', offset: -8, fill: '#64748b' }}
+              label={{ value: 'Datum', position: 'insideBottom', offset: -8, fill: '#64748b' }}
             />
             <YAxis
               tick={{ fill: '#64748b', fontSize: 12 }}
               tickLine={{ fill: '#64748b' }}
               axisLine={{ stroke: '#cbd5e1' }}
-              label={{ value: 'Water (mm)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+              label={{ value: 'Wassergehalt (mm)', angle: -90, fill: '#64748b' }}
             />
+            <ReferenceLine y={0} stroke="#64748b" strokeWidth={.5} />
             <Tooltip content={<TooltipContent />} />
             <Legend wrapperStyle={{ paddingTop: 12 }} />
+            <Line
+              type="monotone"
+              dataKey="soil_storage"
+              stroke="#0f172a"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+              name="Bodenwassergehalt"
+            />
             <Bar
               dataKey="precipitation"
               stackId="incoming"
@@ -134,18 +166,17 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               dataKey="irrigation"
               stackId="incoming"
               fill="#259a057a"
-              name="Bewässerung"
+              name="Bewaesserung"
               maxBarSize={10}
             />
-            <Line
-              type="monotone"
-              dataKey="soil_storage"
-              stroke="#0f172a"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              activeDot={{ r: 5 }}
-              name="Bodenwassergehalt"
-            />
+            {hasEvapotranspiration ? (
+              <Bar
+                dataKey="evapotranspiration_negative"
+                fill="#f59e0b99"
+                name="Evapotranspiration"
+                maxBarSize={10}
+              />
+            ) : null}
             <Line
               type="monotone"
               dataKey="field_capacity"
@@ -153,6 +184,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               strokeDasharray="6 6"
               strokeWidth={1}
               dot={false}
+              activeDot={false}
               legendType="none"
             />
             <Line
@@ -162,6 +194,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               strokeDasharray="4 5"
               strokeWidth={1}
               dot={false}
+              activeDot={false}
               connectNulls={false}
               legendType="none"
             />
@@ -169,7 +202,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-4 grid gap-3 text-sm text-slate-500 sm:grid-cols-3">
+      <div className="mt-2 grid justify-items-center gap-3 text-center text-sm text-slate-500 sm:grid-cols-3">
         <p>
           From <span className="font-medium text-slate-700">{data[0].date}</span>
         </p>
