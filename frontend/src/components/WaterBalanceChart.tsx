@@ -97,9 +97,6 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
             Water Balance
           </p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-            Soil Storage and Incoming Water
-          </h2>
         </div>
       </div>
 
@@ -110,13 +107,13 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
             <XAxis
               dataKey="date"
               tick={{ fill: '#64748b', fontSize: 12 }}
-              tickLine={false}
+              tickLine={{ fill: '#64748b' }}
               axisLine={{ stroke: '#cbd5e1' }}
               label={{ value: 'Date', position: 'insideBottom', offset: -8, fill: '#64748b' }}
             />
             <YAxis
               tick={{ fill: '#64748b', fontSize: 12 }}
-              tickLine={false}
+              tickLine={{ fill: '#64748b' }}
               axisLine={{ stroke: '#cbd5e1' }}
               label={{ value: 'Water (mm)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
             />
@@ -125,16 +122,15 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
             <Bar
               dataKey="precipitation"
               stackId="incoming"
-              fill="#38bdf8"
+              fill="#0682b77d"
               name="Precipitation"
-              radius={[4, 4, 0, 0]}
             />
             <Bar
               dataKey="irrigation"
               stackId="incoming"
-              fill="#22c55e"
+              fill="#259a057a"
               name="Irrigation"
-              radius={[4, 4, 0, 0]}
+              barSize={10}
             />
             <Line
               type="monotone"
@@ -152,7 +148,6 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               strokeDasharray="6 6"
               strokeWidth={2}
               dot={false}
-              name="Field capacity"
             />
             <Line
               type="monotone"
@@ -162,7 +157,6 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               strokeWidth={2}
               dot={false}
               connectNulls={false}
-              name="RAW threshold"
             />
           </ComposedChart>
         </ResponsiveContainer>
