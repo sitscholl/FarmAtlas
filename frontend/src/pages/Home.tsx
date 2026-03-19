@@ -204,12 +204,15 @@ export default function Home() {
             subtitle={buildSubtitle(field)}
             statusBar={buildSafeRatioBar(field)}
             metrics={buildFieldMetrics(field)}
-            borderClassName={
-              field.herbicide_free === true
-                ? 'border-emerald-500/80 hover:border-sky-500'
-                : undefined
-            }
             to={`/fields/${field.id}`}
+            titleAdornment={
+              field.herbicide_free === true ? (
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+              ) : undefined
+            }
             actions={
               <>
                 <button

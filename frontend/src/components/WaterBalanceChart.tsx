@@ -117,7 +117,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Water Balance
+            Wasserbilanz
           </p>
         </div>
       </div>
