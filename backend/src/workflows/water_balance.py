@@ -70,8 +70,8 @@ class WaterBalanceWorkflow:
 
     def _resolve_period_end(self, year: int) -> pd.Timestamp:
         end_of_year = pd.Timestamp(year=year + 1, month=1, day=1, tz=self.timezone)
-        next_day = pd.Timestamp.now(tz=self.timezone).floor("D") + pd.Timedelta(days=1)
-        return min(end_of_year, next_day)
+        today = pd.Timestamp.now(tz=self.timezone).floor("D") #meteo query is end exclusive, so calculation will be done until yesterday
+        return min(end_of_year, today)
 
     def get_cached_water_balance(
         self,
