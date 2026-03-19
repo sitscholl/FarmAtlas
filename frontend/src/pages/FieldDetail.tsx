@@ -99,7 +99,7 @@ export default function FieldDetail() {
 
   return (
     <section className="w-full max-w-6xl">
-      <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-8 shadow-sm">
+      <div className="p-8">
         <Link
           to="/"
           className="text-sm font-medium text-sky-700 hover:text-sky-900"
