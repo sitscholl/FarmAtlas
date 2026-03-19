@@ -105,6 +105,44 @@ def _serialize_irrigation_event(event) -> IrrigationResponse:
         amount=event.amount,
     )
 
+def _build_field_overview(field_id: int) -> FieldOverviewResponse:
+    field = _validate_field_id(field_id)
+    summary_by_field_id = {
+        summary["field_id"]: summary
+        for summary in runtime.db.get_water_balance_summary(field_ids=[field_id])
+    }
+    summary = summary_by_field_id.get(field_id, {})
+
+    return FieldOverviewResponse(
+        id=field.id,
+        name=field.name,
+        section=field.section,
+        variety=field.variety,
+        planting_year=field.planting_year,
+        tree_count=field.tree_count,
+        tree_height=field.tree_height,
+        row_distance=field.row_distance,
+        tree_distance=field.tree_distance,
+        running_metre=field.running_metre,
+        herbicide_free=field.herbicide_free,
+        active=field.active,
+        reference_provider=field.reference_provider,
+        reference_station=field.reference_station,
+        soil_type=field.soil_type,
+        soil_weight=field.soil_weight,
+        humus_pct=field.humus_pct,
+        area_ha=field.area_ha,
+        effective_root_depth_cm=field.effective_root_depth_cm,
+        p_allowable=field.p_allowable,
+        water_balance_as_of=summary.get("as_of"),
+        current_water_deficit=summary.get("current_water_deficit"),
+        current_soil_water_content=summary.get("current_soil_water_content"),
+        available_water_storage=summary.get("available_water_storage"),
+        readily_available_water=summary.get("readily_available_water"),
+        below_raw=summary.get("below_raw"),
+        safe_ratio=summary.get("safe_ratio"),
+    )
+
 def _raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...] = ()) -> None:
     if isinstance(exc, HTTPException):
         raise exc
@@ -251,43 +289,7 @@ async def get_fields_overview():
 
 @app.get("/api/fields/{field_id}/overview", response_model=FieldOverviewResponse)
 async def get_field_overview(field_id: int):
-    field = _validate_field_id(field_id)
-
-    summary_by_field_id = {
-        summary["field_id"]: summary
-        for summary in runtime.db.get_water_balance_summary(field_ids=[field_id])
-    }
-    summary = summary_by_field_id.get(field_id, {})
-
-    return FieldOverviewResponse(
-        id=field.id,
-        name=field.name,
-        section=field.section,
-        variety=field.variety,
-        planting_year=field.planting_year,
-        tree_count=field.tree_count,
-        tree_height=field.tree_height,
-        row_distance=field.row_distance,
-        tree_distance=field.tree_distance,
-        running_metre=field.running_metre,
-        herbicide_free=field.herbicide_free,
-        active=field.active,
-        reference_provider=field.reference_provider,
-        reference_station=field.reference_station,
-        soil_type=field.soil_type,
-        soil_weight=field.soil_weight,
-        humus_pct=field.humus_pct,
-        area_ha=field.area_ha,
-        effective_root_depth_cm=field.effective_root_depth_cm,
-        p_allowable=field.p_allowable,
-        water_balance_as_of=summary.get("as_of"),
-        current_water_deficit=summary.get("current_water_deficit"),
-        current_soil_water_content=summary.get("current_soil_water_content"),
-        available_water_storage=summary.get("available_water_storage"),
-        readily_available_water=summary.get("readily_available_water"),
-        below_raw=summary.get("below_raw"),
-        safe_ratio=summary.get("safe_ratio"),
-    )
+    return _build_field_overview(field_id)
 
 @app.get("/api/fields/{field_id}/irrigation", response_model = list[IrrigationResponse])
 async def list_irrigation_events(field_id: int):
@@ -311,6 +313,16 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
     except Exception as e:
         logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("No field with id", "Could not find any irrigation event with id"))
+
+@app.delete("/api/fields/{field_id}/irrigation", response_model=FieldOverviewResponse)
+async def clear_irrigation_events(field_id: int):
+    _validate_field_id(field_id)
+    try:
+        runtime.db.clear_irrigation_events(field_id)
+        return _build_field_overview(field_id)
+    except Exception as e:
+        logger.exception(f"Clearing irrigation events for field with id {field_id} failed: {e}")
+        _raise_write_http_error(e, not_found_prefixes=("No field with id",))
 
 @app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummaryResponse])
 async def get_water_balance_summary():
@@ -342,6 +354,16 @@ async def get_field_water_balance_series(field_id: int):
         for record in records
     ]
 
+@app.post("/api/fields/{field_id}/water-balance", response_model=FieldOverviewResponse)
+async def trigger_water_balance_calculation(field_id: int):
+    _validate_field_id(field_id)
+    try:
+        runtime.db.clear_water_balance(field_id)
+        runtime.run_workflow_for_field("water_balance", field_id)
+        return _build_field_overview(field_id)
+    except Exception as e:
+        logger.exception(f"Refreshing water balance for field with id {field_id} failed: {e}")
+        _raise_write_http_error(e, not_found_prefixes=("Unknown field id", "No field with id"))
 
 @app.get("/", include_in_schema=False)
 async def serve_frontend_index():

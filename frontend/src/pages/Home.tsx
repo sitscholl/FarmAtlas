@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 
+import { GoPencil } from 'react-icons/go'
+import { IoWater } from 'react-icons/io5'
+import { GiPlantWatering } from "react-icons/gi";
+import { PiTrashBold } from 'react-icons/pi'
+
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import FieldBox, {
@@ -10,9 +15,6 @@ import { fieldCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import type { CreateActionConfig } from '../types/createActions'
 import { type FieldOverview } from '../types/field'
-
-import { PiTrashBold } from "react-icons/pi";
-import { GoPencil } from "react-icons/go";
 
 function formatNumber(value: number, digits = 1) {
   return new Intl.NumberFormat('de-DE', {
@@ -171,6 +173,31 @@ export default function Home() {
     }
   }
 
+  const handleRefreshField = async (field: FieldOverview) => {
+    try {
+      await api.post(`/fields/${field.id}/water-balance`)
+      notifyDataChanged()
+    } catch (error) {
+      console.error(`Error refreshing field ${field.id}`, error)
+      setErrorMessage('Die Wasserbilanz fuer das Feld konnte nicht aktualisiert werden.')
+    }
+  }
+
+  const handleClearIrrigation = async (field: FieldOverview) => {
+    const confirmed = window.confirm(`Sollen alle Bewaesserungseintraege fuer "${field.name}" wirklich geloescht werden?`)
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await api.delete(`/fields/${field.id}/irrigation`)
+      notifyDataChanged()
+    } catch (error) {
+      console.error(`Error clearing irrigation for field ${field.id}`, error)
+      setErrorMessage('Die Bewaesserungseintraege konnten nicht geloescht werden.')
+    }
+  }
+
   const content = (() => {
     if (isLoading) {
       return (
@@ -220,7 +247,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setEditingField(field)}
-                  className="inline-flex w-6 h-6 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
                   aria-label={`${field.name} bearbeiten`}
                 >
                   <GoPencil />
@@ -228,10 +255,26 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => void handleDeleteField(field)}
-                  className="inline-flex w-6 h-6 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
                   aria-label={`${field.name} loeschen`}
                 >
                   <PiTrashBold />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRefreshField(field)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
+                  aria-label={`${field.name} Wasserbilanz aktualisieren`}
+                >
+                  <IoWater />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleClearIrrigation(field)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-700 text-white shadow-sm transition hover:bg-rose-800"
+                  aria-label={`${field.name} Bewaesserung leeren`}
+                >
+                  <GiPlantWatering />
                 </button>
               </>
             }

@@ -342,6 +342,21 @@ class FarmDB:
             self._clear_water_balance(session, field_id = event.field_id)
             return True
 
+    def clear_irrigation_events(self, field_id: int) -> int:
+        with self.session_scope() as session:
+            field = self._get_field(session, id=field_id)
+            if field is None:
+                raise ValueError(f"No field with id {field_id} found. Cannot clear irrigation events")
+
+            deleted = (
+                session.query(models.Irrigation)
+                .filter(models.Irrigation.field_id == field_id)
+                .delete(synchronize_session=False)
+            )
+            self._clear_water_balance(session, field_id=field_id)
+            logger.info("Cleared %s irrigation event(s) for field %s", deleted, field_id)
+            return deleted
+
     ## Water Balance
     def get_water_balance(
         self, 

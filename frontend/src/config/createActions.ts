@@ -75,7 +75,7 @@ export const fieldCreateAction: CreateActionConfig = {
     },
     { id: 'humus_pct', label: 'Humusgehalt (%)', type: 'number', placeholder: '3', step: '0.1', required: true },
     { id: 'effective_root_depth_cm', label: 'Effektive Wurzeltiefe (cm)', type: 'number', defaultValue: 30, step: '1', required: true },
-    { id: 'p_allowable', label: 'p_allowable', type: 'number', defaultValue: 0.30, step: '0.01', required: true },
+    { id: 'p_allowable', label: 'Entziehbarer Wasseranteil (%)', type: 'number', defaultValue: 0.70, step: '0.01', required: true },
   ],
   buildPayload: (values) => ({
     name: values.name.trim(),
@@ -113,7 +113,7 @@ export const createActions: CreateActionConfig[] = [
       { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
       { id: 'date', label: 'Datum', type: 'date', required: true },
       { id: 'method', label: 'Methode', type: 'text', defaultValue: 'drip', required: true },
-      { id: 'amount', label: 'Menge (mm)', type: 'number', defaultValue: 10, step: '0.1', required: true },
+      { id: 'amount', label: 'Menge (mm)', type: 'number', defaultValue: 100, step: '1', required: true },
     ],
     buildPayload: (values) => ({
       field_id: Number(values.field_id),
