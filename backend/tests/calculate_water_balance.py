@@ -27,6 +27,8 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
     field_specs = [
         {
             "name": "Synthetic Field A",
+            "variety": "Example",
+            "planting_year": 1900,
             "reference_provider": provider,
             "reference_station": station_id,
             "soil_type": "sandiger lehm",
@@ -37,6 +39,8 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
         },
         {
             "name": "Synthetic Field B",
+            "variety": "Example",
+            "planting_year": 1900,
             "reference_provider": provider,
             "reference_station": station_id,
             "soil_type": "lehm",
@@ -77,32 +81,34 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="irrigation_manager_wb_") as temp_dir:
         temp_db_path = Path(temp_dir) / "water_balance_test.sqlite"
         runtime = build_runtime(temp_db_path)
+        try:
+            year = pd.Timestamp.now(tz=runtime.timezone).year
 
-        year = pd.Timestamp.now(tz=runtime.timezone).year
+            fields = seed_fields(runtime, provider=provider, station_id=station_id, year=year)
 
-        fields = seed_fields(runtime, provider=provider, station_id=station_id, year=year)
+            logger.info(
+                "Running water-balance workflow for provider=%s station_id=%s year=%s",
+                provider,
+                station_id,
+                year,
+            )
+            populated_fields = runtime.run_workflow_for_fields(
+                workflow_name="water_balance",
+                field_ids=[field.id for field in fields],
+                year=year,
+                persist=True,
+            )
 
-        logger.info(
-            "Running water-balance workflow for provider=%s station_id=%s year=%s",
-            provider,
-            station_id,
-            year,
-        )
-        populated_fields = runtime.run_workflow_for_fields(
-            workflow_name="water_balance",
-            field_ids=[field.id for field in fields],
-            year=year,
-            persist=True,
-        )
-
-        for field in populated_fields:
-            print(f"\n=== {field.name} ===")
-            print("Field capacity:", field.field_capacity)
-            print("Metrics:", field.metrics)
-            if field.water_balance is None or field.water_balance.empty:
-                print("No water-balance output produced.")
-                continue
-            print(field.water_balance.tail())
+            for field in populated_fields:
+                print(f"\n=== {field.name} ===")
+                print("Field capacity:", field.field_capacity)
+                print("Metrics:", field.metrics)
+                if field.water_balance is None or field.water_balance.empty:
+                    print("No water-balance output produced.")
+                    continue
+                print(field.water_balance.tail())
+        finally:
+            runtime.db.close()
 
 
 if __name__ == "__main__":
