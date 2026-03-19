@@ -37,7 +37,7 @@ function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   return [
     { label: 'Flaeche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
     { label: 'Pflanzjahr', value: String(field.planting_year) },
-    { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
+    { label: 'Eff. Wurzeltiefe', value: `${formatNumber(field.effective_root_depth_cm)} cm` },
     {
       label: 'Baumzahl',
       value: field.tree_count === null ? 'n/a' : formatNumber(field.tree_count, 0),
@@ -72,6 +72,7 @@ function buildSubtitle(field: FieldOverview) {
     field.section ? `Abschnitt: ${field.section}` : null,
     `Sorte: ${field.variety}`,
     `Bodenart: ${field.soil_type}`,
+    field.soil_weight ? `Bodenschwere: ${field.soil_weight}` : null,
   ]
     .filter((part): part is string => part !== null)
     .join('\n')
@@ -148,8 +149,9 @@ export default function Home() {
       reference_station: editingField.reference_station,
       area_ha: String(editingField.area_ha ?? ''),
       soil_type: editingField.soil_type,
+      soil_weight: editingField.soil_weight ?? '',
       humus_pct: String(editingField.humus_pct),
-      root_depth_cm: String(editingField.root_depth_cm),
+      effective_root_depth_cm: String(editingField.effective_root_depth_cm),
       p_allowable: String(editingField.p_allowable),
     }
   }, [editingField])

@@ -36,6 +36,7 @@ function buildSubtitle(field: FieldOverview) {
     field.section ? `Abschnitt: ${field.section}` : null,
     `Sorte: ${field.variety}`,
     `Bodenart: ${field.soil_type}`,
+    field.soil_weight ? `Bodenschwere: ${field.soil_weight}` : null,
   ]
     .filter((part): part is string => part !== null)
     .join('\n')
@@ -47,7 +48,7 @@ function buildFieldMetrics(field: FieldOverview): DetailMetric[] {
     { label: 'Pflanzjahr', value: String(field.planting_year) },
     { label: 'Baumzahl', value: formatNumber(field.tree_count, 0) },
     { label: 'Baumhoehe', value: `${formatNumber(field.tree_height, 1)} cm` },
-    { label: 'Wurzeltiefe', value: `${formatNumber(field.root_depth_cm)} cm` },
+    { label: 'Effektive Wurzeltiefe', value: `${formatNumber(field.effective_root_depth_cm)} cm` },
     { label: 'Reihenabstand', value: `${formatNumber(field.row_distance, 1)} m` },
     { label: 'Baumabstand', value: `${formatNumber(field.tree_distance, 1)} m` },
     { label: 'Laufmeter', value: `${formatNumber(field.running_metre, 1)} m` },
@@ -58,7 +59,7 @@ function buildFieldMetrics(field: FieldOverview): DetailMetric[] {
 
 function buildWaterMetrics(field: FieldOverview): DetailMetric[] {
   return [
-    { label: 'Feldkapazitaet', value: `${formatNumber(field.field_capacity, 1)} mm` },
+    { label: 'Verfuegbarer Wasserspeicher', value: `${formatNumber(field.available_water_storage, 1)} mm` },
     { label: 'Wasserdefizit', value: `${formatNumber(field.current_water_deficit, 1)} mm` },
     { label: 'Letzte Aktualisierung', value: field.water_balance_as_of ?? 'n/a' },
   ]

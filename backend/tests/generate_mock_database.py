@@ -21,11 +21,12 @@ FIELD_SPECS = [
         "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "sandiger lehm",
+        "soil_weight": "leicht",
         "humus_pct": 2.4,
-        "root_depth_cm": 35,
+        "effective_root_depth_cm": 35,
         "area_ha": 1.6,
         "p_allowable": 0.45,
-        "field_capacity": 120.0,
+        "available_water_storage": 120.0,
         "target_safe_ratio": 0.9,
     },
     {
@@ -33,11 +34,12 @@ FIELD_SPECS = [
         "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "lehm",
+        "soil_weight": "mittel",
         "humus_pct": 2.0,
-        "root_depth_cm": 45,
+        "effective_root_depth_cm": 45,
         "area_ha": 2.2,
         "p_allowable": 0.5,
-        "field_capacity": 150.0,
+        "available_water_storage": 150.0,
         "target_safe_ratio": 0.45,
     },
     {
@@ -45,11 +47,12 @@ FIELD_SPECS = [
         "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "lehmiger schluff",
+        "soil_weight": "mittel",
         "humus_pct": 1.7,
-        "root_depth_cm": 40,
+        "effective_root_depth_cm": 40,
         "area_ha": 1.1,
         "p_allowable": 0.4,
-        "field_capacity": 135.0,
+        "available_water_storage": 135.0,
         "target_safe_ratio": 0.05,
     },
     {
@@ -57,11 +60,12 @@ FIELD_SPECS = [
         "reference_provider": "province",
         "reference_station": "09700MS",
         "soil_type": "sand",
+        "soil_weight": "sehr leicht",
         "humus_pct": 1.2,
-        "root_depth_cm": 30,
+        "effective_root_depth_cm": 30,
         "area_ha": 0.9,
         "p_allowable": 0.35,
-        "field_capacity": 95.0,
+        "available_water_storage": 95.0,
         "target_safe_ratio": -0.3,
     },
 ]
@@ -69,15 +73,15 @@ FIELD_SPECS = [
 
 def build_water_balance_series(
     field_id: int,
-    field_capacity: float,
+    available_water_storage: float,
     p_allowable: float,
     target_safe_ratio: float,
     end_date: pd.Timestamp,
     days: int = 14,
 ) -> pd.DataFrame:
     index = pd.date_range(end=end_date, periods=days, freq="D")
-    raw = p_allowable * field_capacity
-    trigger_level = field_capacity - raw
+    raw = p_allowable * available_water_storage
+    trigger_level = available_water_storage - raw
 
     start_safe_ratio = min(1.0, max(target_safe_ratio + 0.55, 0.2))
     ratio_step = 0.0 if days <= 1 else (target_safe_ratio - start_safe_ratio) / (days - 1)
@@ -87,7 +91,7 @@ def build_water_balance_series(
         dtype=float,
     )
     soil_water_content = trigger_level + safe_ratios * raw
-    soil_water_content = soil_water_content.clip(lower=0.0, upper=field_capacity)
+    soil_water_content = soil_water_content.clip(lower=0.0, upper=available_water_storage)
 
     evapotranspiration = pd.Series(
         [3.2, 3.5, 4.1, 4.4, 4.8, 5.0, 4.6, 4.0, 3.8, 3.6, 4.2, 4.7, 4.9, 4.3],
@@ -105,7 +109,7 @@ def build_water_balance_series(
     irrigation = (incoming - precipitation).clip(lower=0.0)
     incoming = precipitation + irrigation
     net = incoming - evapotranspiration
-    water_deficit = field_capacity - soil_water_content
+    water_deficit = available_water_storage - soil_water_content
     below_raw = soil_water_content < trigger_level
 
     return pd.DataFrame(
@@ -116,7 +120,7 @@ def build_water_balance_series(
             "incoming": incoming,
             "net": net,
             "soil_water_content": soil_water_content,
-            "field_capacity": field_capacity,
+            "available_water_storage": available_water_storage,
             "water_deficit": water_deficit,
             "readily_available_water": raw,
             "safe_ratio": safe_ratios,
@@ -142,8 +146,9 @@ def seed_mock_database(database_path: Path) -> None:
                 reference_provider=spec["reference_provider"],
                 reference_station=spec["reference_station"],
                 soil_type=spec["soil_type"],
+                soil_weight=spec["soil_weight"],
                 humus_pct=spec["humus_pct"],
-                root_depth_cm=spec["root_depth_cm"],
+                effective_root_depth_cm=spec["effective_root_depth_cm"],
                 area_ha=spec["area_ha"],
                 p_allowable=spec["p_allowable"],
             )
@@ -162,7 +167,7 @@ def seed_mock_database(database_path: Path) -> None:
 
             water_balance = build_water_balance_series(
                 field_id=field.id,
-                field_capacity=spec["field_capacity"],
+                available_water_storage=spec["available_water_storage"],
                 p_allowable=spec["p_allowable"],
                 target_safe_ratio=spec["target_safe_ratio"],
                 end_date=end_date,

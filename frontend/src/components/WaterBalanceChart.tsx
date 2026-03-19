@@ -39,7 +39,7 @@ function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
     raw_threshold:
       point.readily_available_water === null
         ? null
-        : point.field_capacity - point.readily_available_water,
+        : point.available_water_storage - point.readily_available_water,
     evapotranspiration_negative:
       point.evapotranspiration === null || point.evapotranspiration === undefined
         ? null
@@ -63,7 +63,7 @@ function TooltipContent({
   const rows = payload.filter(
     (entry) =>
       entry.value !== undefined &&
-      entry.dataKey !== 'field_capacity' &&
+      entry.dataKey !== 'available_water_storage' &&
       entry.dataKey !== 'raw_threshold',
   )
 
@@ -179,7 +179,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
             ) : null}
             <Line
               type="monotone"
-              dataKey="field_capacity"
+              dataKey="available_water_storage"
               stroke="#94a3b8"
               strokeDasharray="6 6"
               strokeWidth={1}

@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 class FarmDB:
     WATER_BALANCE_TRIGGER_FIELDS = {
         "soil_type",
+        "soil_weight",
         "humus_pct",
-        "root_depth_cm",
+        "effective_root_depth_cm",
         "p_allowable",
         "reference_provider",
         "reference_station",
@@ -39,8 +40,9 @@ class FarmDB:
         "reference_provider",
         "reference_station",
         "soil_type",
+        "soil_weight",
         "humus_pct",
-        "root_depth_cm",
+        "effective_root_depth_cm",
         "p_allowable",
     }
     _UPDATE_IRRIGATION_ALLOWLIST = {"field_id", "date", "method", "amount"}
@@ -121,9 +123,10 @@ class FarmDB:
         reference_provider: str,
         reference_station: str,
         soil_type: str,
+        soil_weight: str | None,
         humus_pct: float,
         area_ha: float,
-        root_depth_cm: float,
+        effective_root_depth_cm: float,
         p_allowable: float,
         section: str | None = None,
         tree_count: int | None = None,
@@ -141,8 +144,9 @@ class FarmDB:
         reference_provider = str(reference_provider)
         reference_station = str(reference_station)
         soil_type = str(soil_type)
+        soil_weight = None if soil_weight in (None, "") else str(soil_weight)
         humus_pct = float(humus_pct)
-        root_depth_cm = float(root_depth_cm)
+        effective_root_depth_cm = float(effective_root_depth_cm)
         area_ha_value = float(area_ha)
         p_allowable_value = float(p_allowable)
         tree_count_value = None if tree_count is None else int(tree_count)
@@ -169,8 +173,9 @@ class FarmDB:
                 reference_provider=reference_provider,
                 reference_station=reference_station,
                 soil_type=soil_type,
+                soil_weight=soil_weight,
                 humus_pct=humus_pct,
-                root_depth_cm=root_depth_cm,
+                effective_root_depth_cm=effective_root_depth_cm,
                 area_ha=area_ha_value,
                 p_allowable=p_allowable_value,
             )
@@ -398,7 +403,7 @@ class FarmDB:
                         "as_of": None if latest_balance is None else latest_balance.date,
                         "current_water_deficit": None if latest_balance is None else latest_balance.water_deficit,
                         "current_soil_water_content": None if latest_balance is None else latest_balance.soil_water_content,
-                        "field_capacity": None if latest_balance is None else latest_balance.field_capacity,
+                        "available_water_storage": None if latest_balance is None else latest_balance.available_water_storage,
                         "readily_available_water": None if latest_balance is None else latest_balance.readily_available_water,
                         "below_raw": None if latest_balance is None else bool(latest_balance.below_raw),
                         "safe_ratio": None if latest_balance is None else latest_balance.safe_ratio,
@@ -435,7 +440,7 @@ class FarmDB:
             'incoming',
             'net',
             'soil_water_content',
-            'field_capacity',
+            'available_water_storage',
             'water_deficit',
         ]
         optional_cols = ['readily_available_water', 'safe_ratio', 'below_raw']

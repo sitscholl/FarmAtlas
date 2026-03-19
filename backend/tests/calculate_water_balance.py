@@ -32,8 +32,9 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "reference_provider": provider,
             "reference_station": station_id,
             "soil_type": "sandiger lehm",
+            "soil_weight": "leicht",
             "humus_pct": 2.2,
-            "root_depth_cm": 35,
+            "effective_root_depth_cm": 35,
             "area_ha": 1.6,
             "p_allowable": 0.45,
         },
@@ -44,8 +45,9 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "reference_provider": provider,
             "reference_station": station_id,
             "soil_type": "lehm",
+            "soil_weight": "mittel",
             "humus_pct": 1.8,
-            "root_depth_cm": 45,
+            "effective_root_depth_cm": 45,
             "area_ha": 2.3,
             "p_allowable": 0.50,
         },
@@ -101,7 +103,7 @@ def main() -> None:
 
             for field in populated_fields:
                 print(f"\n=== {field.name} ===")
-                print("Field capacity:", field.field_capacity)
+                print("Soil water estimate:", field.soil_water_estimate)
                 print("Metrics:", field.metrics)
                 if field.water_balance is None or field.water_balance.empty:
                     print("No water-balance output produced.")

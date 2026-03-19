@@ -3,12 +3,12 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from .database.models import Field
-from .field_capacity import FieldCapacity
+from .water_content import SoilWaterEstimate
 
 
 @dataclass
 class FieldResults:
-    field_capacity: FieldCapacity | None = None
+    soil_water_estimate: SoilWaterEstimate | None = None
     water_balance: pd.DataFrame | None = None
     metrics: dict[str, object] = field(default_factory=dict)
 
@@ -30,9 +30,10 @@ class FieldContext:
     reference_provider: str
     reference_station: str
     soil_type: str
+    soil_weight: str | None
     humus_pct: float
     area_ha: float
-    root_depth_cm: float
+    effective_root_depth_cm: float
     p_allowable: float
 
     @classmethod
@@ -53,9 +54,10 @@ class FieldContext:
             reference_provider=field_model.reference_provider,
             reference_station=field_model.reference_station,
             soil_type=field_model.soil_type,
+            soil_weight=field_model.soil_weight,
             humus_pct=field_model.humus_pct,
             area_ha=field_model.area_ha,
-            root_depth_cm=field_model.root_depth_cm,
+            effective_root_depth_cm=field_model.effective_root_depth_cm,
             p_allowable=field_model.p_allowable,
         )
 
@@ -98,8 +100,12 @@ class FieldState:
         return self.field.area_ha
 
     @property
-    def root_depth_cm(self) -> float:
-        return self.field.root_depth_cm
+    def soil_weight(self) -> str | None:
+        return self.field.soil_weight
+
+    @property
+    def effective_root_depth_cm(self) -> float:
+        return self.field.effective_root_depth_cm
 
     @property
     def p_allowable(self) -> float | None:
@@ -110,12 +116,12 @@ class FieldState:
         return self.results.metrics
 
     @property
-    def field_capacity(self) -> FieldCapacity | None:
-        return self.results.field_capacity
+    def soil_water_estimate(self) -> SoilWaterEstimate | None:
+        return self.results.soil_water_estimate
 
-    @field_capacity.setter
-    def field_capacity(self, value: FieldCapacity | None) -> None:
-        self.results.field_capacity = value
+    @soil_water_estimate.setter
+    def soil_water_estimate(self, value: SoilWaterEstimate | None) -> None:
+        self.results.soil_water_estimate = value
 
     @property
     def water_balance(self) -> pd.DataFrame | None:

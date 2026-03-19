@@ -8,12 +8,12 @@ import pandas as pd
 from ..database.db import FarmDB
 from ..et.base import ET0Calculator
 from ..field import FieldState
-from ..field_capacity import calculate_field_capacity
 from ..irrigation import FieldIrrigation
 from ..meteo.load import MeteoLoader
 from ..meteo.resample import MeteoResampler
 from ..meteo.station import Station
 from ..meteo.validate import MeteoValidator
+from ..water_content import estimate_available_water_storage_capacity
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class WaterBalanceWorkflow:
                     "incoming": record.incoming,
                     "net": record.net,
                     "soil_water_content": record.soil_water_content,
-                    "field_capacity": record.field_capacity,
+                    "available_water_storage": record.available_water_storage,
                     "water_deficit": record.water_deficit,
                     "readily_available_water": getattr(record, "readily_available_water", None),
                     "safe_ratio": getattr(record, "safe_ratio", None),
@@ -129,11 +129,12 @@ class WaterBalanceWorkflow:
         if not isinstance(station_data.index, pd.DatetimeIndex):
             raise TypeError("Station data index must be a pandas DatetimeIndex.")
 
-        if field.field_capacity is None:
-            field.field_capacity = calculate_field_capacity(
+        if field.soil_water_estimate is None:
+            field.soil_water_estimate = estimate_available_water_storage_capacity(
                 soil_type=field.soil_type,
+                soil_weight=field.soil_weight,
                 humus_pct=field.humus_pct,
-                root_depth_cm=field.root_depth_cm,
+                effective_root_depth_cm=field.effective_root_depth_cm,
             )
 
         data = station_data.sort_index().copy()
@@ -154,12 +155,12 @@ class WaterBalanceWorkflow:
 
         incoming = precip + irrigation
         net = incoming - evap
-        field_capacity = field.field_capacity.nfk_total_mm
+        available_water_storage = field.soil_water_estimate.nfk_total_mm
 
         soil_water_content: list[float] = []
-        current_water_content = field_capacity if initial_storage is None else max(0.0, min(field_capacity, initial_storage))
+        current_water_content = available_water_storage if initial_storage is None else max(0.0, min(available_water_storage, initial_storage))
         for delta in net:
-            current_water_content = max(0.0, min(field_capacity, current_water_content + delta))
+            current_water_content = max(0.0, min(available_water_storage, current_water_content + delta))
             soil_water_content.append(current_water_content)
 
         water_balance = pd.DataFrame(
@@ -173,14 +174,14 @@ class WaterBalanceWorkflow:
             },
             index=data.index,
         )
-        water_balance["field_capacity"] = field_capacity
-        water_balance["water_deficit"] = field_capacity - water_balance["soil_water_content"]
+        water_balance["available_water_storage"] = available_water_storage
+        water_balance["water_deficit"] = available_water_storage - water_balance["soil_water_content"]
         water_balance["field_id"] = field.id
 
-        readily_available_water = field.p_allowable * field_capacity
+        readily_available_water = field.p_allowable * available_water_storage
         water_balance["readily_available_water"] = readily_available_water
 
-        trigger_level = field_capacity - readily_available_water
+        trigger_level = available_water_storage - readily_available_water
         water_balance["below_raw"] = water_balance["soil_water_content"] < trigger_level
         water_balance["safe_ratio"] = (
             water_balance["soil_water_content"] - trigger_level
@@ -240,10 +241,11 @@ class WaterBalanceWorkflow:
             logger.warning("No meteo station data available for field %s", field.name)
             return None
 
-        field.field_capacity = calculate_field_capacity(
+        field.soil_water_estimate = estimate_available_water_storage_capacity(
             soil_type=field.soil_type,
+            soil_weight=field.soil_weight,
             humus_pct=field.humus_pct,
-            root_depth_cm=field.root_depth_cm,
+            effective_root_depth_cm=field.effective_root_depth_cm,
         )
         irrigation_events = self.db.list_irrigation_events(field_id=field.id, start=pd.Timestamp(f"{year}-1-1").date()) or []
         field_irrigation = FieldIrrigation.from_list(irrigation_events)

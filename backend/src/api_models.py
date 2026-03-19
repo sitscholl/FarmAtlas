@@ -19,9 +19,10 @@ class FieldSummaryResponse(BaseModel):
     reference_provider: str
     reference_station: str
     soil_type: str
+    soil_weight: str | None
     humus_pct: float
     area_ha: float
-    root_depth_cm: float
+    effective_root_depth_cm: float
     p_allowable: float
 
 class FieldPost(BaseModel):
@@ -39,9 +40,10 @@ class FieldPost(BaseModel):
     reference_provider: str
     reference_station: str
     soil_type: str
+    soil_weight: str | None = None
     humus_pct: float
     area_ha: float
-    root_depth_cm: float
+    effective_root_depth_cm: float
     p_allowable: float
 
 class FieldPut(BaseModel):
@@ -59,9 +61,10 @@ class FieldPut(BaseModel):
     reference_provider: str
     reference_station: str
     soil_type: str
+    soil_weight: str | None = None
     humus_pct: float
     area_ha: float
-    root_depth_cm: float
+    effective_root_depth_cm: float
     p_allowable: float
 
 class FieldOverviewResponse(BaseModel):
@@ -80,14 +83,15 @@ class FieldOverviewResponse(BaseModel):
     reference_provider: str
     reference_station: str
     soil_type: str
+    soil_weight: str | None
     humus_pct: float
     area_ha: float
-    root_depth_cm: float
+    effective_root_depth_cm: float
     p_allowable: float
     water_balance_as_of: date | None
     current_water_deficit: float | None
     current_soil_water_content: float | None
-    field_capacity: float | None
+    available_water_storage: float | None
     readily_available_water: float | None
     below_raw: bool | None
     safe_ratio: float | None
@@ -109,7 +113,7 @@ class WaterBalanceSummaryResponse(BaseModel):
     as_of: date | None
     current_water_deficit: float | None
     current_soil_water_content: float | None
-    field_capacity: float | None
+    available_water_storage: float | None
     readily_available_water: float | None
     below_raw: bool | None
     safe_ratio: float | None
@@ -123,7 +127,7 @@ class WaterBalanceSeriesPointResponse(BaseModel):
     incoming: float
     net: float
     soil_water_content: float
-    field_capacity: float
+    available_water_storage: float
     water_deficit: float
     readily_available_water: float | None
     safe_ratio: float | None

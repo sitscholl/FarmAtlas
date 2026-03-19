@@ -34,8 +34,9 @@ class Field(Base):
     reference_station = Column(String, nullable=False)
 
     soil_type = Column(String, nullable=False)
+    soil_weight = Column(String, nullable=True)
     humus_pct = Column(Float, nullable = False)
-    root_depth_cm = Column(Float, nullable=False)
+    effective_root_depth_cm = Column(Float, nullable=False)
     p_allowable = Column(Float, nullable=False) #fraction of water that can be depleted before stress/irrigation trigger
 
     active = Column(Boolean, nullable=False, default=True)
@@ -82,7 +83,7 @@ class WaterBalance(Base):
     incoming = Column(Float, nullable=False)
     net = Column(Float, nullable=False)
     soil_water_content = Column(Float, nullable=False)
-    field_capacity = Column(Float, nullable=False)
+    available_water_storage = Column(Float, nullable=False)
     water_deficit = Column(Float, nullable=False)
     readily_available_water = Column(Float, nullable=True)
     safe_ratio = Column(Float, nullable=True)

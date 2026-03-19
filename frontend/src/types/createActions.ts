@@ -13,9 +13,10 @@ export type FieldCreatePayload = {
   reference_provider: string
   reference_station: string
   soil_type: string
+  soil_weight: string | null
   humus_pct: number
   area_ha: number
-  root_depth_cm: number
+  effective_root_depth_cm: number
   p_allowable: number
 }
 

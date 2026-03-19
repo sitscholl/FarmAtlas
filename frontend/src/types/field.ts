@@ -14,9 +14,10 @@ export type FieldSummary = {
   reference_provider: string
   reference_station: string
   soil_type: string
+  soil_weight: string | null
   humus_pct: number
   area_ha: number | null
-  root_depth_cm: number
+  effective_root_depth_cm: number
   p_allowable: number
 }
 
@@ -36,14 +37,15 @@ export type FieldOverview = {
   reference_provider: string
   reference_station: string
   soil_type: string
+  soil_weight: string | null
   humus_pct: number
   area_ha: number | null
-  root_depth_cm: number
+  effective_root_depth_cm: number
   p_allowable: number
   water_balance_as_of: string | null
   current_water_deficit: number | null
   current_soil_water_content: number | null
-  field_capacity: number | null
+  available_water_storage: number | null
   readily_available_water: number | null
   below_raw: boolean | null
   safe_ratio: number | null
@@ -57,7 +59,7 @@ export type WaterBalanceSeriesPoint = {
   incoming: number
   net: number
   soil_water_content: number
-  field_capacity: number
+  available_water_storage: number
   water_deficit: number
   readily_available_water: number | null
   safe_ratio: number | null
