@@ -107,7 +107,7 @@ export default function FieldDetail() {
           Back to dashboard
         </Link>
 
-        <div className="mt-6 flex flex-wrap items-start justify-between gap-6">
+        <div className="mt-6 flex flex-wrap items-start justify-between gap-6 border-b border-black pb-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">
               Field Detail
@@ -138,7 +138,7 @@ export default function FieldDetail() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
               Area
