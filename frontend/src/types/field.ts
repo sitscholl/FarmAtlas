@@ -41,8 +41,8 @@ export type FieldOverview = {
   root_depth_cm: number
   p_allowable: number
   water_balance_as_of: string | null
-  current_deficit: number | null
-  current_soil_storage: number | null
+  current_water_deficit: number | null
+  current_soil_water_content: number | null
   field_capacity: number | null
   readily_available_water: number | null
   below_raw: boolean | null
@@ -56,9 +56,9 @@ export type WaterBalanceSeriesPoint = {
   evapotranspiration: number
   incoming: number
   net: number
-  soil_storage: number
+  soil_water_content: number
   field_capacity: number
-  deficit: number
+  water_deficit: number
   readily_available_water: number | null
   safe_ratio: number | null
   below_raw: boolean | null

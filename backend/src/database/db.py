@@ -396,8 +396,8 @@ class FarmDB:
                     {
                         "field_id": field.id,
                         "as_of": None if latest_balance is None else latest_balance.date,
-                        "current_deficit": None if latest_balance is None else latest_balance.deficit,
-                        "current_soil_storage": None if latest_balance is None else latest_balance.soil_storage,
+                        "current_water_deficit": None if latest_balance is None else latest_balance.water_deficit,
+                        "current_soil_water_content": None if latest_balance is None else latest_balance.soil_water_content,
                         "field_capacity": None if latest_balance is None else latest_balance.field_capacity,
                         "readily_available_water": None if latest_balance is None else latest_balance.readily_available_water,
                         "below_raw": None if latest_balance is None else bool(latest_balance.below_raw),
@@ -434,9 +434,9 @@ class FarmDB:
             'evapotranspiration',
             'incoming',
             'net',
-            'soil_storage',
+            'soil_water_content',
             'field_capacity',
-            'deficit',
+            'water_deficit',
         ]
         optional_cols = ['readily_available_water', 'safe_ratio', 'below_raw']
 

@@ -44,7 +44,7 @@ function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
     },
     {
       label: 'Wasserdefizit',
-      value: formatOptionalNumber(field.current_deficit, 'mm', 1),
+      value: formatOptionalNumber(field.current_water_deficit, 'mm', 1),
     },
   ]
 }

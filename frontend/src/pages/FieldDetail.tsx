@@ -59,7 +59,7 @@ function buildFieldMetrics(field: FieldOverview): DetailMetric[] {
 function buildWaterMetrics(field: FieldOverview): DetailMetric[] {
   return [
     { label: 'Feldkapazitaet', value: `${formatNumber(field.field_capacity, 1)} mm` },
-    { label: 'Wasserdefizit', value: `${formatNumber(field.current_deficit, 1)} mm` },
+    { label: 'Wasserdefizit', value: `${formatNumber(field.current_water_deficit, 1)} mm` },
     { label: 'Letzte Aktualisierung', value: field.water_balance_as_of ?? 'n/a' },
   ]
 }

@@ -148,7 +148,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
             <Legend wrapperStyle={{ paddingTop: 12 }} />
             <Line
               type="monotone"
-              dataKey="soil_storage"
+              dataKey="soil_water_content"
               stroke="#0f172a"
               strokeWidth={2}
               dot={{ r: 3 }}
@@ -212,7 +212,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
         <p>
           Latest storage{' '}
           <span className="font-medium text-slate-700">
-            {formatNumber(data[data.length - 1].soil_storage)} mm
+            {formatNumber(data[data.length - 1].soil_water_content)} mm
           </span>
         </p>
       </div>

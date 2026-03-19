@@ -85,8 +85,8 @@ class FieldOverviewResponse(BaseModel):
     root_depth_cm: float
     p_allowable: float
     water_balance_as_of: date | None
-    current_deficit: float | None
-    current_soil_storage: float | None
+    current_water_deficit: float | None
+    current_soil_water_content: float | None
     field_capacity: float | None
     readily_available_water: float | None
     below_raw: bool | None
@@ -107,8 +107,8 @@ class IrrigationPost(BaseModel):
 class WaterBalanceSummaryResponse(BaseModel):
     field_id: int
     as_of: date | None
-    current_deficit: float | None
-    current_soil_storage: float | None
+    current_water_deficit: float | None
+    current_soil_water_content: float | None
     field_capacity: float | None
     readily_available_water: float | None
     below_raw: bool | None
@@ -122,9 +122,9 @@ class WaterBalanceSeriesPointResponse(BaseModel):
     evapotranspiration: float
     incoming: float
     net: float
-    soil_storage: float
+    soil_water_content: float
     field_capacity: float
-    deficit: float
+    water_deficit: float
     readily_available_water: float | None
     safe_ratio: float | None
     below_raw: bool | None

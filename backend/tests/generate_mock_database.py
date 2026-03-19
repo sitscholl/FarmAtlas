@@ -86,15 +86,15 @@ def build_water_balance_series(
         index=index,
         dtype=float,
     )
-    soil_storage = trigger_level + safe_ratios * raw
-    soil_storage = soil_storage.clip(lower=0.0, upper=field_capacity)
+    soil_water_content = trigger_level + safe_ratios * raw
+    soil_water_content = soil_water_content.clip(lower=0.0, upper=field_capacity)
 
     evapotranspiration = pd.Series(
         [3.2, 3.5, 4.1, 4.4, 4.8, 5.0, 4.6, 4.0, 3.8, 3.6, 4.2, 4.7, 4.9, 4.3],
         index=index,
         dtype=float,
     )
-    storage_delta = soil_storage.diff().fillna(0.0)
+    storage_delta = soil_water_content.diff().fillna(0.0)
     incoming = (storage_delta + evapotranspiration).clip(lower=0.0)
 
     precipitation = pd.Series(
@@ -105,8 +105,8 @@ def build_water_balance_series(
     irrigation = (incoming - precipitation).clip(lower=0.0)
     incoming = precipitation + irrigation
     net = incoming - evapotranspiration
-    deficit = field_capacity - soil_storage
-    below_raw = soil_storage < trigger_level
+    water_deficit = field_capacity - soil_water_content
+    below_raw = soil_water_content < trigger_level
 
     return pd.DataFrame(
         {
@@ -115,9 +115,9 @@ def build_water_balance_series(
             "evapotranspiration": evapotranspiration,
             "incoming": incoming,
             "net": net,
-            "soil_storage": soil_storage,
+            "soil_water_content": soil_water_content,
             "field_capacity": field_capacity,
-            "deficit": deficit,
+            "water_deficit": water_deficit,
             "readily_available_water": raw,
             "safe_ratio": safe_ratios,
             "below_raw": below_raw,

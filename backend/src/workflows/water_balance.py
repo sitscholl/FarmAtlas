@@ -45,7 +45,7 @@ class WaterBalanceWorkflow:
         if latest_balance:
             next_ts = pd.Timestamp(latest_balance.date, tz=self.timezone) + timedelta(days=1)
             start_ts = max(season_start_ts, next_ts)
-            initial_storage = latest_balance.soil_storage
+            initial_storage = latest_balance.soil_water_content
         else:
             start_ts = season_start_ts
             initial_storage = None
@@ -103,9 +103,9 @@ class WaterBalanceWorkflow:
                     "evapotranspiration": record.evapotranspiration,
                     "incoming": record.incoming,
                     "net": record.net,
-                    "soil_storage": record.soil_storage,
+                    "soil_water_content": record.soil_water_content,
                     "field_capacity": record.field_capacity,
-                    "deficit": record.deficit,
+                    "water_deficit": record.water_deficit,
                     "readily_available_water": getattr(record, "readily_available_water", None),
                     "safe_ratio": getattr(record, "safe_ratio", None),
                     "below_raw": getattr(record, "below_raw", None),
@@ -154,13 +154,13 @@ class WaterBalanceWorkflow:
 
         incoming = precip + irrigation
         net = incoming - evap
-        capacity = field.field_capacity.nfk_total_mm
+        field_capacity = field.field_capacity.nfk_total_mm
 
-        storage: list[float] = []
-        current_storage = capacity if initial_storage is None else max(0.0, min(capacity, initial_storage))
+        soil_water_content: list[float] = []
+        current_water_content = field_capacity if initial_storage is None else max(0.0, min(field_capacity, initial_storage))
         for delta in net:
-            current_storage = max(0.0, min(capacity, current_storage + delta))
-            storage.append(current_storage)
+            current_water_content = max(0.0, min(field_capacity, current_water_content + delta))
+            soil_water_content.append(current_water_content)
 
         water_balance = pd.DataFrame(
             {
@@ -169,31 +169,28 @@ class WaterBalanceWorkflow:
                 "evapotranspiration": evap,
                 "incoming": incoming,
                 "net": net,
-                "soil_storage": storage,
+                "soil_water_content": soil_water_content,
             },
             index=data.index,
         )
-        water_balance["field_capacity"] = capacity
-        water_balance["deficit"] = capacity - water_balance["soil_storage"]
+        water_balance["field_capacity"] = field_capacity
+        water_balance["water_deficit"] = field_capacity - water_balance["soil_water_content"]
         water_balance["field_id"] = field.id
 
-        if field.p_allowable:
-            raw = field.p_allowable * capacity
-            trigger_level = capacity - raw
-            water_balance["readily_available_water"] = raw
-            water_balance["below_raw"] = water_balance["soil_storage"] < trigger_level
-            water_balance["safe_ratio"] = (
-                water_balance["soil_storage"] - trigger_level
-            ) / raw
+        readily_available_water = field.p_allowable * field_capacity
+        water_balance["readily_available_water"] = readily_available_water
+
+        trigger_level = field_capacity - readily_available_water
+        water_balance["below_raw"] = water_balance["soil_water_content"] < trigger_level
+        water_balance["safe_ratio"] = (
+            water_balance["soil_water_content"] - trigger_level
+        ) / readily_available_water
 
         field.water_balance = water_balance
-        field.metrics["current_soil_storage"] = float(water_balance["soil_storage"].iloc[-1])
-        field.metrics["current_deficit"] = float(water_balance["deficit"].iloc[-1])
-        field.metrics["safe_ratio"] = (
-            None
-            if "safe_ratio" not in water_balance.columns
-            else float(water_balance["safe_ratio"].iloc[-1])
-        )
+        field.metrics["current_soil_water_content"] = float(water_balance["soil_water_content"].iloc[-1])
+        field.metrics["current_water_deficit"] = float(water_balance["water_deficit"].iloc[-1])
+        field.metrics["safe_ratio"] = float(water_balance["safe_ratio"].iloc[-1])
+
         return water_balance
 
     def _prepare_station_data(self, station: Station) -> Station:
