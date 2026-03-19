@@ -102,7 +102,11 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
 
       <div className="mt-6 h-[420px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 16, right: 18, left: 8, bottom: 12 }}>
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
+            barCategoryGap="70%"
+          >
             <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
@@ -123,40 +127,43 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
               dataKey="precipitation"
               stackId="incoming"
               fill="#0682b77d"
-              name="Precipitation"
+              name="Niederschlag"
+              maxBarSize={10}
             />
             <Bar
               dataKey="irrigation"
               stackId="incoming"
               fill="#259a057a"
-              name="Irrigation"
-              barSize={10}
+              name="Bewässerung"
+              maxBarSize={10}
             />
             <Line
               type="monotone"
               dataKey="soil_storage"
               stroke="#0f172a"
-              strokeWidth={3}
+              strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
-              name="Soil storage"
+              name="Bodenwassergehalt"
             />
             <Line
               type="monotone"
               dataKey="field_capacity"
               stroke="#94a3b8"
               strokeDasharray="6 6"
-              strokeWidth={2}
+              strokeWidth={1}
               dot={false}
+              legendType="none"
             />
             <Line
               type="monotone"
               dataKey="raw_threshold"
               stroke="#f43f5e"
               strokeDasharray="4 5"
-              strokeWidth={2}
+              strokeWidth={1}
               dot={false}
               connectNulls={false}
+              legendType="none"
             />
           </ComposedChart>
         </ResponsiveContainer>
