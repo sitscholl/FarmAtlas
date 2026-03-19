@@ -1,12 +1,12 @@
 services:
   meteo-service:
-    image: ghcr.io/sitscholl/irrigationmanager:latest
+    image: ghcr.io/sitscholl/farmatlas:latest
     ports:
       - "8080:8080"
     volumes:
       - ./config:/app/config
     restart: unless-stopped
-    container_name: irrigation-manager
+    container_name: farm-atlas
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 300s

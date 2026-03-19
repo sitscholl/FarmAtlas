@@ -291,7 +291,7 @@ wheels = [
 ]
 
 [[package]]
-name = "irrigationmanager"
+name = "FarmAtlas"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
