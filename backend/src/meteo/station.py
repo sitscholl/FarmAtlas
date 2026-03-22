@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import httpx
 
 # import geopandas as gpd
@@ -217,12 +218,21 @@ class MeteoData:
                 stations_by_id[station.id] = station
                 continue
 
-            if (existing.x, existing.y, existing.crs) != (station.x, station.y, station.crs):
+            if not np.isclose(existing.x, station.x):
                 raise ValueError(
-                    f"Cannot combine station {station.id}: metadata differs between MeteoData objects."
+                    f"Cannot combine station {station.id}: x-coords differ between MeteoData objects {existing.x} vs {station.x}."
+                )
+            if not np.isclose(existing.y, station.y):
+                raise ValueError(
+                    f"Cannot combine station {station.id}: y-coords differ between MeteoData objects {existing.y} vs {station.y}."
+                )
+            if existing.crs != station.crs:
+                raise ValueError(
+                    f"Cannot combine station {station.id}: crs differs between MeteoData objects {existing.crs} vs {station.crs}."
                 )
 
-            merged_data = pd.concat([existing.data, station.data]).sort_index()
+            existing_data = existing.data.loc[~existing.data.index.isin(station.data.index)]
+            merged_data = pd.concat([existing_data, station.data]).sort_index()
             stations_by_id[station.id] = Station(
                 id=existing.id,
                 x=existing.x,

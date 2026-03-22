@@ -6,7 +6,15 @@ from typing import Callable, Any, Iterable
 logger = logging.getLogger(__name__)
 
 def get_mode(column: pd.Series):
-    return column.mode().iloc[0]
+    non_null = column.dropna()
+    if non_null.empty:
+        return pd.NA
+
+    mode = non_null.mode()
+    if mode.empty:
+        return pd.NA
+
+    return mode.iloc[0]
 
 DEFAULT_RESAMPLE_COLMAP = {
     "tair_2m": ["mean", "min", "max"],  

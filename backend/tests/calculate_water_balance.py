@@ -79,6 +79,7 @@ def main() -> None:
 
     provider = os.getenv("METEO_PROVIDER", "province")
     station_id = os.getenv("METEO_STATION_ID", "09700MS")
+    forecast_days = os.getenv("FORECAST_DAYS", 7)
 
     with tempfile.TemporaryDirectory(prefix="irrigation_manager_wb_") as temp_dir:
         temp_db_path = Path(temp_dir) / "water_balance_test.sqlite"
@@ -99,6 +100,7 @@ def main() -> None:
                 field_ids=[field.id for field in fields],
                 year=year,
                 persist=True,
+                forecast_days=forecast_days
             )
 
             for field in populated_fields:
