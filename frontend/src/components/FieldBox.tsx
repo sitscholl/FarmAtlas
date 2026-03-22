@@ -36,9 +36,13 @@ function FieldBoxContent({
   titleAdornment,
 }: FieldBoxProps) {
   const statusBarClasses = statusBar?.isCritical
-    ? 'from-rose-500 via-orange-500 to-red-500'
-    : 'from-sky-500 via-cyan-400 to-blue-400'
+    ? 'bg-rose-500'
+    : 'bg-gradient-to-r from-sky-500 via-cyan-400 to-blue-400'
+  const statusCardClasses = statusBar?.isCritical
+    ? 'border-rose-200/80 bg-rose-50/80'
+    : 'border-slate-200/80 bg-slate-50/80'
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
+  const statusBarWidth = statusBar?.isCritical ? 100 : statusBar?.percentage
 
   return (
     <div className="group relative overflow-hidden rounded-[1.75rem] border p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg border-slate-200/80 hover:border-sky-500">
@@ -72,26 +76,21 @@ function FieldBoxContent({
       ) : null}
 
       {statusBar ? (
-        <div className={`${contentClasses} mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3`}>
+        <div className={`${contentClasses} ${statusCardClasses} mt-4 rounded-2xl border px-4 py-3`}>
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
               {statusBar.label}
             </p>
-            <p className="text-sm font-semibold text-slate-900">
+            <p className={`text-sm font-semibold ${statusBar.isCritical ? 'text-rose-600' : 'text-slate-900'}`}>
               {statusBar.value}
             </p>
           </div>
           <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
             <div
-              className={`h-full rounded-full bg-gradient-to-r ${statusBarClasses} transition-[width] duration-500`}
-              style={{ width: `${statusBar.percentage}%` }}
+              className={`h-full rounded-full ${statusBarClasses} transition-[width] duration-500`}
+              style={{ width: `${statusBarWidth}%` }}
             />
           </div>
-          {statusBar.isCritical ? (
-            <p className="mt-2 text-xs font-medium text-rose-600">
-              Unterhalb Grenzwert!
-            </p>
-          ) : null}
         </div>
       ) : null}
 
