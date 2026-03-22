@@ -20,6 +20,8 @@ type WaterBalanceChartProps = {
 type ChartRow = WaterBalanceSeriesPoint & {
   raw_threshold: number | null
   evapotranspiration_negative: number | null
+  soil_water_content_observed: number | null
+  soil_water_content_forecast: number | null
 }
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -44,6 +46,10 @@ function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
       point.evapotranspiration === null || point.evapotranspiration === undefined
         ? null
         : -Math.abs(point.evapotranspiration),
+    soil_water_content_observed:
+      point.value_type === 'forecast' ? null : point.soil_water_content,
+    soil_water_content_forecast:
+      point.value_type === 'forecast' ? point.soil_water_content : null,
   }))
 }
 
@@ -111,6 +117,11 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
   const hasEvapotranspiration = chartData.some(
     (point) => point.evapotranspiration_negative !== null,
   )
+  const hasForecast = chartData.some((point) => point.value_type === 'forecast')
+  const today = new Date().toLocaleDateString('en-CA')
+  const hasTodayMarker = chartData.some((point) => point.date === today)
+  const latestObserved =
+    [...data].reverse().find((point) => point.value_type !== 'forecast') ?? data[data.length - 1]
 
   return (
     <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm sm:rounded-3xl sm:p-6">
@@ -146,17 +157,39 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
                 width={36}
               />
               <ReferenceLine y={0} stroke="#64748b" strokeWidth={.5} />
+              {hasTodayMarker ? (
+                <ReferenceLine
+                  x={today}
+                  stroke="#475569"
+                  strokeDasharray="4 4"
+                  label={{ value: 'Heute', position: 'top', fill: '#475569', fontSize: 11 }}
+                />
+              ) : null}
               <Tooltip content={<TooltipContent />} />
               <Legend wrapperStyle={{ paddingTop: 8, fontSize: '12px' }} />
               <Line
                 type="monotone"
-                dataKey="soil_water_content"
+                dataKey="soil_water_content_observed"
                 stroke="#0f172a"
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 5 }}
+                connectNulls={false}
                 name="Bodenwassergehalt"
               />
+              {hasForecast ? (
+                <Line
+                  type="monotone"
+                  dataKey="soil_water_content_forecast"
+                  stroke="#0f172a"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  dot={false}
+                  activeDot={{ r: 5 }}
+                  connectNulls={false}
+                  name="Bodenwassergehalt Prognose"
+                />
+              ) : null}
               <Bar
                 dataKey="precipitation"
                 stackId="incoming"
@@ -215,7 +248,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
         <p>
           Latest storage{' '}
           <span className="font-medium text-slate-700">
-            {formatNumber(data[data.length - 1].soil_water_content)} mm
+            {formatNumber(latestObserved.soil_water_content)} mm
           </span>
         </p>
       </div>

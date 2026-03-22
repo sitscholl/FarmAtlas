@@ -132,3 +132,5 @@ class WaterBalanceSeriesPointResponse(BaseModel):
     readily_available_water: float | None
     safe_ratio: float | None
     below_raw: bool | None
+    value_type: str | None = None
+    model: str | None = None

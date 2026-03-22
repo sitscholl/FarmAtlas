@@ -6,6 +6,8 @@ import WaterBalanceChart from '../components/WaterBalanceChart'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/field'
 
+const FORECAST_DAYS = 5
+
 type DetailMetric = {
   label: string
   value: string
@@ -121,7 +123,9 @@ export default function FieldDetail() {
       try {
         const [overviewResponse, seriesResponse] = await Promise.all([
           api.get<FieldOverview>(`/fields/${fieldId}/overview`),
-          api.get<WaterBalanceSeriesPoint[]>(`/fields/${fieldId}/water-balance/series`),
+          api.get<WaterBalanceSeriesPoint[]>(`/fields/${fieldId}/water-balance/series`, {
+            params: { forecast_days: FORECAST_DAYS },
+          }),
         ])
         setField(overviewResponse.data)
         setSeries(seriesResponse.data)

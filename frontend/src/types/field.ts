@@ -64,4 +64,6 @@ export type WaterBalanceSeriesPoint = {
   readily_available_water: number | null
   safe_ratio: number | null
   below_raw: boolean | null
+  value_type: 'observed' | 'forecast' | string | null
+  model: string | null
 }

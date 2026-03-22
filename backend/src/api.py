@@ -3,10 +3,11 @@ from datetime import datetime
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, status, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+import pandas as pd
 from sqlalchemy.exc import IntegrityError
 
 from .api_models import (
@@ -332,8 +333,43 @@ async def get_water_balance_summary():
     ]
 
 @app.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPointResponse])
-async def get_field_water_balance_series(field_id: int):
+async def get_field_water_balance_series(
+    field_id: int,
+    forecast_days: int = Query(default=0, ge=0, le=14),
+):
     _validate_field_id(field_id)
+
+    if forecast_days > 0:
+        field_state = runtime.run_workflow_for_field(
+            "water_balance",
+            field_id,
+            persist=True,
+            forecast_days=forecast_days,
+        )
+        water_balance = None if field_state is None else field_state.water_balance
+        if water_balance is None or water_balance.empty:
+            return []
+
+        series = water_balance.reset_index().rename(columns={"index": "date"})
+        return [
+            WaterBalanceSeriesPointResponse(
+                date=pd.Timestamp(row["date"]).date(),
+                precipitation=float(row["precipitation"]),
+                irrigation=float(row["irrigation"]),
+                evapotranspiration=float(row["evapotranspiration"]),
+                incoming=float(row["incoming"]),
+                net=float(row["net"]),
+                soil_water_content=float(row["soil_water_content"]),
+                available_water_storage=float(row["available_water_storage"]),
+                water_deficit=float(row["water_deficit"]),
+                readily_available_water=None if pd.isna(row.get("readily_available_water")) else float(row["readily_available_water"]),
+                safe_ratio=None if pd.isna(row.get("safe_ratio")) else float(row["safe_ratio"]),
+                below_raw=None if pd.isna(row.get("below_raw")) else bool(row["below_raw"]),
+                value_type=None if pd.isna(row.get("value_type")) else str(row["value_type"]),
+                model=None if pd.isna(row.get("model")) else str(row["model"]),
+            )
+            for _, row in series.iterrows()
+        ]
 
     records = runtime.db.get_water_balance(field_id=field_id)
     return [
@@ -350,6 +386,8 @@ async def get_field_water_balance_series(field_id: int):
             readily_available_water=record.readily_available_water,
             safe_ratio=record.safe_ratio,
             below_raw=None if record.below_raw is None else bool(record.below_raw),
+            value_type="observed",
+            model="observation",
         )
         for record in records
     ]

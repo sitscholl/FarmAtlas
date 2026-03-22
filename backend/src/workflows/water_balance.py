@@ -57,7 +57,7 @@ class WaterBalanceWorkflow:
             "start_ts": start_ts,
             "initial_storage": initial_storage,
             "observe_end": observe_end,
-            "cache_end": observe_end - pd.Timedelta(days=1),
+            "cache_end": observe_end,
             "forecast_end": forecast_end,
         }
 
@@ -240,6 +240,19 @@ class WaterBalanceWorkflow:
             data=resampled,
         )
 
+    def _set_cached_water_balance(
+        self,
+        field: FieldState,
+        context: dict[str, object],
+    ) -> pd.DataFrame | None:
+        cached = self.get_cached_water_balance(
+            field,
+            start=context["season_start_ts"],
+            end=context["cache_end"],
+        )
+        field.water_balance = cached if not cached.empty else None
+        return field.water_balance
+
     def _run_field(
         self,
         field: FieldState,
@@ -259,9 +272,7 @@ class WaterBalanceWorkflow:
         observe_end = context["observe_end"]
         cache_end = context["cache_end"]
         if start_ts >= period_end:
-            cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
-            field.water_balance = cached if not cached.empty else None
-            return field.water_balance
+            return self._set_cached_water_balance(field, context)
 
         if station is None:
             logger.warning("No meteo station data available for field %s", field.name)
@@ -365,6 +376,8 @@ class WaterBalanceWorkflow:
 
                 if meteo_data is None:
                     logger.warning("No meteo data available for station %s", station_id)
+                    for field in station_fields:
+                        self._set_cached_water_balance(field, field_contexts[field.id])
                     continue
 
                 logger.debug("Meteo query completed for station %s", station_id)
@@ -373,6 +386,8 @@ class WaterBalanceWorkflow:
                 station = meteo_data.get_station_data(station_id)
                 if station is None:
                     logger.warning("No meteo station data available for station %s", station_id)
+                    for field in station_fields:
+                        self._set_cached_water_balance(field, field_contexts[field.id])
                     continue
 
                 station = self._prepare_station_data(station)
