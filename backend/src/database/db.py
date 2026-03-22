@@ -400,24 +400,31 @@ class FarmDB:
             return query.all()
 
     def _get_latest_water_balance(
-        self, session: Session, field_id: int
+        self,
+        session: Session,
+        field_id: int,
+        end: datetime.date | None = None,
     ) -> Optional[models.WaterBalance]:
 
         field = self._get_field(session, id = field_id)
         if field is None:
             raise ValueError(f"No field with id {field_id} found. Cannot query latest water balance")
 
-        return (
-            session.query(models.WaterBalance)
-            .filter(models.WaterBalance.field_id == field_id)
-            .order_by(models.WaterBalance.date.desc())
-            .limit(1)
-            .one_or_none()
-        )
+        query = session.query(models.WaterBalance).filter(models.WaterBalance.field_id == field_id)
+        if end is not None:
+            query = query.filter(models.WaterBalance.date < end)
 
-    def get_latest_water_balance(self, field_id: int) -> models.WaterBalance | None:
+        return query.order_by(models.WaterBalance.date.desc()).limit(1).one_or_none()
+
+    def get_latest_water_balance(
+        self,
+        field_id: int,
+        end: datetime.date | None = None,
+    ) -> models.WaterBalance | None:
+        if end is not None:
+            end = pd.Timestamp(end).date()
         with self.session_scope() as session:
-            return self._get_latest_water_balance(session = session, field_id = field_id)
+            return self._get_latest_water_balance(session=session, field_id=field_id, end=end)
 
     def get_water_balance_summary(self, field_ids: list[int] | None = None) -> list[dict[str, object]]:
         with self.session_scope() as session:

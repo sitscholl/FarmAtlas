@@ -202,6 +202,38 @@ class MeteoData:
 
         return pd.concat(frames, ignore_index=True)
 
+    def combine(
+        self,
+        other: "MeteoData",
+    ) -> "MeteoData":
+        stations_by_id: dict[str, Station] = {}
+
+        for station in self.stations:
+            stations_by_id[station.id] = station
+
+        for station in other.stations:
+            existing = stations_by_id.get(station.id)
+            if existing is None:
+                stations_by_id[station.id] = station
+                continue
+
+            if (existing.x, existing.y, existing.crs) != (station.x, station.y, station.crs):
+                raise ValueError(
+                    f"Cannot combine station {station.id}: metadata differs between MeteoData objects."
+                )
+
+            merged_data = pd.concat([existing.data, station.data]).sort_index()
+            stations_by_id[station.id] = Station(
+                id=existing.id,
+                x=existing.x,
+                y=existing.y,
+                crs=existing.crs,
+                elevation=existing.elevation if existing.elevation is not None else station.elevation,
+                data=merged_data,
+            )
+
+        return MeteoData.from_list(list(stations_by_id.values()))
+
     def get_station_data(self, station_id: str):
         station = next((item for item in self.stations if item.id == station_id), None)
         if station is None:
