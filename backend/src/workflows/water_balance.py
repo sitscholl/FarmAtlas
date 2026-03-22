@@ -27,13 +27,16 @@ class WaterBalanceWorkflow:
     timezone: ZoneInfo
     meteo_resampler: MeteoResampler | None = None
     min_sample_size: int = 1
+    forecast_provider: str = 'open-meteo'
 
     def _get_field_run_context(
         self,
         field: FieldState,
         year: int,
-        period_end: pd.Timestamp,
+        observe_end: pd.Timestamp,
+        forecast_end: pd.Timestamp | None
     ) -> dict[str, object] | None:
+
         field_season_start = self.db.get_first_irrigation_event(field.id, year)
         if field_season_start is None:
             logger.info("No irrigation events found for field %s. Skipping", field.name)
@@ -54,7 +57,8 @@ class WaterBalanceWorkflow:
             "season_start_ts": season_start_ts,
             "start_ts": start_ts,
             "initial_storage": initial_storage,
-            "cache_end": period_end - pd.Timedelta(days=1),
+            "cache_end": observe_end - pd.Timedelta(days=1),
+            "forecast_end": forecast_end
         }
 
     def _build_station(self, station: Station, start: pd.Timestamp, end: pd.Timestamp) -> Station:
@@ -68,10 +72,14 @@ class WaterBalanceWorkflow:
             data=sliced,
         )
 
-    def _resolve_period_end(self, year: int) -> pd.Timestamp:
-        end_of_year = pd.Timestamp(year=year + 1, month=1, day=1, tz=self.timezone)
-        today = pd.Timestamp.now(tz=self.timezone).floor("D") #meteo query is end exclusive, so calculation will be done until yesterday
-        return min(end_of_year, today)
+    def _resolve_period_end(self, forecast_days: int = 0) -> pd.Timestamp:
+        observe_period_end = pd.Timestamp.now(tz=self.timezone).floor("D") #meteo query is end exclusive, so calculation will be done until yesterday
+        if forecast_days > 0:
+            forecast_period_end = observe_period_end + pd.Timedelta(days = int(forecast_days))
+        else:
+            forecast_period_end = None
+
+        return min(observe_period_end, forecast_period_end)
 
     def get_cached_water_balance(
         self,
@@ -268,26 +276,28 @@ class WaterBalanceWorkflow:
         fields: list[FieldState],
         year: int | None = None,
         persist: bool = True,
+        forecast_days: int = 0
     ) -> list[FieldState]:
 
         if year is None:
             year = pd.Timestamp.now(tz=self.timezone).year
-        period_end = self._resolve_period_end(year)
+        
+        observe_end, forecast_end = self._resolve_period_end(forecast_days)
 
         field_contexts: dict[int, dict[str, object]] = {}
         fields_by_station: dict[str, list[FieldState]] = {}
 
         for field in fields:
             try:
-                context = self._get_field_run_context(field, year, period_end)
+                context = self._get_field_run_context(field, year, observe_end, forecast_end)
                 if context is None:
                     continue
                 field_contexts[field.id] = context
-                if context["start_ts"] >= period_end:
+                if forecast_end is None and context["start_ts"] >= observe_end:
                     self._run_field(
                         field=field,
                         year=year,
-                        period_end=period_end,
+                        period_end=observe_end,
                         persist=persist,
                         context=context,
                     )
@@ -304,8 +314,21 @@ class WaterBalanceWorkflow:
                     provider=provider,
                     station_ids=[station_id],
                     start=station_start,
-                    end=period_end,
+                    end=observe_end,
                 )
+
+                if forecast_end is not None:
+                    try:
+                        forecast_meteo_data = self.meteo_loader.query(
+                            provider = self.forecast_provider,
+                            station_ids=[station_id],
+                            start = observe_end,
+                            end=forecast_end
+                        )
+                        meteo_data = meteo_data.append(forecast_meteo_data)
+                    except Exception as e:
+                        logger.exception(f"Error getting forecast meteo data: {e}")
+
                 logger.debug("Meteo query completed for station %s", station_id)
                 meteo_data = self.meteo_validator.validate(meteo_data)
                 logger.debug("Meteo validation completed for station %s", station_id)
@@ -325,12 +348,12 @@ class WaterBalanceWorkflow:
                     field_station = self._build_station(
                         station,
                         start=context["start_ts"],
-                        end=period_end,
+                        end=forecast_end or observe_end,
                     )
                     self._run_field(
                         field=field,
                         year=year,
-                        period_end=period_end,
+                        period_end=forecast_end or observe_end,
                         persist=persist,
                         station=field_station,
                         context=context,
