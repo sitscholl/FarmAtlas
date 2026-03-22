@@ -330,14 +330,17 @@ class WaterBalanceWorkflow:
         for (provider, station_id), station_fields in fields_by_station.items():
             try:
                 station_start = min(field_contexts[field.id]["start_ts"] for field in station_fields)
-                meteo_data = None
-                if station_start < observe_end:
-                    meteo_data = self.meteo_loader.query(
-                        provider=provider,
-                        station_ids=[station_id],
-                        start=station_start,
-                        end=observe_end,
-                    )
+                try:
+                    if station_start < observe_end:
+                        meteo_data = self.meteo_loader.query(
+                            provider=provider,
+                            station_ids=[station_id],
+                            start=station_start,
+                            end=observe_end,
+                        )
+                except Exception:
+                    logger.exception("Error getting observed meteo data for station %s", station_id)
+                    meteo_data = None
 
                 if forecast_end is not None:
                     try:
