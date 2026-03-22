@@ -36,21 +36,28 @@ function formatNumber(value: number | null | undefined, digits = 1) {
 }
 
 function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
-  return data.map((point) => ({
-    ...point,
-    raw_threshold:
-      point.readily_available_water === null
-        ? null
-        : point.available_water_storage - point.readily_available_water,
-    evapotranspiration_negative:
-      point.evapotranspiration === null || point.evapotranspiration === undefined
-        ? null
-        : -Math.abs(point.evapotranspiration),
-    soil_water_content_observed:
-      point.value_type === 'forecast' ? null : point.soil_water_content,
-    soil_water_content_forecast:
-      point.value_type === 'forecast' ? point.soil_water_content : null,
-  }))
+  return data.map((point, index) => {
+    const nextPoint = data[index + 1]
+    const forecastStartsNext = nextPoint?.value_type === 'forecast'
+
+    return {
+      ...point,
+      raw_threshold:
+        point.readily_available_water === null
+          ? null
+          : point.available_water_storage - point.readily_available_water,
+      evapotranspiration_negative:
+        point.evapotranspiration === null || point.evapotranspiration === undefined
+          ? null
+          : -Math.abs(point.evapotranspiration),
+      soil_water_content_observed:
+        point.value_type === 'forecast' ? null : point.soil_water_content,
+      soil_water_content_forecast:
+        point.value_type === 'forecast' || forecastStartsNext
+          ? point.soil_water_content
+          : null,
+    }
+  })
 }
 
 function TooltipContent({
@@ -188,6 +195,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
                   activeDot={{ r: 5 }}
                   connectNulls={false}
                   name="Bodenwassergehalt Prognose"
+                  legendType="none"
                 />
               ) : null}
               <Bar
