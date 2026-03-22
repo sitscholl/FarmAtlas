@@ -166,7 +166,7 @@ export default function FieldDetail() {
 
   return (
     <section className="w-full max-w-6xl">
-      <div className="p-8">
+      <div className="px-3 py-4 sm:px-6 sm:py-6 lg:p-8">
         <Link
           to="/"
           className="text-sm font-medium text-sky-700 hover:text-sky-900"
@@ -174,12 +174,12 @@ export default function FieldDetail() {
           Back to dashboard
         </Link>
 
-        <div className="mt-6 flex flex-wrap items-start justify-between gap-6 border-b border-black pb-2">
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-4 border-b border-black pb-3 sm:mt-6 sm:gap-6 sm:pb-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">
               Field Detail
             </p>
-            <h1 className="mt-3 text-4xl font-semibold text-slate-900">
+            <h1 className="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
               {field.name}
             </h1>
             <p className="relative mt-2 text-sm text-slate-500 whitespace-pre-line">{ buildSubtitle(field) }</p>

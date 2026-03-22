@@ -113,7 +113,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
   )
 
   return (
-    <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
+    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm sm:rounded-3xl sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -122,84 +122,87 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
         </div>
       </div>
 
-      <div className="mt-6 h-[420px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
-            barCategoryGap="80%"
-          >
-            <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tick={{ fill: '#64748b', fontSize: 12 }}
-              tickLine={{ fill: '#64748b' }}
-              axisLine={{ stroke: '#cbd5e1' }}
-              label={{ value: 'Datum', position: 'insideBottom', offset: -8, fill: '#64748b' }}
-            />
-            <YAxis
-              tick={{ fill: '#64748b', fontSize: 12 }}
-              tickLine={{ fill: '#64748b' }}
-              axisLine={{ stroke: '#cbd5e1' }}
-              label={{ value: 'Wassergehalt (mm)', angle: -90, fill: '#64748b' }}
-            />
-            <ReferenceLine y={0} stroke="#64748b" strokeWidth={.5} />
-            <Tooltip content={<TooltipContent />} />
-            <Legend wrapperStyle={{ paddingTop: 12 }} />
-            <Line
-              type="monotone"
-              dataKey="soil_water_content"
-              stroke="#0f172a"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              activeDot={{ r: 5 }}
-              name="Bodenwassergehalt"
-            />
-            <Bar
-              dataKey="precipitation"
-              stackId="incoming"
-              fill="#0682b77d"
-              name="Niederschlag"
-              maxBarSize={10}
-            />
-            <Bar
-              dataKey="irrigation"
-              stackId="incoming"
-              fill="#259a057a"
-              name="Bewaesserung"
-              maxBarSize={10}
-            />
-            {hasEvapotranspiration ? (
+      <div className="mt-4 overflow-x-auto sm:mt-6">
+        <div className="h-[320px] min-w-[40rem] sm:h-[420px] sm:min-w-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={chartData}
+              margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
+              barCategoryGap="80%"
+            >
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: '#64748b', fontSize: 11 }}
+                tickLine={{ fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                minTickGap={24}
+                height={36}
+              />
+              <YAxis
+                tick={{ fill: '#64748b', fontSize: 11 }}
+                tickLine={{ fill: '#64748b' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                width={36}
+              />
+              <ReferenceLine y={0} stroke="#64748b" strokeWidth={.5} />
+              <Tooltip content={<TooltipContent />} />
+              <Legend wrapperStyle={{ paddingTop: 8, fontSize: '12px' }} />
+              <Line
+                type="monotone"
+                dataKey="soil_water_content"
+                stroke="#0f172a"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 5 }}
+                name="Bodenwassergehalt"
+              />
               <Bar
-                dataKey="evapotranspiration_negative"
-                fill="#f59e0b99"
-                name="Evapotranspiration"
+                dataKey="precipitation"
+                stackId="incoming"
+                fill="#0682b77d"
+                name="Niederschlag"
                 maxBarSize={10}
               />
-            ) : null}
-            <Line
-              type="monotone"
-              dataKey="available_water_storage"
-              stroke="#94a3b8"
-              strokeDasharray="6 6"
-              strokeWidth={1}
-              dot={false}
-              activeDot={false}
-              legendType="none"
-            />
-            <Line
-              type="monotone"
-              dataKey="raw_threshold"
-              stroke="#f43f5e"
-              strokeDasharray="4 5"
-              strokeWidth={1}
-              dot={false}
-              activeDot={false}
-              connectNulls={false}
-              legendType="none"
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+              <Bar
+                dataKey="irrigation"
+                stackId="incoming"
+                fill="#259a057a"
+                name="Bewaesserung"
+                maxBarSize={10}
+              />
+              {hasEvapotranspiration ? (
+                <Bar
+                  dataKey="evapotranspiration_negative"
+                  fill="#f59e0b99"
+                  name="Evapotranspiration"
+                  maxBarSize={10}
+                />
+              ) : null}
+              <Line
+                type="monotone"
+                dataKey="available_water_storage"
+                stroke="#94a3b8"
+                strokeDasharray="6 6"
+                strokeWidth={1}
+                dot={false}
+                activeDot={false}
+                legendType="none"
+              />
+              <Line
+                type="monotone"
+                dataKey="raw_threshold"
+                stroke="#f43f5e"
+                strokeDasharray="4 5"
+                strokeWidth={1}
+                dot={false}
+                activeDot={false}
+                connectNulls={false}
+                legendType="none"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="mt-2 grid justify-items-center gap-3 text-center text-sm text-slate-500 sm:grid-cols-3">
