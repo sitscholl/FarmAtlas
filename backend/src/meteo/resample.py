@@ -117,6 +117,7 @@ class MeteoResampler:
         datetime_col: str = "datetime",
         groupby_cols: list[str] | None = None,
         min_sample_size: int = 1,
+        numeric_only: bool = True,
     ) -> pd.DataFrame:
 
         if min_sample_size < 1:
@@ -140,6 +141,16 @@ class MeteoResampler:
 
         # 3. Build Named Aggregations
         value_cols = [c for c in df.columns if c not in required_cols]
+        if numeric_only:
+            non_numeric_cols = [c for c in value_cols if not pd.api.types.is_numeric_dtype(df[c])]
+            if non_numeric_cols:
+                logger.warning(
+                    "Found non-numeric value columns. They will be dropped when resampling: %s",
+                    non_numeric_cols,
+                )
+                df = df.drop(columns=non_numeric_cols)
+                value_cols = [c for c in value_cols if c not in non_numeric_cols]
+
         named_aggs = self._prepare_named_aggs(value_cols, self.default_aggfunc)
 
         if not named_aggs:
