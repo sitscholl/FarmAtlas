@@ -1,15 +1,10 @@
 services:
-  meteo-service:
+  farm-atlas:
     image: ghcr.io/sitscholl/farmatlas:latest
-    ports:
-      - "8080:8080"
+    # ports:
+    #   - "8080:8080"
     volumes:
       - ./config:/app/config
+      - ./db:/app/db
     restart: unless-stopped
     container_name: farm-atlas
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 300s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
