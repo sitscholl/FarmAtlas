@@ -110,9 +110,12 @@ export default function FieldDetail() {
   const [field, setField] = useState<FieldOverview | null>(null)
   const [series, setSeries] = useState<WaterBalanceSeriesPoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isForecastLoading, setIsForecastLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
+    let isActive = true
+
     const fetchDetail = async () => {
       if (!fieldId) {
         setErrorMessage('Field id is missing.')
@@ -123,17 +126,42 @@ export default function FieldDetail() {
       try {
         const [overviewResponse, seriesResponse] = await Promise.all([
           api.get<FieldOverview>(`/fields/${fieldId}/overview`),
-          api.get<WaterBalanceSeriesPoint[]>(`/fields/${fieldId}/water-balance/series`, {
-            params: { forecast_days: FORECAST_DAYS },
-          }),
+          api.get<WaterBalanceSeriesPoint[]>(`/fields/${fieldId}/water-balance/series`),
         ])
+        if (!isActive) {
+          return
+        }
+
         setField(overviewResponse.data)
         setSeries(seriesResponse.data)
         setErrorMessage(null)
+        setIsLoading(false)
+
+        setIsForecastLoading(true)
+        try {
+          const forecastResponse = await api.get<WaterBalanceSeriesPoint[]>(
+            `/fields/${fieldId}/water-balance/series`,
+            {
+              params: { forecast_days: FORECAST_DAYS },
+            },
+          )
+          if (!isActive) {
+            return
+          }
+          setSeries(forecastResponse.data)
+        } catch (error) {
+          console.error('Error fetching forecast water-balance data', error)
+        } finally {
+          if (isActive) {
+            setIsForecastLoading(false)
+          }
+        }
       } catch (error) {
+        if (!isActive) {
+          return
+        }
         console.error('Error fetching field detail', error)
         setErrorMessage('Field details could not be loaded.')
-      } finally {
         setIsLoading(false)
       }
     }
@@ -142,11 +170,15 @@ export default function FieldDetail() {
 
     const handleDataChanged = () => {
       setIsLoading(true)
+      setIsForecastLoading(false)
       void fetchDetail()
     }
 
     window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged)
-    return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
+    return () => {
+      isActive = false
+      window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
+    }
   }, [fieldId])
 
   if (isLoading) {
@@ -211,6 +243,11 @@ export default function FieldDetail() {
 
         <div className="mt-10">
           <WaterBalanceChart data={series} />
+          {isForecastLoading ? (
+            <p className="mt-3 text-sm text-slate-500">
+              Lade Prognosedaten...
+            </p>
+          ) : null}
         </div>
 
         <h1 className="mt-12 text-4xl font-semibold text-slate-900">
