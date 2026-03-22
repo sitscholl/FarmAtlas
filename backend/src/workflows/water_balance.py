@@ -202,11 +202,16 @@ class WaterBalanceWorkflow:
             water_balance["value_type"] = water_balance["model"].eq("observation").map(
                 {True: "observed", False: "forecast"}
             )
+        else:
+            water_balance["value_type"] = "observed"
+
+        current_rows = water_balance.loc[water_balance["value_type"] == "observed"]
+        current_row = current_rows.iloc[-1] if not current_rows.empty else water_balance.iloc[-1]
 
         field.water_balance = water_balance
-        field.metrics["current_soil_water_content"] = float(water_balance["soil_water_content"].iloc[-1])
-        field.metrics["current_water_deficit"] = float(water_balance["water_deficit"].iloc[-1])
-        field.metrics["safe_ratio"] = float(water_balance["safe_ratio"].iloc[-1])
+        field.metrics["current_soil_water_content"] = float(current_row["soil_water_content"])
+        field.metrics["current_water_deficit"] = float(current_row["water_deficit"])
+        field.metrics["safe_ratio"] = float(current_row["safe_ratio"])
 
         return water_balance
 
@@ -330,6 +335,7 @@ class WaterBalanceWorkflow:
         for (provider, station_id), station_fields in fields_by_station.items():
             try:
                 station_start = min(field_contexts[field.id]["start_ts"] for field in station_fields)
+                meteo_data = None
                 try:
                     if station_start < observe_end:
                         meteo_data = self.meteo_loader.query(
