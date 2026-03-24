@@ -6,7 +6,7 @@ import WaterBalanceChart from '../components/WaterBalanceChart'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/field'
 
-const FORECAST_DAYS = 5
+const FORECAST_DAYS = 6
 
 type DetailMetric = {
   label: string
