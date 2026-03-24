@@ -42,7 +42,7 @@ function buildInitialValues(
 function buildFieldOptions(fields: FieldSummary[]): FieldOption[] {
   return fields.map((field) => ({
     value: String(field.id),
-    label: `${field.name} (${field.reference_provider}: ${field.reference_station})`,
+    label: `${field.name}${field.section ? ` (${field.section})` : ''}`,
   }))
 }
 

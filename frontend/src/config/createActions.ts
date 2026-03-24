@@ -112,7 +112,15 @@ export const createActions: CreateActionConfig[] = [
     fields: [
       { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
       { id: 'date', label: 'Datum', type: 'date', required: true },
-      { id: 'method', label: 'Methode', type: 'text', defaultValue: 'drip', required: true },
+      { 
+        id: 'method', 
+        label: 'Methode', 
+        type: 'select',
+        options: [
+          { value: 'drip', label: 'Tropfer' },
+          { value: 'overhead', label: 'Oberkrone' },
+        ],
+        required: true },
       { id: 'amount', label: 'Menge (mm)', type: 'number', defaultValue: 100, step: '1', required: true },
     ],
     buildPayload: (values) => ({
