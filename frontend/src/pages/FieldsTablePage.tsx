@@ -4,7 +4,10 @@ import { GoPencil } from 'react-icons/go'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
-import DataTable, { type DataTableColumn } from '../components/DataTable'
+import DataTable, {
+  type DataTableColumn,
+  type DataTableFilter,
+} from '../components/DataTable'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import {
   buildFieldEditAction,
@@ -36,6 +39,12 @@ export default function FieldsTablePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
+  const [filters, setFilters] = useState({
+    query: '',
+    section: '',
+    status: '',
+    soilType: '',
+  })
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -151,6 +160,86 @@ export default function FieldsTablePage() {
     [],
   )
 
+  const tableFilters = useMemo<DataTableFilter[]>(
+    () => [
+      {
+        id: 'query',
+        label: 'Suche',
+        type: 'text',
+        value: filters.query,
+        placeholder: 'Name, Sorte oder Station',
+      },
+      {
+        id: 'section',
+        label: 'Abschnitt',
+        type: 'text',
+        value: filters.section,
+        placeholder: 'z. B. Nord',
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'select',
+        value: filters.status,
+        options: [
+          { label: 'Alle', value: '' },
+          { label: 'Aktiv', value: 'active' },
+          { label: 'Inaktiv', value: 'inactive' },
+        ],
+      },
+      {
+        id: 'soilType',
+        label: 'Bodenart',
+        type: 'text',
+        value: filters.soilType,
+        placeholder: 'lehm, sandig, ...',
+      },
+    ],
+    [filters],
+  )
+
+  const filteredFields = useMemo(() => {
+    const normalizedQuery = filters.query.trim().toLowerCase()
+    const normalizedSection = filters.section.trim().toLowerCase()
+    const normalizedSoilType = filters.soilType.trim().toLowerCase()
+
+    return fields.filter((field) => {
+      const matchesQuery =
+        normalizedQuery === '' ||
+        [field.name, field.variety, field.reference_station, field.reference_provider]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedQuery)
+
+      const matchesSection =
+        normalizedSection === '' ||
+        (field.section ?? '').toLowerCase().includes(normalizedSection)
+
+      const matchesStatus =
+        filters.status === '' ||
+        (filters.status === 'active' ? field.active : !field.active)
+
+      const matchesSoilType =
+        normalizedSoilType === '' ||
+        field.soil_type.toLowerCase().includes(normalizedSoilType)
+
+      return matchesQuery && matchesSection && matchesStatus && matchesSoilType
+    })
+  }, [fields, filters])
+
+  const handleFilterChange = (filterId: string, value: string) => {
+    setFilters((current) => ({ ...current, [filterId]: value }))
+  }
+
+  const handleResetFilters = () => {
+    setFilters({
+      query: '',
+      section: '',
+      status: '',
+      soilType: '',
+    })
+  }
+
   const editAction = useMemo(() => buildFieldEditAction(editingField), [editingField])
   const editInitialValues = useMemo(
     () => buildFieldEditInitialValues(editingField),
@@ -170,7 +259,7 @@ export default function FieldsTablePage() {
             </h1>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            {fields.length} Eintraege
+            {filteredFields.length} / {fields.length} Eintraege
           </div>
         </div>
 
@@ -186,9 +275,12 @@ export default function FieldsTablePage() {
           ) : (
             <DataTable
               columns={columns}
-              rows={fields}
+              rows={filteredFields}
               getRowKey={(field) => field.id}
               emptyMessage="Keine Anlagen gefunden."
+              filters={tableFilters}
+              onFilterChange={handleFilterChange}
+              onResetFilters={handleResetFilters}
             />
           )}
         </div>
