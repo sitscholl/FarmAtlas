@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 
 import Navbar from './components/Navbar'
 import FieldDetail from './pages/FieldDetail'
+import FieldsTablePage from './pages/FieldsTablePage'
 import Home from './pages/Home'
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
       <main className="flex min-h-screen w-screen items-center justify-center px-6 py-10">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/fields" element={<FieldsTablePage />} />
           <Route path="/fields/:fieldId" element={<FieldDetail />} />
         </Routes>
       </main>

@@ -7,6 +7,7 @@ import CreateEntityModal from './CreateEntityModal'
 
 import { IoMdAdd } from "react-icons/io";
 import { IoHomeOutline } from "react-icons/io5";
+import { LuTableProperties } from 'react-icons/lu'
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -28,9 +29,14 @@ export default function Navbar() {
     <>
       <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 py-3 shadow-sm backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6">
-          <Link className="inline-flex items-center gap-2 text-gray-700 hover:text-sky-500" to="/">
-            <IoHomeOutline /> Home
-          </Link>
+          <div className="flex items-center gap-5">
+            <Link className="inline-flex items-center gap-2 text-gray-700 hover:text-sky-500" to="/">
+              <IoHomeOutline /> Home
+            </Link>
+            <Link className="inline-flex items-center gap-2 text-gray-700 hover:text-sky-500" to="/fields">
+              <LuTableProperties /> Anlagen
+            </Link>
+          </div>
 
           <div ref={containerRef} className="relative">
             <button

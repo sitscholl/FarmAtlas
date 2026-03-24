@@ -11,9 +11,11 @@ import FieldBox, {
   type FieldBoxMetric,
   type FieldBoxStatusBar,
 } from '../components/FieldBox'
-import { fieldCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
-import type { CreateActionConfig } from '../types/createActions'
+import {
+  buildFieldEditAction,
+  buildFieldEditInitialValues,
+} from '../lib/fieldForm'
 import { type FieldOverview } from '../types/field'
 
 function formatNumber(value: number, digits = 1) {
@@ -115,48 +117,12 @@ export default function Home() {
     return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [])
 
-  const editAction = useMemo<CreateActionConfig | null>(() => {
-    if (editingField === null) {
-      return null
-    }
+  const editAction = useMemo(() => buildFieldEditAction(editingField), [editingField])
 
-    return {
-      ...fieldCreateAction,
-      title: 'Anlage bearbeiten',
-      submitLabel: 'Anlage speichern',
-      endpoint: `/fields/${editingField.id}`,
-      method: 'put',
-    }
-  }, [editingField])
-
-  const editInitialValues = useMemo<Record<string, string> | undefined>(() => {
-    if (editingField === null) {
-      return undefined
-    }
-
-    return {
-      name: editingField.name,
-      section: editingField.section ?? '',
-      variety: editingField.variety,
-      planting_year: String(editingField.planting_year),
-      tree_count: String(editingField.tree_count ?? ''),
-      tree_height: String(editingField.tree_height ?? ''),
-      row_distance: String(editingField.row_distance ?? ''),
-      tree_distance: String(editingField.tree_distance ?? ''),
-      running_metre: String(editingField.running_metre ?? ''),
-      herbicide_free:
-        editingField.herbicide_free === null ? '' : String(editingField.herbicide_free),
-      active: String(editingField.active),
-      reference_provider: editingField.reference_provider,
-      reference_station: editingField.reference_station,
-      area_ha: String(editingField.area_ha ?? ''),
-      soil_type: editingField.soil_type,
-      soil_weight: editingField.soil_weight ?? '',
-      humus_pct: String(editingField.humus_pct),
-      effective_root_depth_cm: String(editingField.effective_root_depth_cm),
-      p_allowable: String(editingField.p_allowable),
-    }
-  }, [editingField])
+  const editInitialValues = useMemo(
+    () => buildFieldEditInitialValues(editingField),
+    [editingField],
+  )
 
   const handleDeleteField = async (field: FieldOverview) => {
     const confirmed = window.confirm(`Soll die Anlage "${field.name}" wirklich geloescht werden?`)
