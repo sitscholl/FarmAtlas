@@ -100,34 +100,34 @@ export const fieldCreateAction: CreateActionConfig = {
   }),
 }
 
-export const createActions: CreateActionConfig[] = [
-  fieldCreateAction,
-  {
-    id: 'irrigation',
-    label: 'Bewaesserung eintragen',
-    title: 'Bewaesserung eintragen',
-    submitLabel: 'Bewaesserung speichern',
-    endpoint: '',
-    method: 'post',
-    fields: [
-      { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
-      { id: 'date', label: 'Datum', type: 'date', required: true },
-      { 
-        id: 'method', 
-        label: 'Methode', 
-        type: 'select',
-        options: [
-          { value: 'drip', label: 'Tropfer' },
-          { value: 'overhead', label: 'Oberkrone' },
-        ],
-        required: true },
-      { id: 'amount', label: 'Menge (mm)', type: 'number', defaultValue: 100, step: '1', required: true },
-    ],
-    buildPayload: (values) => ({
-      field_id: Number(values.field_id),
-      date: values.date,
-      method: values.method.trim(),
-      amount: Number(values.amount),
-    }),
-  },
-]
+export const irrigationCreateAction: CreateActionConfig = {
+  id: 'irrigation',
+  label: 'Bewaesserung eintragen',
+  title: 'Bewaesserung eintragen',
+  submitLabel: 'Bewaesserung speichern',
+  endpoint: '',
+  method: 'post',
+  fields: [
+    { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
+    { id: 'date', label: 'Datum', type: 'date', required: true },
+    {
+      id: 'method',
+      label: 'Methode',
+      type: 'select',
+      options: [
+        { value: 'drip', label: 'Tropfer' },
+        { value: 'overhead', label: 'Oberkrone' },
+      ],
+      required: true,
+    },
+    { id: 'amount', label: 'Menge (mm)', type: 'number', defaultValue: 100, step: '1', required: true },
+  ],
+  buildPayload: (values) => ({
+    field_id: Number(values.field_id),
+    date: values.date,
+    method: values.method.trim(),
+    amount: Number(values.amount),
+  }),
+}
+
+export const createActions: CreateActionConfig[] = [fieldCreateAction, irrigationCreateAction]

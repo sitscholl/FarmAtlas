@@ -4,6 +4,7 @@ import Navbar from './components/Navbar'
 import FieldDetail from './pages/FieldDetail'
 import FieldsTablePage from './pages/FieldsTablePage'
 import Home from './pages/Home'
+import IrrigationTablePage from './pages/IrrigationTablePage'
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/fields" element={<FieldsTablePage />} />
+          <Route path="/irrigation" element={<IrrigationTablePage />} />
           <Route path="/fields/:fieldId" element={<FieldDetail />} />
         </Routes>
       </main>

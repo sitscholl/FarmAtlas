@@ -17,6 +17,7 @@ from .api_models import (
     FieldSummaryResponse,
     IrrigationResponse,
     IrrigationPost,
+    IrrigationPut,
     WaterBalanceSeriesPointResponse,
     WaterBalanceSummaryResponse,
 )
@@ -105,6 +106,18 @@ def _serialize_irrigation_event(event) -> IrrigationResponse:
         method=event.method,
         amount=event.amount,
     )
+
+def _get_irrigation_event(event_id: int):
+    event = next(
+        (event for event in runtime.db.list_irrigation_events() if event.id == event_id),
+        None,
+    )
+    if event is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not find any irrigation event with id {event_id}",
+        )
+    return event
 
 def _build_field_overview(field_id: int) -> FieldOverviewResponse:
     field = _validate_field_id(field_id)
@@ -299,6 +312,11 @@ async def list_irrigation_events(field_id: int):
     events = runtime.db.list_irrigation_events(field_id = field_id)
     return [_serialize_irrigation_event(event) for event in events]
 
+@app.get("/api/irrigation", response_model=list[IrrigationResponse])
+async def list_all_irrigation_events():
+    events = runtime.db.list_irrigation_events()
+    return [_serialize_irrigation_event(event) for event in events]
+
 @app.post("/api/fields/{field_id}/irrigation", response_model=IrrigationResponse, status_code=status.HTTP_201_CREATED)
 async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: int, irrigation_event: IrrigationPost):
     _validate_field_id(field_id)
@@ -314,6 +332,58 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
     except Exception as e:
         logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("No field with id", "Could not find any irrigation event with id"))
+
+@app.put("/api/irrigation/{event_id}", response_model=IrrigationResponse)
+async def update_irrigation_event(
+    background_tasks: BackgroundTasks,
+    event_id: int,
+    irrigation_event: IrrigationPut,
+):
+    existing_event = _get_irrigation_event(event_id)
+    _validate_field_id(irrigation_event.field_id)
+    try:
+        updated_event = runtime.db.update_irrigation_event(
+            event_id=event_id,
+            updates={
+                "field_id": irrigation_event.field_id,
+                "date": irrigation_event.date,
+                "method": irrigation_event.method,
+                "amount": irrigation_event.amount,
+            },
+        )
+        background_tasks.add_task(
+            runtime.run_workflow_for_field,
+            "water_balance",
+            updated_event.field_id,
+        )
+        if existing_event.field_id != updated_event.field_id:
+            background_tasks.add_task(
+                runtime.run_workflow_for_field,
+                "water_balance",
+                existing_event.field_id,
+            )
+        return _serialize_irrigation_event(updated_event)
+    except Exception as e:
+        logger.exception(f"Updating irrigation event {event_id} failed: {e}")
+        _raise_write_http_error(
+            e,
+            not_found_prefixes=("No field with id", "Could not find any irrigation event with id"),
+        )
+
+@app.delete("/api/irrigation/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_irrigation_event(background_tasks: BackgroundTasks, event_id: int):
+    existing_event = _get_irrigation_event(event_id)
+    deleted = runtime.db.delete_irrigation_event(event_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not find any irrigation event with id {event_id}",
+        )
+    background_tasks.add_task(
+        runtime.run_workflow_for_field,
+        "water_balance",
+        existing_event.field_id,
+    )
 
 @app.delete("/api/fields/{field_id}/irrigation", response_model=FieldOverviewResponse)
 async def clear_irrigation_events(field_id: int):

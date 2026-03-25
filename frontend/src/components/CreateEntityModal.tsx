@@ -112,7 +112,7 @@ export default function CreateEntityModal({
     try {
       const payload = action.buildPayload(values)
       const endpoint =
-        action.id === 'irrigation'
+        action.id === 'irrigation' && action.endpoint === ''
           ? `/fields/${(payload as { field_id: number }).field_id}/irrigation`
           : action.endpoint
 

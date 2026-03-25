@@ -108,6 +108,12 @@ class IrrigationPost(BaseModel):
     method: str
     amount: float = 100
 
+class IrrigationPut(BaseModel):
+    field_id: int
+    date: date
+    method: str
+    amount: float = 100
+
 class WaterBalanceSummaryResponse(BaseModel):
     field_id: int
     as_of: date | None
