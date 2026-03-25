@@ -7,6 +7,7 @@ import CreateEntityModal from '../components/CreateEntityModal'
 import DataTable, {
   type DataTableColumn,
   type DataTableFilter,
+  type DataTableSummaryCell,
 } from '../components/DataTable'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import {
@@ -231,6 +232,32 @@ export default function FieldsTablePage() {
     })
   }
 
+  const summaryCells = useMemo<DataTableSummaryCell<FieldOverview>[]>(
+    () => [
+      {
+        columnId: 'name',
+        content: 'Summe',
+      },
+      {
+        columnId: 'area_ha',
+        content: (rows) =>
+          formatNumber(
+            rows.reduce((total, field) => total + (field.area_ha ?? 0), 0),
+            2,
+          ),
+      },
+      {
+        columnId: 'tree_count',
+        content: (rows) =>
+          formatNumber(
+            rows.reduce((total, field) => total + (field.tree_count ?? 0), 0),
+            0,
+          ),
+      },
+    ],
+    [],
+  )
+
   const editAction = useMemo(() => buildFieldEditAction(editingField), [editingField])
   const editInitialValues = useMemo(
     () => buildFieldEditInitialValues(editingField),
@@ -272,6 +299,7 @@ export default function FieldsTablePage() {
               filters={tableFilters}
               onFilterChange={handleFilterChange}
               onResetFilters={handleResetFilters}
+              summaryCells={summaryCells}
             />
           )}
         </div>

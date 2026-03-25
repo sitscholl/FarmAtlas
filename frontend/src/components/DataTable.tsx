@@ -20,6 +20,12 @@ export type DataTableFilter = {
   }>
 }
 
+export type DataTableSummaryCell<Row> = {
+  columnId: string
+  content: ReactNode | ((rows: Row[]) => ReactNode)
+  className?: string
+}
+
 type DataTableProps<Row> = {
   columns: DataTableColumn<Row>[]
   rows: Row[]
@@ -28,6 +34,7 @@ type DataTableProps<Row> = {
   filters?: DataTableFilter[]
   onFilterChange?: (filterId: string, value: string) => void
   onResetFilters?: () => void
+  summaryCells?: DataTableSummaryCell<Row>[]
 }
 
 export default function DataTable<Row>({
@@ -38,8 +45,10 @@ export default function DataTable<Row>({
   filters = [],
   onFilterChange,
   onResetFilters,
+  summaryCells = [],
 }: DataTableProps<Row>) {
   const hasFilters = filters.length > 0
+  const hasSummaryRow = summaryCells.length > 0 && rows.length > 0
   const [selectedRowKey, setSelectedRowKey] = useState<string | number | null>(null)
 
   useEffect(() => {
@@ -146,6 +155,32 @@ export default function DataTable<Row>({
               )})
             )}
           </tbody>
+          {hasSummaryRow ? (
+            <tfoot className="border-t border-slate-200 bg-slate-50">
+              <tr>
+                {columns.map((column) => {
+                  const summaryCell = summaryCells.find(
+                    (cell) => cell.columnId === column.id,
+                  )
+                  const content =
+                    summaryCell === undefined
+                      ? null
+                      : typeof summaryCell.content === 'function'
+                        ? summaryCell.content(rows)
+                        : summaryCell.content
+
+                  return (
+                    <td
+                      key={column.id}
+                      className={`whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-700 ${column.cellClassName ?? ''} ${summaryCell?.className ?? ''}`}
+                    >
+                      {content}
+                    </td>
+                  )
+                })}
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
     </div>
