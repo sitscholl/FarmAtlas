@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 export type DataTableColumn<Row> = {
   id: string
@@ -40,6 +40,18 @@ export default function DataTable<Row>({
   onResetFilters,
 }: DataTableProps<Row>) {
   const hasFilters = filters.length > 0
+  const [selectedRowKey, setSelectedRowKey] = useState<string | number | null>(null)
+
+  useEffect(() => {
+    if (selectedRowKey === null) {
+      return
+    }
+
+    const stillExists = rows.some((row) => getRowKey(row) === selectedRowKey)
+    if (!stillExists) {
+      setSelectedRowKey(null)
+    }
+  }, [getRowKey, rows, selectedRowKey])
 
   return (
     <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -112,8 +124,16 @@ export default function DataTable<Row>({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={getRowKey(row)} className="transition hover:bg-slate-50/80">
+              rows.map((row) => {
+                const rowKey = getRowKey(row)
+                const isSelected = selectedRowKey === rowKey
+
+                return (
+                <tr
+                  key={rowKey}
+                  className={`cursor-pointer transition hover:bg-slate-300/80 ${isSelected ? 'bg-slate-300/80' : ''}`}
+                  onClick={() => setSelectedRowKey(rowKey)}
+                >
                   {columns.map((column) => (
                     <td
                       key={column.id}
@@ -123,7 +143,7 @@ export default function DataTable<Row>({
                     </td>
                   ))}
                 </tr>
-              ))
+              )})
             )}
           </tbody>
         </table>
