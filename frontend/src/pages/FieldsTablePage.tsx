@@ -197,24 +197,26 @@ export default function FieldsTablePage() {
   const filteredFields = useMemo(() => {
     const normalizedQuery = filters.query.trim().toLowerCase()
 
-    return fields.filter((field) => {
-      const matchesQuery =
-        normalizedQuery === '' ||
-        [field.name, field.variety, field.reference_station, field.reference_provider]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedQuery)
+    return [...fields]
+      .sort((left, right) => left.name.localeCompare(right.name, 'de-DE'))
+      .filter((field) => {
+        const matchesQuery =
+          normalizedQuery === '' ||
+          [field.name, field.variety, field.reference_station, field.reference_provider]
+            .join(' ')
+            .toLowerCase()
+            .includes(normalizedQuery)
 
-      const matchesStatus =
-        filters.status === '' ||
-        (filters.status === 'active' ? field.active : !field.active)
+        const matchesStatus =
+          filters.status === '' ||
+          (filters.status === 'active' ? field.active : !field.active)
 
-      const matchesherbicideFree =
-        filters.herbicideFree === '' ||
-        (filters.herbicideFree === 'Ja' ? field.herbicide_free : !field.herbicide_free)
+        const matchesherbicideFree =
+          filters.herbicideFree === '' ||
+          (filters.herbicideFree === 'Ja' ? field.herbicide_free : !field.herbicide_free)
 
-      return matchesQuery && matchesStatus && matchesherbicideFree
-    })
+        return matchesQuery && matchesStatus && matchesherbicideFree
+      })
   }, [fields, filters])
 
   const handleFilterChange = (filterId: string, value: string) => {
