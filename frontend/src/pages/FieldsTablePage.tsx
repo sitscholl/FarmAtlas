@@ -41,7 +41,7 @@ export default function FieldsTablePage() {
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
   const [filters, setFilters] = useState({
     query: '',
-    status: '',
+    status: 'active',
     herbicideFree: '',
   })
 
@@ -226,7 +226,7 @@ export default function FieldsTablePage() {
   const handleResetFilters = () => {
     setFilters({
       query: '',
-      status: '',
+      status: 'active',
       herbicideFree: '',
     })
   }
