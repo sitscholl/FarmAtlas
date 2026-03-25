@@ -43,7 +43,7 @@ export default function FieldsTablePage() {
     query: '',
     section: '',
     status: '',
-    soilType: '',
+    herbicideFree: '',
   })
 
   useEffect(() => {
@@ -188,11 +188,15 @@ export default function FieldsTablePage() {
         ],
       },
       {
-        id: 'soilType',
-        label: 'Bodenart',
-        type: 'text',
-        value: filters.soilType,
-        placeholder: 'lehm, sandig, ...',
+        id: 'herbicideFree',
+        label: 'Herbizidfrei',
+        type: 'select',
+        value: filters.herbicideFree,
+        options: [
+          {label: 'Alle', value: ''},
+          {label: 'Ja', value: 'Ja'},
+          {label: 'Nein', value: 'Nein'},
+        ]
       },
     ],
     [filters],
@@ -201,7 +205,6 @@ export default function FieldsTablePage() {
   const filteredFields = useMemo(() => {
     const normalizedQuery = filters.query.trim().toLowerCase()
     const normalizedSection = filters.section.trim().toLowerCase()
-    const normalizedSoilType = filters.soilType.trim().toLowerCase()
 
     return fields.filter((field) => {
       const matchesQuery =
@@ -219,11 +222,11 @@ export default function FieldsTablePage() {
         filters.status === '' ||
         (filters.status === 'active' ? field.active : !field.active)
 
-      const matchesSoilType =
-        normalizedSoilType === '' ||
-        field.soil_type.toLowerCase().includes(normalizedSoilType)
+      const matchesherbicideFree =
+        filters.herbicideFree === '' ||
+        (filters.herbicideFree === 'Ja' ? field.herbicide_free : !field.herbicide_free)
 
-      return matchesQuery && matchesSection && matchesStatus && matchesSoilType
+      return matchesQuery && matchesSection && matchesStatus && matchesherbicideFree
     })
   }, [fields, filters])
 
@@ -236,7 +239,7 @@ export default function FieldsTablePage() {
       query: '',
       section: '',
       status: '',
-      soilType: '',
+      herbicideFree: '',
     })
   }
 
