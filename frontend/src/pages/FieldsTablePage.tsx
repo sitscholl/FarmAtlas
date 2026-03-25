@@ -41,7 +41,6 @@ export default function FieldsTablePage() {
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
   const [filters, setFilters] = useState({
     query: '',
-    section: '',
     status: '',
     herbicideFree: '',
   })
@@ -170,13 +169,6 @@ export default function FieldsTablePage() {
         placeholder: 'Name, Sorte oder Station',
       },
       {
-        id: 'section',
-        label: 'Abschnitt',
-        type: 'text',
-        value: filters.section,
-        placeholder: 'z. B. Nord',
-      },
-      {
         id: 'status',
         label: 'Status',
         type: 'select',
@@ -204,7 +196,6 @@ export default function FieldsTablePage() {
 
   const filteredFields = useMemo(() => {
     const normalizedQuery = filters.query.trim().toLowerCase()
-    const normalizedSection = filters.section.trim().toLowerCase()
 
     return fields.filter((field) => {
       const matchesQuery =
@@ -214,10 +205,6 @@ export default function FieldsTablePage() {
           .toLowerCase()
           .includes(normalizedQuery)
 
-      const matchesSection =
-        normalizedSection === '' ||
-        (field.section ?? '').toLowerCase().includes(normalizedSection)
-
       const matchesStatus =
         filters.status === '' ||
         (filters.status === 'active' ? field.active : !field.active)
@@ -226,7 +213,7 @@ export default function FieldsTablePage() {
         filters.herbicideFree === '' ||
         (filters.herbicideFree === 'Ja' ? field.herbicide_free : !field.herbicide_free)
 
-      return matchesQuery && matchesSection && matchesStatus && matchesherbicideFree
+      return matchesQuery && matchesStatus && matchesherbicideFree
     })
   }, [fields, filters])
 
@@ -237,7 +224,6 @@ export default function FieldsTablePage() {
   const handleResetFilters = () => {
     setFilters({
       query: '',
-      section: '',
       status: '',
       herbicideFree: '',
     })
