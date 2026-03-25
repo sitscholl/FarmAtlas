@@ -35,6 +35,8 @@ type DataTableProps<Row> = {
   onFilterChange?: (filterId: string, value: string) => void
   onResetFilters?: () => void
   summaryCells?: DataTableSummaryCell<Row>[]
+  selectedRowKey?: string | number | null
+  onRowSelect?: (row: Row | null) => void
 }
 
 export default function DataTable<Row>({
@@ -46,10 +48,18 @@ export default function DataTable<Row>({
   onFilterChange,
   onResetFilters,
   summaryCells = [],
+  selectedRowKey: controlledSelectedRowKey,
+  onRowSelect,
 }: DataTableProps<Row>) {
   const hasFilters = filters.length > 0
   const hasSummaryRow = summaryCells.length > 0 && rows.length > 0
-  const [selectedRowKey, setSelectedRowKey] = useState<string | number | null>(null)
+  const [uncontrolledSelectedRowKey, setUncontrolledSelectedRowKey] = useState<
+    string | number | null
+  >(null)
+  const selectedRowKey =
+    controlledSelectedRowKey !== undefined
+      ? controlledSelectedRowKey
+      : uncontrolledSelectedRowKey
 
   useEffect(() => {
     if (selectedRowKey === null) {
@@ -58,9 +68,19 @@ export default function DataTable<Row>({
 
     const stillExists = rows.some((row) => getRowKey(row) === selectedRowKey)
     if (!stillExists) {
-      setSelectedRowKey(null)
+      if (controlledSelectedRowKey === undefined) {
+        setUncontrolledSelectedRowKey(null)
+      }
+      onRowSelect?.(null)
     }
-  }, [getRowKey, rows, selectedRowKey])
+  }, [controlledSelectedRowKey, getRowKey, onRowSelect, rows, selectedRowKey])
+
+  const handleRowSelect = (row: Row) => {
+    if (controlledSelectedRowKey === undefined) {
+      setUncontrolledSelectedRowKey(getRowKey(row))
+    }
+    onRowSelect?.(row)
+  }
 
   return (
     <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -138,21 +158,22 @@ export default function DataTable<Row>({
                 const isSelected = selectedRowKey === rowKey
 
                 return (
-                <tr
-                  key={rowKey}
-                  className={`cursor-pointer transition hover:bg-slate-300/80 ${isSelected ? 'bg-slate-300/80' : ''}`}
-                  onClick={() => setSelectedRowKey(rowKey)}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.id}
-                      className={`whitespace-nowrap px-4 py-3 text-sm text-slate-700 ${column.cellClassName ?? ''}`}
-                    >
-                      {column.cell(row)}
-                    </td>
-                  ))}
-                </tr>
-              )})
+                  <tr
+                    key={rowKey}
+                    className={`cursor-pointer transition hover:bg-slate-300/80 ${isSelected ? 'bg-slate-300/80' : ''}`}
+                    onClick={() => handleRowSelect(row)}
+                  >
+                    {columns.map((column) => (
+                      <td
+                        key={column.id}
+                        className={`whitespace-nowrap px-4 py-3 text-sm text-slate-700 ${column.cellClassName ?? ''}`}
+                      >
+                        {column.cell(row)}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })
             )}
           </tbody>
           {hasSummaryRow ? (

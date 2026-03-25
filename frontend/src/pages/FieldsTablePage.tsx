@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { GoPencil } from 'react-icons/go'
+import { PiTrashBold } from 'react-icons/pi'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
@@ -9,7 +10,7 @@ import DataTable, {
   type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
-import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
+import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
   buildFieldEditAction,
   buildFieldEditInitialValues,
@@ -36,9 +37,11 @@ function formatBoolean(value: boolean | null) {
 }
 
 export default function FieldsTablePage() {
+  const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
   const [fields, setFields] = useState<FieldOverview[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
   const [filters, setFilters] = useState({
     query: '',
@@ -76,24 +79,23 @@ export default function FieldsTablePage() {
     return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [])
 
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (interactiveAreaRef.current === null) {
+        return
+      }
+
+      if (!interactiveAreaRef.current.contains(event.target as Node)) {
+        setSelectedFieldId(null)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [])
+
   const columns = useMemo<DataTableColumn<FieldOverview>[]>(
     () => [
-      {
-        id: 'edit',
-        header: '',
-        headerClassName: 'w-14',
-        cellClassName: 'w-14',
-        cell: (field) => (
-          <button
-            type="button"
-            onClick={() => setEditingField(field)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
-            aria-label={`${field.name} bearbeiten`}
-          >
-            <GoPencil />
-          </button>
-        ),
-      },
       {
         id: 'name',
         header: 'Anlage',
@@ -220,6 +222,22 @@ export default function FieldsTablePage() {
       })
   }, [fields, filters])
 
+  const selectedField = useMemo(
+    () => filteredFields.find((field) => field.id === selectedFieldId) ?? null,
+    [filteredFields, selectedFieldId],
+  )
+
+  useEffect(() => {
+    if (selectedFieldId === null) {
+      return
+    }
+
+    const stillExists = filteredFields.some((field) => field.id === selectedFieldId)
+    if (!stillExists) {
+      setSelectedFieldId(null)
+    }
+  }, [filteredFields, selectedFieldId])
+
   const handleFilterChange = (filterId: string, value: string) => {
     setFilters((current) => ({ ...current, [filterId]: value }))
   }
@@ -230,6 +248,22 @@ export default function FieldsTablePage() {
       status: 'active',
       herbicideFree: '',
     })
+  }
+
+  const handleDeleteField = async (field: FieldOverview) => {
+    const confirmed = window.confirm(`Soll die Anlage "${field.name}" wirklich geloescht werden?`)
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await api.delete(`/fields/${field.id}`)
+      setSelectedFieldId(null)
+      notifyDataChanged()
+    } catch (error) {
+      console.error(`Error deleting field ${field.id}`, error)
+      setErrorMessage('Die Anlage konnte nicht geloescht werden.')
+    }
   }
 
   const summaryCells = useMemo<DataTableSummaryCell<FieldOverview>[]>(
@@ -281,7 +315,38 @@ export default function FieldsTablePage() {
           </div>
         </div>
 
-        <div className="mt-8">
+        <div ref={interactiveAreaRef} className="mt-8">
+          {selectedField ? (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border border-slate-200 bg-slate-50 px-4 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Ausgewaehlte Anlage
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {selectedField.name}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingField(selectedField)}
+                  className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-500"
+                >
+                  <GoPencil />
+                  Bearbeiten
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteField(selectedField)}
+                  className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
+                >
+                  <PiTrashBold />
+                  Loeschen
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {isLoading ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
               Lade Felddaten...
@@ -300,6 +365,8 @@ export default function FieldsTablePage() {
               onFilterChange={handleFilterChange}
               onResetFilters={handleResetFilters}
               summaryCells={summaryCells}
+              selectedRowKey={selectedFieldId}
+              onRowSelect={(field) => setSelectedFieldId(field?.id ?? null)}
             />
           )}
         </div>
