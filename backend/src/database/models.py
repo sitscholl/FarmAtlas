@@ -6,11 +6,14 @@ Base = declarative_base()
 
 class Field(Base):
     __tablename__ = 'fields'
-    ## Unique constraint so no duplicated name where active=true can exist
+    ## Only one active field may exist for the same identity tuple.
     __table_args__ = (
         Index(
-            'uq_fields_active_name',
+            'uq_fields_active_identity',
             'name',
+            text("coalesce(section, '')"),
+            'variety',
+            'planting_year',
             unique=True,
             sqlite_where=text('active = 1'),
         ),
