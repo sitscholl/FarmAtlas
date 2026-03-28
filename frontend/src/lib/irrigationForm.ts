@@ -1,9 +1,9 @@
 import { irrigationCreateAction } from '../config/createActions'
 import type { CreateActionConfig } from '../types/createActions'
-import type { IrrigationEvent } from '../types/irrigation'
+import type { IrrigationRead } from '../types/generated/api'
 
 export function buildIrrigationEditAction(
-  event: IrrigationEvent | null,
+  event: IrrigationRead | null,
 ): CreateActionConfig | null {
   if (event === null) {
     return null
@@ -19,7 +19,7 @@ export function buildIrrigationEditAction(
 }
 
 export function buildIrrigationEditInitialValues(
-  event: IrrigationEvent | null,
+  event: IrrigationRead | null,
 ): Record<string, string> | undefined {
   if (event === null) {
     return undefined

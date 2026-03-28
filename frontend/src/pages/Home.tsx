@@ -16,7 +16,7 @@ import {
   buildFieldEditAction,
   buildFieldEditInitialValues,
 } from '../lib/fieldForm'
-import { type FieldOverview } from '../types/field'
+import { type FieldOverview } from '../types/generated/api'
 
 function formatNumber(value: number, digits = 1) {
   return new Intl.NumberFormat('de-DE', {

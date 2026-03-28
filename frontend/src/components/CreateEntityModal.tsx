@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
 import api from '../api'
 import { notifyDataChanged } from '../lib/dataEvents'
-import type { FieldSummary } from '../types/field'
+import type { FieldRead } from '../types/generated/api'
 import {
   type CreateActionConfig,
   type CreateActionField,
@@ -39,7 +39,7 @@ function buildInitialValues(
   }
 }
 
-function buildFieldOptions(fields: FieldSummary[]): FieldOption[] {
+function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   return fields.map((field) => ({
     value: String(field.id),
     label: `${field.name}${field.section ? ` (${field.section})` : ''}`,
@@ -78,7 +78,7 @@ export default function CreateEntityModal({
 
     const fetchFields = async () => {
       try {
-        const response = await api.get<FieldSummary[]>('/fields')
+        const response = await api.get<FieldRead[]>('/fields')
         const options = buildFieldOptions(response.data)
         setFieldOptions(options)
         setValues((currentValues) => {

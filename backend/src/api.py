@@ -10,16 +10,17 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 from sqlalchemy.exc import IntegrityError
 
-from .api_models import (
-    FieldOverviewResponse,
-    FieldPost,
-    FieldPut,
-    FieldSummaryResponse,
-    IrrigationResponse,
-    IrrigationPost,
-    IrrigationPut,
-    WaterBalanceSeriesPointResponse,
-    WaterBalanceSummaryResponse,
+from .schemas import (
+    FieldCreate,
+    FieldOverview,
+    FieldRead,
+    FieldUpdate,
+    FieldWaterBalanceSummary,
+    IrrigationCreate,
+    IrrigationRead,
+    IrrigationUpdate,
+    WaterBalanceSeriesPoint,
+    WaterBalanceSummary,
 )
 from .runtime import RuntimeContext
 from .scheduler import WorkflowScheduler
@@ -74,37 +75,34 @@ def _validate_field_id(field_id: int):
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-def _serialize_field(field) -> FieldSummaryResponse:
-    return FieldSummaryResponse(
-        id=field.id,
-        name=field.name,
-        section=field.section,
-        variety=field.variety,
-        planting_year=field.planting_year,
-        tree_count=field.tree_count,
-        tree_height=field.tree_height,
-        row_distance=field.row_distance,
-        tree_distance=field.tree_distance,
-        running_metre=field.running_metre,
-        herbicide_free=field.herbicide_free,
-        active=field.active,
-        reference_provider=field.reference_provider,
-        reference_station=field.reference_station,
-        soil_type=field.soil_type,
-        soil_weight=field.soil_weight,
-        humus_pct=field.humus_pct,
-        area_ha=field.area_ha,
-        effective_root_depth_cm=field.effective_root_depth_cm,
-        p_allowable=field.p_allowable,
-    )
+def _serialize_field(field) -> FieldRead:
+    return FieldRead.model_validate(field)
 
-def _serialize_irrigation_event(event) -> IrrigationResponse:
-    return IrrigationResponse(
-        id=event.id,
-        field_id=event.field_id,
-        date=event.date,
-        method=event.method,
-        amount=event.amount,
+
+def _serialize_irrigation_event(event) -> IrrigationRead:
+    return IrrigationRead.model_validate(event)
+
+
+def _serialize_field_water_balance_summary(summary: dict[str, object] | None) -> FieldWaterBalanceSummary:
+    if summary is None:
+        return FieldWaterBalanceSummary(
+            water_balance_as_of=None,
+            current_water_deficit=None,
+            current_soil_water_content=None,
+            available_water_storage=None,
+            readily_available_water=None,
+            below_raw=None,
+            safe_ratio=None,
+        )
+
+    return FieldWaterBalanceSummary(
+        water_balance_as_of=summary.get("as_of"),
+        current_water_deficit=summary.get("current_water_deficit"),
+        current_soil_water_content=summary.get("current_soil_water_content"),
+        available_water_storage=summary.get("available_water_storage"),
+        readily_available_water=summary.get("readily_available_water"),
+        below_raw=summary.get("below_raw"),
+        safe_ratio=summary.get("safe_ratio"),
     )
 
 def _get_irrigation_event(event_id: int):
@@ -119,43 +117,15 @@ def _get_irrigation_event(event_id: int):
         )
     return event
 
-def _build_field_overview(field_id: int) -> FieldOverviewResponse:
+def _build_field_overview(field_id: int) -> FieldOverview:
     field = _validate_field_id(field_id)
     summary_by_field_id = {
         summary["field_id"]: summary
         for summary in runtime.db.get_water_balance_summary(field_ids=[field_id])
     }
-    summary = summary_by_field_id.get(field_id, {})
-
-    return FieldOverviewResponse(
-        id=field.id,
-        name=field.name,
-        section=field.section,
-        variety=field.variety,
-        planting_year=field.planting_year,
-        tree_count=field.tree_count,
-        tree_height=field.tree_height,
-        row_distance=field.row_distance,
-        tree_distance=field.tree_distance,
-        running_metre=field.running_metre,
-        herbicide_free=field.herbicide_free,
-        active=field.active,
-        reference_provider=field.reference_provider,
-        reference_station=field.reference_station,
-        soil_type=field.soil_type,
-        soil_weight=field.soil_weight,
-        humus_pct=field.humus_pct,
-        area_ha=field.area_ha,
-        effective_root_depth_cm=field.effective_root_depth_cm,
-        p_allowable=field.p_allowable,
-        water_balance_as_of=summary.get("as_of"),
-        current_water_deficit=summary.get("current_water_deficit"),
-        current_soil_water_content=summary.get("current_soil_water_content"),
-        available_water_storage=summary.get("available_water_storage"),
-        readily_available_water=summary.get("readily_available_water"),
-        below_raw=summary.get("below_raw"),
-        safe_ratio=summary.get("safe_ratio"),
-    )
+    field_data = _serialize_field(field).model_dump()
+    summary_data = _serialize_field_water_balance_summary(summary_by_field_id.get(field_id)).model_dump()
+    return FieldOverview.model_validate(field_data | summary_data)
 
 def _raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...] = ()) -> None:
     if isinstance(exc, HTTPException):
@@ -182,67 +152,27 @@ async def health_check():
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
-@app.get("/api/fields", response_model=list[FieldSummaryResponse])
+@app.get("/api/fields", response_model=list[FieldRead])
 async def list_fields():
     return [_serialize_field(field) for field in runtime.fields]
 
-@app.post("/api/fields", response_model=FieldSummaryResponse, status_code=status.HTTP_201_CREATED)
-async def create_field(background_tasks: BackgroundTasks, field: FieldPost):
+@app.post("/api/fields", response_model=FieldRead, status_code=status.HTTP_201_CREATED)
+async def create_field(background_tasks: BackgroundTasks, field: FieldCreate):
     try: 
-        new_field = runtime.db.create_field(
-            name = field.name,
-            section = field.section,
-            variety = field.variety,
-            planting_year = field.planting_year,
-            reference_provider = field.reference_provider,
-            reference_station = field.reference_station,
-            soil_type = field.soil_type,
-            soil_weight = field.soil_weight,
-            humus_pct = field.humus_pct,
-            area_ha = field.area_ha,
-            effective_root_depth_cm = field.effective_root_depth_cm,
-            p_allowable = field.p_allowable,
-            tree_count = field.tree_count,
-            tree_height = field.tree_height,
-            row_distance = field.row_distance,
-            tree_distance = field.tree_distance,
-            running_metre = field.running_metre,
-            herbicide_free = field.herbicide_free,
-            active = field.active,
-        )
+        new_field = runtime.db.create_field(**field.model_dump())
         background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", new_field.id)
         return _serialize_field(new_field)
     except Exception as e:
         logger.exception(f"Adding field failed: {e}")
         _raise_write_http_error(e)
 
-@app.put("/api/fields/{field_id}", response_model=FieldSummaryResponse)
-async def update_field(background_tasks: BackgroundTasks, field_id: int, field: FieldPut):
+@app.put("/api/fields/{field_id}", response_model=FieldRead)
+async def update_field(background_tasks: BackgroundTasks, field_id: int, field: FieldUpdate):
     existing_field = _validate_field_id(field_id)
     try:
         updated_field = runtime.db.update_field(
             id=field_id,
-            updates={
-                "name": field.name,
-                "section": field.section,
-                "variety": field.variety,
-                "planting_year": field.planting_year,
-                "reference_provider": field.reference_provider,
-                "reference_station": field.reference_station,
-                "soil_type": field.soil_type,
-                "soil_weight": field.soil_weight,
-                "humus_pct": field.humus_pct,
-                "area_ha": field.area_ha,
-                "effective_root_depth_cm": field.effective_root_depth_cm,
-                "p_allowable": field.p_allowable,
-                "tree_count": field.tree_count,
-                "tree_height": field.tree_height,
-                "row_distance": field.row_distance,
-                "tree_distance": field.tree_distance,
-                "running_metre": field.running_metre,
-                "herbicide_free": field.herbicide_free,
-                "active": field.active,
-            },
+            updates=field.model_dump(),
         )
 
         if any(
@@ -261,7 +191,7 @@ async def delete_field(field_id: int):
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Could not find any field with id {field_id}")
 
-@app.get("/api/fields/overview", response_model=list[FieldOverviewResponse])
+@app.get("/api/fields/overview", response_model=list[FieldOverview])
 async def get_fields_overview():
     summary_by_field_id = {
         summary["field_id"]: summary
@@ -269,56 +199,31 @@ async def get_fields_overview():
     }
 
     return [
-        FieldOverviewResponse(
-            id=field.id,
-            name=field.name,
-            section=field.section,
-            variety=field.variety,
-            planting_year=field.planting_year,
-            tree_count=field.tree_count,
-            tree_height=field.tree_height,
-            row_distance=field.row_distance,
-            tree_distance=field.tree_distance,
-            running_metre=field.running_metre,
-            herbicide_free=field.herbicide_free,
-            active=field.active,
-            reference_provider=field.reference_provider,
-            reference_station=field.reference_station,
-            soil_type=field.soil_type,
-            soil_weight=field.soil_weight,
-            humus_pct=field.humus_pct,
-            area_ha=field.area_ha,
-            effective_root_depth_cm=field.effective_root_depth_cm,
-            p_allowable=field.p_allowable,
-            water_balance_as_of=summary_by_field_id.get(field.id, {}).get("as_of"),
-            current_water_deficit=summary_by_field_id.get(field.id, {}).get("current_water_deficit"),
-            current_soil_water_content=summary_by_field_id.get(field.id, {}).get("current_soil_water_content"),
-            available_water_storage=summary_by_field_id.get(field.id, {}).get("available_water_storage"),
-            readily_available_water=summary_by_field_id.get(field.id, {}).get("readily_available_water"),
-            below_raw=summary_by_field_id.get(field.id, {}).get("below_raw"),
-            safe_ratio=summary_by_field_id.get(field.id, {}).get("safe_ratio"),
+        FieldOverview.model_validate(
+            _serialize_field(field).model_dump()
+            | _serialize_field_water_balance_summary(summary_by_field_id.get(field.id)).model_dump()
         )
         for field in runtime.fields
     ]
 
-@app.get("/api/fields/{field_id}/overview", response_model=FieldOverviewResponse)
+@app.get("/api/fields/{field_id}/overview", response_model=FieldOverview)
 async def get_field_overview(field_id: int):
     return _build_field_overview(field_id)
 
-@app.get("/api/fields/{field_id}/irrigation", response_model = list[IrrigationResponse])
+@app.get("/api/fields/{field_id}/irrigation", response_model = list[IrrigationRead])
 async def list_irrigation_events(field_id: int):
     _validate_field_id(field_id)
     
     events = runtime.db.list_irrigation_events(field_id = field_id)
     return [_serialize_irrigation_event(event) for event in events]
 
-@app.get("/api/irrigation", response_model=list[IrrigationResponse])
+@app.get("/api/irrigation", response_model=list[IrrigationRead])
 async def list_all_irrigation_events():
     events = runtime.db.list_irrigation_events()
     return [_serialize_irrigation_event(event) for event in events]
 
-@app.post("/api/fields/{field_id}/irrigation", response_model=IrrigationResponse, status_code=status.HTTP_201_CREATED)
-async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: int, irrigation_event: IrrigationPost):
+@app.post("/api/fields/{field_id}/irrigation", response_model=IrrigationRead, status_code=status.HTTP_201_CREATED)
+async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: int, irrigation_event: IrrigationCreate):
     _validate_field_id(field_id)
     try: 
         new_event = runtime.db.create_irrigation_event(
@@ -333,23 +238,18 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
         logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("No field with id", "Could not find any irrigation event with id"))
 
-@app.put("/api/irrigation/{event_id}", response_model=IrrigationResponse)
+@app.put("/api/irrigation/{event_id}", response_model=IrrigationRead)
 async def update_irrigation_event(
     background_tasks: BackgroundTasks,
     event_id: int,
-    irrigation_event: IrrigationPut,
+    irrigation_event: IrrigationUpdate,
 ):
     existing_event = _get_irrigation_event(event_id)
     _validate_field_id(irrigation_event.field_id)
     try:
         updated_event = runtime.db.update_irrigation_event(
             event_id=event_id,
-            updates={
-                "field_id": irrigation_event.field_id,
-                "date": irrigation_event.date,
-                "method": irrigation_event.method,
-                "amount": irrigation_event.amount,
-            },
+            updates=irrigation_event.model_dump(),
         )
         background_tasks.add_task(
             runtime.run_workflow_for_field,
@@ -385,7 +285,7 @@ async def delete_irrigation_event(background_tasks: BackgroundTasks, event_id: i
         existing_event.field_id,
     )
 
-@app.delete("/api/fields/{field_id}/irrigation", response_model=FieldOverviewResponse)
+@app.delete("/api/fields/{field_id}/irrigation", response_model=FieldOverview)
 async def clear_irrigation_events(field_id: int):
     _validate_field_id(field_id)
     try:
@@ -395,14 +295,14 @@ async def clear_irrigation_events(field_id: int):
         logger.exception(f"Clearing irrigation events for field with id {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("No field with id",))
 
-@app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummaryResponse])
+@app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummary])
 async def get_water_balance_summary():
     return [
-        WaterBalanceSummaryResponse(**summary)
+        WaterBalanceSummary(**summary)
         for summary in runtime.db.get_water_balance_summary()
     ]
 
-@app.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPointResponse])
+@app.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPoint])
 async def get_field_water_balance_series(
     field_id: int,
     forecast_days: int = Query(default=0, ge=0, le=14),
@@ -422,7 +322,7 @@ async def get_field_water_balance_series(
 
         series = water_balance.reset_index().rename(columns={"index": "date"})
         return [
-            WaterBalanceSeriesPointResponse(
+            WaterBalanceSeriesPoint(
                 date=pd.Timestamp(row["date"]).date(),
                 precipitation=float(row["precipitation"]),
                 irrigation=float(row["irrigation"]),
@@ -443,7 +343,7 @@ async def get_field_water_balance_series(
 
     records = runtime.db.get_water_balance(field_id=field_id)
     return [
-        WaterBalanceSeriesPointResponse(
+        WaterBalanceSeriesPoint(
             date=record.date,
             precipitation=record.precipitation,
             irrigation=record.irrigation,
@@ -462,7 +362,7 @@ async def get_field_water_balance_series(
         for record in records
     ]
 
-@app.post("/api/fields/{field_id}/water-balance", response_model=FieldOverviewResponse)
+@app.post("/api/fields/{field_id}/water-balance", response_model=FieldOverview)
 async def trigger_water_balance_calculation(field_id: int):
     _validate_field_id(field_id)
     try:

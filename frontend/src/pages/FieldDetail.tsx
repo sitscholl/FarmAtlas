@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import api from '../api'
 import WaterBalanceChart from '../components/WaterBalanceChart'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
-import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/field'
+import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/generated/api'
 
 const FORECAST_DAYS = 6
 

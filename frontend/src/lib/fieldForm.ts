@@ -1,6 +1,6 @@
 import { fieldCreateAction } from '../config/createActions'
 import type { CreateActionConfig } from '../types/createActions'
-import type { FieldOverview } from '../types/field'
+import type { FieldOverview } from '../types/generated/api'
 
 export function buildFieldEditAction(field: FieldOverview | null): CreateActionConfig | null {
   if (field === null) {

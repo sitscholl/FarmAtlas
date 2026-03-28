@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 
-import { type WaterBalanceSeriesPoint } from '../types/field'
+import { type WaterBalanceSeriesPoint } from '../types/generated/api'
 
 type WaterBalanceChartProps = {
   data: WaterBalanceSeriesPoint[]

@@ -15,7 +15,7 @@ import {
   buildFieldEditAction,
   buildFieldEditInitialValues,
 } from '../lib/fieldForm'
-import type { FieldOverview } from '../types/field'
+import type { FieldOverview } from '../types/generated/api'
 
 function formatNumber(value: number | null, digits = 1) {
   if (value === null) {

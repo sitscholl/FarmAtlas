@@ -1,24 +1,6 @@
-export type FieldCreatePayload = {
-  name: string
-  section: string | null
-  variety: string
-  planting_year: number
-  tree_count: number | null
-  tree_height: number | null
-  row_distance: number | null
-  tree_distance: number | null
-  running_metre: number | null
-  herbicide_free: boolean | null
-  active: boolean
-  reference_provider: string
-  reference_station: string
-  soil_type: string
-  soil_weight: string | null
-  humus_pct: number
-  area_ha: number
-  effective_root_depth_cm: number
-  p_allowable: number
-}
+import type { FieldCreate } from './generated/api'
+
+export type FieldCreatePayload = FieldCreate
 
 export type IrrigationCreatePayload = {
   field_id: number

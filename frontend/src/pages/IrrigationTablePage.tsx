@@ -14,8 +14,7 @@ import {
   buildIrrigationEditAction,
   buildIrrigationEditInitialValues,
 } from '../lib/irrigationForm'
-import type { FieldSummary } from '../types/field'
-import type { IrrigationEvent } from '../types/irrigation'
+import type { FieldRead, IrrigationRead } from '../types/generated/api'
 
 type IrrigationColumnKey = 'date' | 'field' | 'section' | 'method' | 'amount'
 
@@ -44,12 +43,12 @@ function formatMethod(value: string) {
 
 export default function IrrigationTablePage() {
   const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
-  const [events, setEvents] = useState<IrrigationEvent[]>([])
-  const [fields, setFields] = useState<FieldSummary[]>([])
+  const [events, setEvents] = useState<IrrigationRead[]>([])
+  const [fields, setFields] = useState<FieldRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
-  const [editingEvent, setEditingEvent] = useState<IrrigationEvent | null>(null)
+  const [editingEvent, setEditingEvent] = useState<IrrigationRead | null>(null)
   const [filters, setFilters] = useState({
     fieldId: '',
     method: '',
@@ -61,8 +60,8 @@ export default function IrrigationTablePage() {
     const fetchData = async () => {
       try {
         const [eventsResponse, fieldsResponse] = await Promise.all([
-          api.get<IrrigationEvent[]>('/irrigation'),
-          api.get<FieldSummary[]>('/fields'),
+          api.get<IrrigationRead[]>('/irrigation'),
+          api.get<FieldRead[]>('/fields'),
         ])
 
         setEvents(eventsResponse.data)
@@ -118,8 +117,8 @@ export default function IrrigationTablePage() {
     [fields],
   )
 
-  const columns = useMemo<DataTableColumn<IrrigationEvent>[]>(() => {
-    const availableColumns: Record<IrrigationColumnKey, DataTableColumn<IrrigationEvent>> = {
+  const columns = useMemo<DataTableColumn<IrrigationRead>[]>(() => {
+    const availableColumns: Record<IrrigationColumnKey, DataTableColumn<IrrigationRead>> = {
       date: {
         id: 'date',
         header: 'Datum',
@@ -244,7 +243,7 @@ export default function IrrigationTablePage() {
     })
   }
 
-  const handleDeleteEvent = async (event: IrrigationEvent) => {
+  const handleDeleteEvent = async (event: IrrigationRead) => {
     const fieldName = fieldsById[event.field_id]?.name ?? `#${event.field_id}`
     const confirmed = window.confirm(
       `Soll der Bewaesserungseintrag fuer "${fieldName}" am ${formatDate(event.date)} wirklich geloescht werden?`,
@@ -263,7 +262,7 @@ export default function IrrigationTablePage() {
     }
   }
 
-  const summaryCells = useMemo<DataTableSummaryCell<IrrigationEvent>[]>(
+  const summaryCells = useMemo<DataTableSummaryCell<IrrigationRead>[]>(
     () => [
       {
         columnId: 'field',
