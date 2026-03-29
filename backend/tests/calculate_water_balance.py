@@ -57,14 +57,15 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
     follow_up_date = start_date + timedelta(days=4)
 
     for spec in field_specs:
-        field_model = runtime.db.create_field(**spec)
-        runtime.db.create_irrigation_event(
+        with runtime.db.session_scope() as session:
+            field_model = runtime.db.fields.create(session, **spec)
+        runtime.db.irrigation_service.create(
             field_id=field_model.id,
             date=start_date,
             method="drip",
             amount=18.0,
         )
-        runtime.db.create_irrigation_event(
+        runtime.db.irrigation_service.create(
             field_id=field_model.id,
             date=follow_up_date,
             method="drip",

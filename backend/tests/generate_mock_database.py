@@ -10,7 +10,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from src.database.db import FarmDB
+from src.database.db import Database
 
 logger = logging.getLogger(__name__)
 
@@ -136,29 +136,33 @@ def seed_mock_database(database_path: Path) -> None:
     if database_path.exists():
         database_path.unlink()
 
-    db = FarmDB(f"sqlite:///{database_path.as_posix()}")
+    db = Database(f"sqlite:///{database_path.as_posix()}")
     end_date = pd.Timestamp.now().floor("D")
 
     try:
         for spec in FIELD_SPECS:
-            field = db.create_field(
-                name=spec["name"],
-                reference_provider=spec["reference_provider"],
-                reference_station=spec["reference_station"],
-                soil_type=spec["soil_type"],
-                soil_weight=spec["soil_weight"],
-                humus_pct=spec["humus_pct"],
-                effective_root_depth_cm=spec["effective_root_depth_cm"],
-                area_ha=spec["area_ha"],
-                p_allowable=spec["p_allowable"],
-            )
+            with db.session_scope() as session:
+                field = db.fields.create(
+                    session,
+                    name=spec["name"],
+                    reference_provider=spec["reference_provider"],
+                    reference_station=spec["reference_station"],
+                    soil_type=spec["soil_type"],
+                    soil_weight=spec["soil_weight"],
+                    humus_pct=spec["humus_pct"],
+                    effective_root_depth_cm=spec["effective_root_depth_cm"],
+                    area_ha=spec["area_ha"],
+                    p_allowable=spec["p_allowable"],
+                    variety="Example",
+                    planting_year=1900,
+                )
             if field is None:
                 raise RuntimeError(f"Failed to create mock field {spec['name']}")
 
             irrigation_dates = [end_date.date() - pd.Timedelta(days=9), end_date.date() - pd.Timedelta(days=4)]
             irrigation_amounts = [14.0, 18.0] if spec["target_safe_ratio"] >= 0 else [8.0, 10.0]
             for irrigation_date, amount in zip(irrigation_dates, irrigation_amounts):
-                db.create_irrigation_event(
+                db.irrigation_service.create(
                     field_id=field.id,
                     date=irrigation_date,
                     method="drip",
@@ -172,7 +176,8 @@ def seed_mock_database(database_path: Path) -> None:
                 target_safe_ratio=spec["target_safe_ratio"],
                 end_date=end_date,
             )
-            db.add_water_balance(water_balance, field_id=field.id)
+            with db.session_scope() as session:
+                db.water_balance.add(session, db.engine, water_balance, field_id=field.id)
 
         logger.info("Mock database generated at %s", database_path)
     finally:

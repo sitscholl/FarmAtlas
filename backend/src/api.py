@@ -106,10 +106,8 @@ def _serialize_field_water_balance_summary(summary: dict[str, object] | None) ->
     )
 
 def _get_irrigation_event(event_id: int):
-    event = next(
-        (event for event in runtime.db.list_irrigation_events() if event.id == event_id),
-        None,
-    )
+    with runtime.db.session_scope() as session:
+        event = runtime.db.irrigation.get_by_id(session, event_id)
     if event is None:
         raise HTTPException(
             status_code=404,
@@ -119,10 +117,11 @@ def _get_irrigation_event(event_id: int):
 
 def _build_field_overview(field_id: int) -> FieldOverview:
     field = _validate_field_id(field_id)
-    summary_by_field_id = {
-        summary["field_id"]: summary
-        for summary in runtime.db.get_water_balance_summary(field_ids=[field_id])
-    }
+    with runtime.db.session_scope() as session:
+        summary_by_field_id = {
+            summary["field_id"]: summary
+            for summary in runtime.db.water_balance.get_summary(session, field_ids=[field_id])
+        }
     field_data = _serialize_field(field).model_dump()
     summary_data = _serialize_field_water_balance_summary(summary_by_field_id.get(field_id)).model_dump()
     return FieldOverview.model_validate(field_data | summary_data)
@@ -159,7 +158,8 @@ async def list_fields():
 @app.post("/api/fields", response_model=FieldRead, status_code=status.HTTP_201_CREATED)
 async def create_field(background_tasks: BackgroundTasks, field: FieldCreate):
     try: 
-        new_field = runtime.db.create_field(**field.model_dump())
+        with runtime.db.session_scope() as session:
+            new_field = runtime.db.fields.create(session, **field.model_dump())
         background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", new_field.id)
         return _serialize_field(new_field)
     except Exception as e:
@@ -170,10 +170,7 @@ async def create_field(background_tasks: BackgroundTasks, field: FieldCreate):
 async def update_field(background_tasks: BackgroundTasks, field_id: int, field: FieldUpdate):
     existing_field = _validate_field_id(field_id)
     try:
-        updated_field = runtime.db.update_field(
-            id=field_id,
-            updates=field.model_dump(),
-        )
+        updated_field = runtime.db.field_service.update(field_id=field_id, updates=field.model_dump())
 
         if any(
             getattr(existing_field, attr) != getattr(updated_field, attr)
@@ -187,16 +184,18 @@ async def update_field(background_tasks: BackgroundTasks, field_id: int, field: 
 
 @app.delete("/api/fields/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_field(field_id: int):
-    deleted = runtime.db.delete_field(field_id)
+    with runtime.db.session_scope() as session:
+        deleted = runtime.db.fields.delete(session, field_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Could not find any field with id {field_id}")
 
 @app.get("/api/fields/overview", response_model=list[FieldOverview])
 async def get_fields_overview():
-    summary_by_field_id = {
-        summary["field_id"]: summary
-        for summary in runtime.db.get_water_balance_summary()
-    }
+    with runtime.db.session_scope() as session:
+        summary_by_field_id = {
+            summary["field_id"]: summary
+            for summary in runtime.db.water_balance.get_summary(session)
+        }
 
     return [
         FieldOverview.model_validate(
@@ -214,19 +213,21 @@ async def get_field_overview(field_id: int):
 async def list_irrigation_events(field_id: int):
     _validate_field_id(field_id)
     
-    events = runtime.db.list_irrigation_events(field_id = field_id)
+    with runtime.db.session_scope() as session:
+        events = runtime.db.irrigation.list(session, field_id=field_id)
     return [_serialize_irrigation_event(event) for event in events]
 
 @app.get("/api/irrigation", response_model=list[IrrigationRead])
 async def list_all_irrigation_events():
-    events = runtime.db.list_irrigation_events()
+    with runtime.db.session_scope() as session:
+        events = runtime.db.irrigation.list(session)
     return [_serialize_irrigation_event(event) for event in events]
 
 @app.post("/api/fields/{field_id}/irrigation", response_model=IrrigationRead, status_code=status.HTTP_201_CREATED)
 async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: int, irrigation_event: IrrigationCreate):
     _validate_field_id(field_id)
     try: 
-        new_event = runtime.db.create_irrigation_event(
+        new_event = runtime.db.irrigation_service.create(
             field_id = field_id,
             date = irrigation_event.date,
             method= irrigation_event.method,
@@ -247,10 +248,7 @@ async def update_irrigation_event(
     existing_event = _get_irrigation_event(event_id)
     _validate_field_id(irrigation_event.field_id)
     try:
-        updated_event = runtime.db.update_irrigation_event(
-            event_id=event_id,
-            updates=irrigation_event.model_dump(),
-        )
+        updated_event = runtime.db.irrigation_service.update(event_id=event_id, updates=irrigation_event.model_dump())
         background_tasks.add_task(
             runtime.run_workflow_for_field,
             "water_balance",
@@ -273,7 +271,7 @@ async def update_irrigation_event(
 @app.delete("/api/irrigation/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_irrigation_event(background_tasks: BackgroundTasks, event_id: int):
     existing_event = _get_irrigation_event(event_id)
-    deleted = runtime.db.delete_irrigation_event(event_id)
+    deleted, _ = runtime.db.irrigation_service.delete(event_id)
     if not deleted:
         raise HTTPException(
             status_code=404,
@@ -289,7 +287,7 @@ async def delete_irrigation_event(background_tasks: BackgroundTasks, event_id: i
 async def clear_irrigation_events(field_id: int):
     _validate_field_id(field_id)
     try:
-        runtime.db.clear_irrigation_events(field_id)
+        runtime.db.irrigation_service.clear_for_field(field_id)
         return _build_field_overview(field_id)
     except Exception as e:
         logger.exception(f"Clearing irrigation events for field with id {field_id} failed: {e}")
@@ -297,10 +295,9 @@ async def clear_irrigation_events(field_id: int):
 
 @app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummary])
 async def get_water_balance_summary():
-    return [
-        WaterBalanceSummary(**summary)
-        for summary in runtime.db.get_water_balance_summary()
-    ]
+    with runtime.db.session_scope() as session:
+        summaries = runtime.db.water_balance.get_summary(session)
+    return [WaterBalanceSummary(**summary) for summary in summaries]
 
 @app.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPoint])
 async def get_field_water_balance_series(
@@ -341,7 +338,8 @@ async def get_field_water_balance_series(
             for _, row in series.iterrows()
         ]
 
-    records = runtime.db.get_water_balance(field_id=field_id)
+    with runtime.db.session_scope() as session:
+        records = runtime.db.water_balance.list_for_field(session, field_id=field_id)
     return [
         WaterBalanceSeriesPoint(
             date=record.date,
@@ -366,7 +364,8 @@ async def get_field_water_balance_series(
 async def trigger_water_balance_calculation(field_id: int):
     _validate_field_id(field_id)
     try:
-        runtime.db.clear_water_balance(field_id)
+        with runtime.db.session_scope() as session:
+            runtime.db.water_balance.clear_for_field(session, field_id)
         runtime.run_workflow_for_field("water_balance", field_id)
         return _build_field_overview(field_id)
     except Exception as e:

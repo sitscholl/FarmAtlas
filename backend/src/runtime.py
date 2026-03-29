@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from .database.db import FarmDB
+from .database.db import Database
 from .et import ET0Calculator
 from .et.et_correction import ETCorrection
 from .field import FieldContext, FieldState
@@ -90,7 +90,7 @@ class RuntimeContext:
         )
 
         ## Database
-        self.db = FarmDB(config.get('database', {}).get('path', 'sqlite:///db/database.db'))
+        self.db = Database(config.get('database', {}).get('path', 'sqlite:///db/database.db'))
        
         ## Fields
         if len(self.fields) == 0:
@@ -126,10 +126,12 @@ class RuntimeContext:
 
     @property
     def fields(self) -> list[FieldContext]:
-        return [FieldContext.from_model(field) for field in self.db.list_fields()]
+        with self.db.session_scope() as session:
+            return [FieldContext.from_model(field) for field in self.db.fields.list_all(session)]
 
     def get_field(self, field_id: int) -> FieldContext:
-        field_model = self.db.get_field(field_id)
+        with self.db.session_scope() as session:
+            field_model = self.db.fields.get_by_id(session, field_id)
         if field_model is None:
             raise ValueError(f"Unknown field id: {field_id}")
         return FieldContext.from_model(field_model)

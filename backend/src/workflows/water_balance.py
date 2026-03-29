@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ..database.db import FarmDB
+from ..database.db import Database
 from ..et.base import ET0Calculator
 from ..field import FieldState
 from ..irrigation import FieldIrrigation
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class WaterBalanceWorkflow:
-    db: FarmDB
+    db: Database
     meteo_loader: MeteoLoader
     meteo_validator: MeteoValidator
     et_calculator: ET0Calculator
@@ -36,13 +36,15 @@ class WaterBalanceWorkflow:
         observe_end: pd.Timestamp,
         forecast_end: pd.Timestamp | None,
     ) -> dict[str, object] | None:
-        field_season_start = self.db.get_first_irrigation_event(field.id, year)
+        with self.db.session_scope() as session:
+            field_season_start = self.db.irrigation.get_first_for_year(session, field_id=field.id, year=year)
         if field_season_start is None:
             logger.info("No irrigation events found for field %s. Skipping", field.name)
             return None
 
         season_start_ts = pd.Timestamp(field_season_start.date, tz=self.timezone)
-        latest_balance = self.db.get_latest_water_balance(field.id, end=observe_end.date())
+        with self.db.session_scope() as session:
+            latest_balance = self.db.water_balance.get_latest(session, field_id=field.id, end=observe_end.date())
 
         if latest_balance:
             next_ts = pd.Timestamp(latest_balance.date, tz=self.timezone) + timedelta(days=1)
@@ -94,11 +96,13 @@ class WaterBalanceWorkflow:
             end = pd.Timestamp(end)
             end = end.tz_localize(self.timezone) if end.tz is None else end.tz_convert(self.timezone)
 
-        records = self.db.get_water_balance(
-            field_id=field.id,
-            start=start.date() if start is not None else None,
-            end=end.date() if end is not None else None,
-        )
+        with self.db.session_scope() as session:
+            records = self.db.water_balance.list_for_field(
+                session,
+                field_id=field.id,
+                start=start.date() if start is not None else None,
+                end=end.date() if end is not None else None,
+            )
         if not records:
             return pd.DataFrame()
 
@@ -284,7 +288,12 @@ class WaterBalanceWorkflow:
             humus_pct=field.humus_pct,
             effective_root_depth_cm=field.effective_root_depth_cm,
         )
-        irrigation_events = self.db.list_irrigation_events(field_id=field.id, start=pd.Timestamp(f"{year}-1-1").date()) or []
+        with self.db.session_scope() as session:
+            irrigation_events = self.db.irrigation.list(
+                session,
+                field_id=field.id,
+                start=pd.Timestamp(f"{year}-1-1").date(),
+            ) or []
         field_irrigation = FieldIrrigation.from_list(irrigation_events)
         water_balance = self.calculate_water_balance(
             field=field,
@@ -296,7 +305,13 @@ class WaterBalanceWorkflow:
         if persist:
             observed_water_balance = water_balance.loc[water_balance.index < observe_end]
             if not observed_water_balance.empty:
-                self.db.add_water_balance(observed_water_balance, field_id=field.id)
+                with self.db.session_scope() as session:
+                    self.db.water_balance.add(
+                        session,
+                        self.db.engine,
+                        observed_water_balance,
+                        field_id=field.id,
+                    )
             cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
             forecast_water_balance = water_balance.loc[water_balance.index >= observe_end]
             if cached.empty:
