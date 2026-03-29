@@ -1,21 +1,29 @@
-from sqlalchemy import Boolean, Column, Date, Float, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    Date,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
 
 class Field(Base):
-    __tablename__ = 'fields'
-    ## Only one active field may exist for the same identity tuple.
+    __tablename__ = "fields"
     __table_args__ = (
         Index(
-            'uq_fields_active_identity',
-            'name',
+            "uq_fields_identity",
+            "name",
             text("coalesce(section, '')"),
-            'variety',
-            'planting_year',
             unique=True,
-            sqlite_where=text('active = 1'),
         ),
     )
 
@@ -23,63 +31,143 @@ class Field(Base):
     name = Column(String, nullable=False)
     section = Column(String, nullable=True)
 
-    variety = Column(String, nullable=False)
-    planting_year = Column(Integer, nullable=False)
-    area_ha = Column(Float, nullable=False)
-    tree_count = Column(Integer, nullable=True)
-    tree_height = Column(Float, nullable=True)
-    row_distance = Column(Float, nullable=True)
-    tree_distance = Column(Float, nullable=True)
-    running_metre = Column(Float, nullable = True)
-    herbicide_free = Column(Boolean, nullable=True)
-
     reference_provider = Column(String, nullable=False)
     reference_station = Column(String, nullable=False)
 
     soil_type = Column(String, nullable=False)
     soil_weight = Column(String, nullable=True)
-    humus_pct = Column(Float, nullable = False)
+    humus_pct = Column(Float, nullable=False)
     effective_root_depth_cm = Column(Float, nullable=False)
-    p_allowable = Column(Float, nullable=False) #fraction of water that can be depleted before stress/irrigation trigger
+    p_allowable = Column(Float, nullable=False)  # Fraction depleted before stress.
 
-    active = Column(Boolean, nullable=False, default=True)
-
+    versions = relationship(
+        "FieldVersion",
+        back_populates="field",
+        cascade="all, delete-orphan",
+        order_by="FieldVersion.valid_from",
+    )
     irrigation_events = relationship(
-        'Irrigation',
-        back_populates='field',
-        cascade='all, delete-orphan'
+        "Irrigation",
+        back_populates="field",
+        cascade="all, delete-orphan",
     )
     water_balance = relationship(
-        'WaterBalance',
-        back_populates='field',
-        cascade='all, delete-orphan'
+        "WaterBalance",
+        back_populates="field",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
         return f"Field(id={self.id!r}, name={self.name!r})"
 
 
-class Irrigation(Base):
-    __tablename__ = 'irrigation_events'
+class FieldVersion(Base):
+    __tablename__ = "field_versions"
+    __table_args__ = (
+        UniqueConstraint("field_id", "valid_from", name="uq_field_versions_field_valid_from"),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_field_versions_valid_range",
+        ),
+        Index(
+            "uq_field_versions_open_ended",
+            "field_id",
+            unique=True,
+            sqlite_where=text("valid_to IS NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
-    field_id = Column(Integer, ForeignKey('fields.id'), nullable=False)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
+    variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=False)
+    planting_year = Column(Integer, nullable=False)
+    area_ha = Column(Float, nullable=False)
+    tree_count = Column(Integer, nullable=True)
+    tree_height = Column(Float, nullable=True)
+    row_distance = Column(Float, nullable=True)
+    tree_distance = Column(Float, nullable=True)
+    running_metre = Column(Float, nullable=True)
+    herbicide_free = Column(Boolean, nullable=True)
+
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=True)
+
+    field = relationship("Field", back_populates="versions")
+    variety = relationship("Variety", back_populates="field_versions")
+
+    def __repr__(self) -> str:
+        return f"FieldVersion(id={self.id!r}, field_id={self.field_id!r}, valid_from={self.valid_from!r})"
+
+
+class Variety(Base):
+    __tablename__ = "varieties"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    group = Column(String, nullable=False)
+
+    nr_per_kg = Column(Float, nullable=True)
+    kg_per_box = Column(Float, nullable=True)
+    slope = Column(Float, nullable=True)
+    intercept = Column(Float, nullable=True)
+    specific_weight = Column(Float, nullable=True)  # g/cm^3
+
+    field_versions = relationship("FieldVersion", back_populates="variety")
+    nutrient_requirements = relationship(
+        "NutrientRequirement",
+        back_populates="variety",
+        cascade="all, delete-orphan",
+    )
+
+
+class NutrientRequirement(Base):
+    __tablename__ = "nutrients"
+    __table_args__ = (
+        Index(
+            "uq_nutrients_global_default",
+            "nutrient_code",
+            unique=True,
+            sqlite_where=text("variety_id IS NULL"),
+        ),
+        Index(
+            "uq_nutrients_variety_override",
+            "nutrient_code",
+            "variety_id",
+            unique=True,
+            sqlite_where=text("variety_id IS NOT NULL"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=True, default=None)
+    nutrient_code = Column(String, nullable=False)
+    requirement_per_kg_yield = Column(Float, nullable=False)
+
+    variety = relationship("Variety", back_populates="nutrient_requirements")
+
+
+class Irrigation(Base):
+    __tablename__ = "irrigation_events"
+
+    id = Column(Integer, primary_key=True)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
     date = Column(Date, nullable=False)
     method = Column(String, nullable=False)
     amount = Column(Float, default=100)
 
-    field = relationship('Field', back_populates='irrigation_events')
+    field = relationship("Field", back_populates="irrigation_events")
 
-    __table_args__ = (UniqueConstraint('field_id', 'date', name='uq_irrigation_field_date'),)
+    __table_args__ = (UniqueConstraint("field_id", "date", name="uq_irrigation_field_date"),)
 
     def __repr__(self) -> str:
         return f"Irrigation(id={self.id!r}, field_id={self.field_id!r}, date={self.date!r})"
 
+
 class WaterBalance(Base):
-    __tablename__ = 'water_balance'
+    __tablename__ = "water_balance"
 
     date = Column(Date, primary_key=True)
-    field_id = Column(Integer, ForeignKey('fields.id'), primary_key=True)
+    field_id = Column(Integer, ForeignKey("fields.id"), primary_key=True)
     precipitation = Column(Float, nullable=False)
     irrigation = Column(Float, nullable=False)
     evapotranspiration = Column(Float, nullable=False)
@@ -92,7 +180,6 @@ class WaterBalance(Base):
     safe_ratio = Column(Float, nullable=True)
     below_raw = Column(Float, nullable=True)
 
-    field = relationship('Field', back_populates='water_balance')
+    field = relationship("Field", back_populates="water_balance")
 
-    __table_args__ = (UniqueConstraint('field_id', 'date', name='uq_waterbalance_field_date'),)
-    
+    __table_args__ = (UniqueConstraint("field_id", "date", name="uq_waterbalance_field_date"),)
