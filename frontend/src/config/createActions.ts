@@ -27,7 +27,7 @@ export const fieldCreateAction: CreateActionConfig = {
   fields: [
     { id: 'name', label: 'Name', type: 'text', placeholder: 'Parzellenname', required: true },
     { id: 'section', label: 'Abschnitt', type: 'text', placeholder: 'Nord', required: false },
-    { id: 'variety', label: 'Sorte', type: 'text', placeholder: 'Gala', required: true },
+    { id: 'variety', label: 'Sorte', type: 'select', optionsSource: 'varieties', required: true },
     { id: 'area_ha', label: 'Flaeche (ha)', type: 'number', placeholder: '1', step: '0.1', required: true },
     { id: 'planting_year', label: 'Pflanzjahr', type: 'number', placeholder: '2018', step: '1', required: true },
     { id: 'tree_count', label: 'Baumzahl', type: 'number', placeholder: '250', step: '1', required: false },
@@ -100,6 +100,33 @@ export const fieldCreateAction: CreateActionConfig = {
   }),
 }
 
+export const varietyCreateAction: CreateActionConfig = {
+  id: 'variety',
+  label: 'Sorte hinzufuegen',
+  title: 'Neue Sorte',
+  submitLabel: 'Sorte anlegen',
+  endpoint: '/varieties',
+  method: 'post',
+  fields: [
+    { id: 'name', label: 'Name', type: 'text', placeholder: 'Gala', required: true },
+    { id: 'group', label: 'Gruppe', type: 'text', placeholder: 'Apfel', required: true },
+    { id: 'nr_per_kg', label: 'N pro kg', type: 'number', placeholder: '0.03', step: '0.001', required: false },
+    { id: 'kg_per_box', label: 'kg pro Kiste', type: 'number', placeholder: '12', step: '0.1', required: false },
+    { id: 'slope', label: 'Slope', type: 'number', placeholder: '1', step: '0.001', required: false },
+    { id: 'intercept', label: 'Intercept', type: 'number', placeholder: '0', step: '0.001', required: false },
+    { id: 'specific_weight', label: 'Spez. Gewicht', type: 'number', placeholder: '0.8', step: '0.001', required: false },
+  ],
+  buildPayload: (values) => ({
+    name: values.name.trim(),
+    group: values.group.trim(),
+    nr_per_kg: toOptionalNumber(values.nr_per_kg),
+    kg_per_box: toOptionalNumber(values.kg_per_box),
+    slope: toOptionalNumber(values.slope),
+    intercept: toOptionalNumber(values.intercept),
+    specific_weight: toOptionalNumber(values.specific_weight),
+  }),
+}
+
 export const irrigationCreateAction: CreateActionConfig = {
   id: 'irrigation',
   label: 'Bewaesserung eintragen',
@@ -130,4 +157,4 @@ export const irrigationCreateAction: CreateActionConfig = {
   }),
 }
 
-export const createActions: CreateActionConfig[] = [fieldCreateAction, irrigationCreateAction]
+export const createActions: CreateActionConfig[] = [fieldCreateAction, varietyCreateAction, irrigationCreateAction]

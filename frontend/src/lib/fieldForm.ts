@@ -1,18 +1,30 @@
 import { fieldCreateAction } from '../config/createActions'
 import type { CreateActionConfig } from '../types/createActions'
-import type { FieldOverview } from '../types/generated/api'
+import type { FieldCreate, FieldOverview, FieldUpdate } from '../types/generated/api'
 
 export function buildFieldEditAction(field: FieldOverview | null): CreateActionConfig | null {
   if (field === null) {
     return null
   }
 
+  const effectiveFromField = {
+    id: 'effective_from' as const,
+    label: 'Gueltig ab',
+    type: 'date' as const,
+    required: true,
+  }
+
   return {
     ...fieldCreateAction,
     title: 'Anlage bearbeiten',
-    submitLabel: 'Anlage speichern',
+    submitLabel: 'Version ersetzen',
     endpoint: `/fields/${field.id}`,
     method: 'put',
+    fields: [effectiveFromField, ...fieldCreateAction.fields],
+    buildPayload: (values): FieldUpdate => ({
+      ...(fieldCreateAction.buildPayload(values) as FieldCreate),
+      effective_from: values.effective_from,
+    }),
   }
 }
 
@@ -24,6 +36,7 @@ export function buildFieldEditInitialValues(
   }
 
   return {
+    effective_from: new Date().toISOString().slice(0, 10),
     name: field.name,
     section: field.section ?? '',
     variety: field.variety,

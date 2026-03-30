@@ -56,10 +56,20 @@ class FieldRepository:
         return variety
 
     def get_by_id(self, session: Session, field_id: int) -> models.Field | None:
-        return self._query(session).filter(models.Field.id == field_id).one_or_none()
+        return (
+            self._query(session)
+            .filter(models.Field.id == field_id)
+            .filter(models.Field.versions.any())
+            .one_or_none()
+        )
 
     def list_all(self, session: Session) -> list[models.Field]:
-        return self._query(session).order_by(models.Field.id).all()
+        return (
+            self._query(session)
+            .filter(models.Field.versions.any())
+            .order_by(models.Field.id)
+            .all()
+        )
 
     def get_current_version(self, session: Session, field_id: int) -> models.FieldVersion | None:
         field = self.get_by_id(session, field_id)
@@ -135,40 +145,106 @@ class FieldRepository:
         if current_version is None:
             raise ValueError(f"Field {field_id} has no current version")
 
+        effective_from_raw = updates.pop("effective_from", None)
+        effective_from = None
+        if effective_from_raw is not None:
+            effective_from = datetime.date.fromisoformat(str(effective_from_raw))
+
         changed_keys: set[str] = set()
+        stable_updates: dict[str, Any] = {}
+        versioned_updates: dict[str, Any] = {}
         for field_key, new_value in updates.items():
             if field_key not in self.UPDATE_ALLOWLIST:
                 raise ValueError(f"Invalid key {field_key} in update_field. Choose one of {self.UPDATE_ALLOWLIST}")
 
             if field_key in self.STABLE_UPDATE_ALLOWLIST:
-                normalized_value = self._normalize_section(new_value) if field_key == "section" else new_value
-                if getattr(existing_field, field_key) != normalized_value:
-                    setattr(existing_field, field_key, normalized_value)
-                    changed_keys.add(field_key)
+                stable_updates[field_key] = self._normalize_section(new_value) if field_key == "section" else new_value
                 continue
 
-            if field_key == "variety":
-                variety_model = self._get_variety_by_name(session, str(new_value))
-                if current_version.variety_id != variety_model.id:
-                    current_version.variety_id = variety_model.id
-                    changed_keys.add(field_key)
-                continue
+            versioned_updates[field_key] = new_value
 
-            if field_key == "active":
-                new_active = bool(new_value)
-                current_active = current_version.valid_to is None
-                if current_active != new_active:
-                    current_version.valid_to = None if new_active else datetime.date.today()
-                    changed_keys.add(field_key)
-                continue
-
+        for field_key, new_value in stable_updates.items():
             if getattr(existing_field, field_key) != new_value:
-                setattr(current_version, field_key, new_value)
+                setattr(existing_field, field_key, new_value)
+                changed_keys.add(field_key)
+
+        version_changes: dict[str, Any] = {}
+        if "variety" in versioned_updates:
+            variety_model = self._get_variety_by_name(session, str(versioned_updates["variety"]))
+            if current_version.variety_id != variety_model.id:
+                version_changes["variety_id"] = variety_model.id
+                changed_keys.add("variety")
+
+        if "active" in versioned_updates:
+            new_active = bool(versioned_updates["active"])
+            current_active = current_version.valid_to is None
+            if current_active != new_active:
+                version_changes["active"] = new_active
+                changed_keys.add("active")
+
+        for field_key in self.VERSIONED_UPDATE_ALLOWLIST - {"variety", "active"}:
+            if field_key not in versioned_updates:
+                continue
+            new_value = versioned_updates[field_key]
+            if getattr(existing_field, field_key) != new_value:
+                version_changes[field_key] = new_value
                 changed_keys.add(field_key)
 
         if not changed_keys:
             logger.debug("No changes for field %s; skipping update", existing_field)
             return existing_field, changed_keys
+
+        if version_changes:
+            effective_on = effective_from or datetime.date.today()
+            if effective_on < current_version.valid_from:
+                raise ValueError(
+                    f"effective_from {effective_on.isoformat()} cannot be before the current version start {current_version.valid_from.isoformat()}"
+                )
+
+            replaces_current_version = effective_on > current_version.valid_from
+            if replaces_current_version:
+                current_version.valid_to = effective_on - datetime.timedelta(days=1)
+                replacement = models.FieldVersion(
+                    field_id=existing_field.id,
+                    variety_id=current_version.variety_id,
+                    planting_year=current_version.planting_year,
+                    area_ha=current_version.area_ha,
+                    tree_count=current_version.tree_count,
+                    tree_height=current_version.tree_height,
+                    row_distance=current_version.row_distance,
+                    tree_distance=current_version.tree_distance,
+                    running_metre=current_version.running_metre,
+                    herbicide_free=current_version.herbicide_free,
+                    valid_from=effective_on,
+                    valid_to=None,
+                )
+                session.add(replacement)
+                working_version = replacement
+            else:
+                working_version = current_version
+
+            if "variety_id" in version_changes:
+                working_version.variety_id = version_changes["variety_id"]
+            if "planting_year" in version_changes:
+                working_version.planting_year = int(version_changes["planting_year"])
+            if "area_ha" in version_changes:
+                working_version.area_ha = float(version_changes["area_ha"])
+            if "tree_count" in version_changes:
+                working_version.tree_count = None if version_changes["tree_count"] is None else int(version_changes["tree_count"])
+            if "tree_height" in version_changes:
+                working_version.tree_height = None if version_changes["tree_height"] is None else float(version_changes["tree_height"])
+            if "row_distance" in version_changes:
+                working_version.row_distance = None if version_changes["row_distance"] is None else float(version_changes["row_distance"])
+            if "tree_distance" in version_changes:
+                working_version.tree_distance = None if version_changes["tree_distance"] is None else float(version_changes["tree_distance"])
+            if "running_metre" in version_changes:
+                working_version.running_metre = None if version_changes["running_metre"] is None else float(version_changes["running_metre"])
+            if "herbicide_free" in version_changes:
+                working_version.herbicide_free = (
+                    None if version_changes["herbicide_free"] is None else bool(version_changes["herbicide_free"])
+                )
+            if "active" in version_changes:
+                working_version.valid_to = None if version_changes["active"] else effective_on
 
         session.flush()
         return self.get_by_id(session, field_id) or existing_field, changed_keys

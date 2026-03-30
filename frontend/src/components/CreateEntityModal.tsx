@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
 import api from '../api'
 import { notifyDataChanged } from '../lib/dataEvents'
-import type { FieldRead } from '../types/generated/api'
+import type { FieldRead, VarietyRead } from '../types/generated/api'
 import {
   type CreateActionConfig,
   type CreateActionField,
@@ -46,6 +46,13 @@ function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   }))
 }
 
+function buildVarietyOptions(varieties: VarietyRead[]): FieldOption[] {
+  return varieties.map((variety) => ({
+    value: variety.name,
+    label: `${variety.name}${variety.group ? ` (${variety.group})` : ''}`,
+  }))
+}
+
 export default function CreateEntityModal({
   action,
   isOpen,
@@ -54,11 +61,20 @@ export default function CreateEntityModal({
 }: CreateEntityModalProps) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [fieldOptions, setFieldOptions] = useState<FieldOption[]>([])
+  const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const needsFieldOptions = useMemo(
-    () => action?.fields.some((field) => field.type === 'select' && field.optionsSource === 'fields') ?? false,
+  const dynamicOptionSources = useMemo(
+    () =>
+      new Set(
+        action?.fields
+          .filter(
+            (field): field is Extract<CreateActionField, { type: 'select' }> =>
+              field.type === 'select' && field.optionsSource !== undefined,
+          )
+          .map((field) => field.optionsSource) ?? [],
+      ),
     [action],
   )
 
@@ -72,29 +88,39 @@ export default function CreateEntityModal({
   }, [action, initialValues, isOpen])
 
   useEffect(() => {
-    if (!isOpen || !needsFieldOptions) {
+    if (!isOpen || dynamicOptionSources.size === 0) {
       return
     }
 
-    const fetchFields = async () => {
+    const fetchAndSeedOptions = async () => {
       try {
-        const response = await api.get<FieldRead[]>('/fields')
-        const options = buildFieldOptions(response.data)
-        setFieldOptions(options)
+        const nextFieldOptions = dynamicOptionSources.has('fields')
+          ? buildFieldOptions((await api.get<FieldRead[]>('/fields')).data)
+          : []
+        const nextVarietyOptions = dynamicOptionSources.has('varieties')
+          ? buildVarietyOptions((await api.get<VarietyRead[]>('/varieties')).data)
+          : []
+
+        setFieldOptions(nextFieldOptions)
+        setVarietyOptions(nextVarietyOptions)
         setValues((currentValues) => {
-          if (currentValues.field_id || options.length === 0) {
-            return currentValues
+          const nextValues = { ...currentValues }
+          if (!nextValues.field_id && nextFieldOptions.length > 0) {
+            nextValues.field_id = nextFieldOptions[0].value
           }
-          return { ...currentValues, field_id: options[0].value }
+          if (!nextValues.variety && nextVarietyOptions.length > 0) {
+            nextValues.variety = nextVarietyOptions[0].value
+          }
+          return nextValues
         })
       } catch (error) {
-        console.error('Error loading field options', error)
-        setErrorMessage('Die verfuegbaren Anlagen konnten nicht geladen werden.')
+        console.error('Error loading select options', error)
+        setErrorMessage('Die verfuegbaren Optionen konnten nicht geladen werden.')
       }
     }
 
-    void fetchFields()
-  }, [isOpen, needsFieldOptions])
+    void fetchAndSeedOptions()
+  }, [dynamicOptionSources, isOpen])
 
   if (!isOpen || action === null) {
     return null
@@ -136,7 +162,12 @@ export default function CreateEntityModal({
       'mt-2 w-full border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 
     if (field.type === 'select') {
-      const options = field.optionsSource === 'fields' ? fieldOptions : (field.options ?? [])
+      const options =
+        field.optionsSource === 'fields'
+          ? fieldOptions
+          : field.optionsSource === 'varieties'
+            ? varietyOptions
+            : (field.options ?? [])
 
       return (
         <select
@@ -146,6 +177,11 @@ export default function CreateEntityModal({
           className={commonClasses}
           required={field.required ?? true}
         >
+          {options.length === 0 ? (
+            <option value="">
+              {field.optionsSource === 'varieties' ? 'Keine Sorten vorhanden' : 'Keine Auswahl verfuegbar'}
+            </option>
+          ) : null}
           {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}

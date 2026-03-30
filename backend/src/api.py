@@ -19,6 +19,8 @@ from .schemas import (
     IrrigationCreate,
     IrrigationRead,
     IrrigationUpdate,
+    VarietyCreate,
+    VarietyRead,
     WaterBalanceSeriesPoint,
     WaterBalanceSummary,
 )
@@ -76,11 +78,17 @@ def _validate_field_id(field_id: int):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 def _serialize_field(field) -> FieldRead:
+    if getattr(field, "current_version", None) is None:
+        raise ValueError(f"Field {getattr(field, 'id', 'unknown')} has no current version")
     return FieldRead.model_validate(field)
 
 
 def _serialize_irrigation_event(event) -> IrrigationRead:
     return IrrigationRead.model_validate(event)
+
+
+def _serialize_variety(variety) -> VarietyRead:
+    return VarietyRead.model_validate(variety)
 
 
 def _serialize_field_water_balance_summary(summary: dict[str, object] | None) -> FieldWaterBalanceSummary:
@@ -149,6 +157,24 @@ async def health_check():
     except Exception as e:
         logger.exception(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
+
+
+@app.get("/api/varieties", response_model=list[VarietyRead])
+async def list_varieties():
+    with runtime.db.session_scope() as session:
+        varieties = runtime.db.varieties.list_all(session)
+    return [_serialize_variety(variety) for variety in varieties]
+
+
+@app.post("/api/varieties", response_model=VarietyRead, status_code=status.HTTP_201_CREATED)
+async def create_variety(variety: VarietyCreate):
+    try:
+        with runtime.db.session_scope() as session:
+            new_variety = runtime.db.varieties.create(session, **variety.model_dump())
+        return _serialize_variety(new_variety)
+    except Exception as e:
+        logger.exception(f"Adding variety failed: {e}")
+        _raise_write_http_error(e)
 
 
 @app.get("/api/fields", response_model=list[FieldRead])

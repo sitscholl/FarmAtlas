@@ -1,6 +1,8 @@
-import type { FieldCreate } from './generated/api'
+import type { FieldCreate, FieldUpdate, VarietyCreate } from './generated/api'
 
 export type FieldCreatePayload = FieldCreate
+export type FieldUpdatePayload = FieldUpdate
+export type VarietyCreatePayload = VarietyCreate
 
 export type IrrigationCreatePayload = {
   field_id: number
@@ -9,9 +11,21 @@ export type IrrigationCreatePayload = {
   amount: number
 }
 
+type ActionFieldId =
+  | keyof FieldCreatePayload
+  | keyof FieldUpdatePayload
+  | keyof IrrigationCreatePayload
+  | keyof VarietyCreatePayload
+
+type ActionPayload =
+  | FieldCreatePayload
+  | FieldUpdatePayload
+  | IrrigationCreatePayload
+  | VarietyCreatePayload
+
 export type CreateActionField =
   | {
-      id: keyof FieldCreatePayload | keyof IrrigationCreatePayload
+      id: ActionFieldId
       label: string
       type: 'text' | 'number' | 'date'
       placeholder?: string
@@ -20,24 +34,24 @@ export type CreateActionField =
       required?: boolean
     }
   | {
-      id: keyof FieldCreatePayload | keyof IrrigationCreatePayload
+      id: ActionFieldId
       label: string
       type: 'select'
-      optionsSource?: 'fields'
+      optionsSource?: 'fields' | 'varieties'
       options?: FieldOption[]
       defaultValue?: string | number
       required?: boolean
     }
 
 export type CreateActionConfig = {
-  id: 'field' | 'irrigation'
+  id: 'field' | 'irrigation' | 'variety'
   label: string
   title: string
   submitLabel: string
   endpoint: string
   method?: 'post' | 'put'
   fields: CreateActionField[]
-  buildPayload: (values: Record<string, string>) => FieldCreatePayload | IrrigationCreatePayload
+  buildPayload: (values: Record<string, string>) => ActionPayload
 }
 
 export type FieldOption = {

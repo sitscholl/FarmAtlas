@@ -1,5 +1,5 @@
 from .core import DatabaseCore
-from .repositories import FieldRepository, IrrigationRepository, WaterBalanceRepository
+from .repositories import FieldRepository, IrrigationRepository, VarietyRepository, WaterBalanceRepository
 from .services import FieldService, IrrigationService
 
 
@@ -19,6 +19,7 @@ class Database:
         self.engine = self.core.engine
 
         self.fields = FieldRepository()
+        self.varieties = VarietyRepository()
         self.water_balance = WaterBalanceRepository(self.fields)
         self.irrigation = IrrigationRepository(self.fields)
 

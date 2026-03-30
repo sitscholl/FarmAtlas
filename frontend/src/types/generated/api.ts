@@ -98,6 +98,7 @@ export type FieldUpdate = {
   area_ha: number
   effective_root_depth_cm: number
   p_allowable: number
+  effective_from?: string | null
 }
 
 export type HTTPValidationError = {
@@ -132,6 +133,27 @@ export type ValidationError = {
   input?: unknown
   ctx?: {
 }
+}
+
+export type VarietyCreate = {
+  name: string
+  group: string
+  nr_per_kg?: number | null
+  kg_per_box?: number | null
+  slope?: number | null
+  intercept?: number | null
+  specific_weight?: number | null
+}
+
+export type VarietyRead = {
+  name: string
+  group: string
+  nr_per_kg?: number | null
+  kg_per_box?: number | null
+  slope?: number | null
+  intercept?: number | null
+  specific_weight?: number | null
+  id: number
 }
 
 export type WaterBalanceSeriesPoint = {

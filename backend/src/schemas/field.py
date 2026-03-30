@@ -32,7 +32,7 @@ class FieldCreate(FieldBase):
 
 
 class FieldUpdate(FieldBase):
-    pass
+    effective_from: date | None = None
 
 
 class FieldRead(FieldBase, ORMModel):
