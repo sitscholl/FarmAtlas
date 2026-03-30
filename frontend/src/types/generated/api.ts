@@ -4,7 +4,6 @@
  */
 
 export type FieldCreate = {
-  unique_name: string
   group: string
   name: string
   section?: string | null
@@ -35,7 +34,6 @@ export type FieldOverview = {
   readily_available_water: number | null
   below_raw: boolean | null
   safe_ratio: number | null
-  unique_name: string
   group: string
   name: string
   section: string | null
@@ -57,10 +55,11 @@ export type FieldOverview = {
   effective_root_depth_cm: number | null
   p_allowable: number | null
   id: number
+  valid_from: string
+  valid_to: string | null
 }
 
 export type FieldRead = {
-  unique_name: string
   group: string
   name: string
   section: string | null
@@ -82,10 +81,11 @@ export type FieldRead = {
   effective_root_depth_cm: number | null
   p_allowable: number | null
   id: number
+  valid_from: string
+  valid_to: string | null
 }
 
-export type FieldUpdate = {
-  unique_name: string
+export type FieldReplant = {
   group: string
   name: string
   section?: string | null
@@ -106,7 +106,30 @@ export type FieldUpdate = {
   area_ha: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
-  effective_from?: string | null
+  valid_from: string
+}
+
+export type FieldUpdate = {
+  group: string
+  name: string
+  section?: string | null
+  variety: string
+  planting_year: number
+  tree_count?: number | null
+  tree_height?: number | null
+  row_distance?: number | null
+  tree_distance?: number | null
+  running_metre?: number | null
+  herbicide_free?: boolean | null
+  active?: boolean
+  reference_provider: string
+  reference_station: string
+  soil_type?: string | null
+  soil_weight?: string | null
+  humus_pct?: number | null
+  area_ha: number
+  effective_root_depth_cm?: number | null
+  p_allowable?: number | null
 }
 
 export type HTTPValidationError = {

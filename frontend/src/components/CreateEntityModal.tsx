@@ -42,7 +42,9 @@ function buildInitialValues(
 function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   return fields.map((field) => ({
     value: String(field.id),
-    label: field.unique_name,
+    label: [field.name, field.section, field.variety, String(field.planting_year)]
+      .filter((part) => part && String(part).trim() !== '')
+      .join(' | '),
   }))
 }
 
@@ -136,14 +138,17 @@ export default function CreateEntityModal({
     setIsSubmitting(true)
 
     try {
-      const payload = action.buildPayload(values)
+      const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+      const useSecondaryAction = submitter?.dataset.submitKind === 'secondary'
+      const submission = useSecondaryAction && action.secondaryAction ? action.secondaryAction : action
+      const payload = submission.buildPayload(values)
       const endpoint =
-        action.id === 'irrigation' && action.endpoint === ''
+        action.id === 'irrigation' && submission.endpoint === ''
           ? `/fields/${(payload as { field_id: number }).field_id}/irrigation`
-          : action.endpoint
+          : submission.endpoint
 
       await api.request({
-        method: action.method ?? 'post',
+        method: submission.method ?? 'post',
         url: endpoint,
         data: payload,
       })
@@ -253,6 +258,16 @@ export default function CreateEntityModal({
             >
               {isSubmitting ? 'Speichern...' : action.submitLabel}
             </button>
+            {action.secondaryAction ? (
+              <button
+                type="submit"
+                data-submit-kind="secondary"
+                disabled={isSubmitting}
+                className="rounded-full bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-amber-200"
+              >
+                {isSubmitting ? 'Speichern...' : action.secondaryAction.submitLabel}
+              </button>
+            ) : null}
           </div>
         </form>
       </div>

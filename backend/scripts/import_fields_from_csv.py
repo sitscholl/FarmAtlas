@@ -120,7 +120,6 @@ def _build_field_payload(
     running_metre_value = _optional_float(row.get("running_metre"))
 
     payload = {
-        "unique_name": _required_text(row, "unique_name"),
         "group": _required_text_any(row, "group", "Group"),
         "name": _required_text(row, "name"),
         "section": _optional_text(row.get("section")),
@@ -238,23 +237,35 @@ def import_fields(
             continue
 
         if dry_run:
-            print(f"[dry-run] Would create field '{payload['unique_name']}' ({payload['variety']}).")
+            print(
+                f"[dry-run] Would create field '{payload['name']}' / '{payload['section']}' "
+                f"({payload['variety']}, {payload['planting_year']})."
+            )
             created += 1
             continue
 
         status, body = _request_json("POST", f"{api_base}/fields", payload)
         if 200 <= status < 300:
             created += 1
-            print(f"[row {index}] Created field '{payload['unique_name']}' ({payload['variety']}).")
+            print(
+                f"[row {index}] Created field '{payload['name']}' / '{payload['section']}' "
+                f"({payload['variety']}, {payload['planting_year']})."
+            )
             continue
 
         if status == 409:
             skipped += 1
-            print(f"[row {index}] Skipped existing field '{payload['unique_name']}' ({payload['variety']}).")
+            print(
+                f"[row {index}] Skipped existing field '{payload['name']}' / '{payload['section']}' "
+                f"({payload['variety']}, {payload['planting_year']})."
+            )
             continue
 
         failed += 1
-        print(f"[row {index}] Failed to create field '{payload['unique_name']}': HTTP {status} - {body}")
+        print(
+            f"[row {index}] Failed to create field '{payload['name']}' / '{payload['section']}' "
+            f"({payload['variety']}, {payload['planting_year']}): HTTP {status} - {body}"
+        )
 
     print(
         f"Import finished. created={created}, skipped={skipped}, failed={failed}, "

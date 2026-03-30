@@ -110,8 +110,9 @@ export default function IrrigationTablePage() {
           field.id,
           {
             name: field.name,
-            unique_name: field.unique_name,
             section: field.section,
+            variety: field.variety,
+            planting_year: field.planting_year,
           },
         ]),
       ),
@@ -163,7 +164,9 @@ export default function IrrigationTablePage() {
             .slice()
             .sort((left, right) => left.name.localeCompare(right.name, 'de-DE'))
             .map((field) => ({
-              label: field.unique_name,
+              label: [field.name, field.section, field.variety, String(field.planting_year)]
+                .filter((part) => part && String(part).trim() !== '')
+                .join(' | '),
               value: String(field.id),
             })),
         ],

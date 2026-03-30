@@ -3,6 +3,8 @@ from typing import Any
 from .. import models
 from ..core import DatabaseCore
 from ..repositories import FieldRepository, WaterBalanceRepository
+
+
 class FieldService:
     def __init__(
         self,
@@ -23,3 +25,8 @@ class FieldService:
             if changed_keys & self._water_balance_trigger_fields:
                 self._water_balance.clear_for_field(session, updated_field.id)
             return updated_field
+
+    def replant(self, field_id: int, *, valid_from, updates: dict[str, Any]) -> models.Field:
+        with self._core.session_scope() as session:
+            new_field, _ = self._fields.replant(session, field_id, valid_from=valid_from, updates=updates)
+            return new_field

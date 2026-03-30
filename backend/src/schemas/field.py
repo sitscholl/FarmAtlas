@@ -6,7 +6,6 @@ from .base import ORMModel
 
 
 class FieldBase(BaseModel):
-    unique_name: str
     group: str
     name: str
     section: str | None = None
@@ -34,11 +33,17 @@ class FieldCreate(FieldBase):
 
 
 class FieldUpdate(FieldBase):
-    effective_from: date | None = None
+    pass
+
+
+class FieldReplant(FieldBase):
+    valid_from: date
 
 
 class FieldRead(FieldBase, ORMModel):
     id: int
+    valid_from: date
+    valid_to: date | None
     section: str | None
     tree_count: int | None
     tree_height: float | None

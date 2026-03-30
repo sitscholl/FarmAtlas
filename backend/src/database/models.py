@@ -21,8 +21,11 @@ class Field(Base):
     __tablename__ = "fields"
     __table_args__ = (
         Index(
-            "uq_fields_unique_name",
-            "unique_name",
+            "uq_fields_identity",
+            "name",
+            text("coalesce(section, '')"),
+            "variety_id",
+            "planting_year",
             unique=True,
         ),
         Index(
@@ -30,13 +33,27 @@ class Field(Base):
             "name",
             text("coalesce(section, '')"),
         ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to >= valid_from",
+            name="ck_fields_valid_range",
+        ),
     )
 
     id = Column(Integer, primary_key=True)
-    unique_name = Column(String, nullable=False)
     group = Column(String, nullable=False)
     name = Column(String, nullable=False)
     section = Column(String, nullable=True)
+    variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=False)
+    planting_year = Column(Integer, nullable=False)
+    area_ha = Column(Float, nullable=False)
+    tree_count = Column(Integer, nullable=True)
+    tree_height = Column(Float, nullable=True)
+    row_distance = Column(Float, nullable=True)
+    tree_distance = Column(Float, nullable=True)
+    running_metre = Column(Float, nullable=True)
+    herbicide_free = Column(Boolean, nullable=True)
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=True)
 
     reference_provider = Column(String, nullable=False)
     reference_station = Column(String, nullable=False)
@@ -47,12 +64,7 @@ class Field(Base):
     effective_root_depth_cm = Column(Float, nullable=True)
     p_allowable = Column(Float, nullable=True)  # Fraction depleted before stress.
 
-    versions = relationship(
-        "FieldVersion",
-        back_populates="field",
-        cascade="all, delete-orphan",
-        order_by="FieldVersion.valid_from",
-    )
+    variety_ref = relationship("Variety", back_populates="fields")
     irrigation_events = relationship(
         "Irrigation",
         back_populates="field",
@@ -65,109 +77,16 @@ class Field(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Field(id={self.id!r}, unique_name={self.unique_name!r})"
-
-    @property
-    def current_version(self) -> "FieldVersion | None":
-        today = datetime.date.today()
-        candidates = [
-            version
-            for version in self.versions
-            if version.valid_from <= today and (version.valid_to is None or version.valid_to >= today)
-        ]
-        if candidates:
-            return max(candidates, key=lambda version: version.valid_from)
-        if self.versions:
-            return max(self.versions, key=lambda version: version.valid_from)
-        return None
+        return f"Field(id={self.id!r}, name={self.name!r}, variety_id={self.variety_id!r})"
 
     @property
     def variety(self) -> str | None:
-        version = self.current_version
-        return None if version is None or version.variety is None else version.variety.name
-
-    @property
-    def planting_year(self) -> int | None:
-        version = self.current_version
-        return None if version is None else version.planting_year
-
-    @property
-    def area_ha(self) -> float | None:
-        version = self.current_version
-        return None if version is None else version.area_ha
-
-    @property
-    def tree_count(self) -> int | None:
-        version = self.current_version
-        return None if version is None else version.tree_count
-
-    @property
-    def tree_height(self) -> float | None:
-        version = self.current_version
-        return None if version is None else version.tree_height
-
-    @property
-    def row_distance(self) -> float | None:
-        version = self.current_version
-        return None if version is None else version.row_distance
-
-    @property
-    def tree_distance(self) -> float | None:
-        version = self.current_version
-        return None if version is None else version.tree_distance
-
-    @property
-    def running_metre(self) -> float | None:
-        version = self.current_version
-        return None if version is None else version.running_metre
-
-    @property
-    def herbicide_free(self) -> bool | None:
-        version = self.current_version
-        return None if version is None else version.herbicide_free
+        return None if self.variety_ref is None else self.variety_ref.name
 
     @property
     def active(self) -> bool:
-        version = self.current_version
-        return bool(version is not None and version.valid_to is None)
-
-
-class FieldVersion(Base):
-    __tablename__ = "field_versions"
-    __table_args__ = (
-        UniqueConstraint("field_id", "valid_from", name="uq_field_versions_field_valid_from"),
-        CheckConstraint(
-            "valid_to IS NULL OR valid_to >= valid_from",
-            name="ck_field_versions_valid_range",
-        ),
-        Index(
-            "uq_field_versions_open_ended",
-            "field_id",
-            unique=True,
-            sqlite_where=text("valid_to IS NULL"),
-        ),
-    )
-
-    id = Column(Integer, primary_key=True)
-    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
-    variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=False)
-    planting_year = Column(Integer, nullable=False)
-    area_ha = Column(Float, nullable=False)
-    tree_count = Column(Integer, nullable=True)
-    tree_height = Column(Float, nullable=True)
-    row_distance = Column(Float, nullable=True)
-    tree_distance = Column(Float, nullable=True)
-    running_metre = Column(Float, nullable=True)
-    herbicide_free = Column(Boolean, nullable=True)
-
-    valid_from = Column(Date, nullable=False)
-    valid_to = Column(Date, nullable=True)
-
-    field = relationship("Field", back_populates="versions")
-    variety = relationship("Variety", back_populates="field_versions")
-
-    def __repr__(self) -> str:
-        return f"FieldVersion(id={self.id!r}, field_id={self.field_id!r}, valid_from={self.valid_from!r})"
+        today = datetime.date.today()
+        return self.valid_from <= today and (self.valid_to is None or self.valid_to >= today)
 
 
 class Variety(Base):
@@ -183,7 +102,7 @@ class Variety(Base):
     intercept = Column(Float, nullable=True)
     specific_weight = Column(Float, nullable=True)  # g/cm^3
 
-    field_versions = relationship("FieldVersion", back_populates="variety")
+    fields = relationship("Field", back_populates="variety_ref")
     nutrient_requirements = relationship(
         "NutrientRequirement",
         back_populates="variety",

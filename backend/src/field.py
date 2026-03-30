@@ -1,3 +1,4 @@
+from datetime import date
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -16,7 +17,6 @@ class FieldResults:
 @dataclass
 class FieldContext:
     id: int
-    unique_name: str
     group: str
     name: str
     section: str | None
@@ -37,12 +37,13 @@ class FieldContext:
     area_ha: float
     effective_root_depth_cm: float | None
     p_allowable: float | None
+    valid_from: date
+    valid_to: date | None
 
     @classmethod
     def from_model(cls, field_model: Field) -> "FieldContext":
         return cls(
             id=field_model.id,
-            unique_name=field_model.unique_name,
             group=field_model.group,
             name=field_model.name,
             section=field_model.section,
@@ -63,6 +64,8 @@ class FieldContext:
             area_ha=field_model.area_ha,
             effective_root_depth_cm=field_model.effective_root_depth_cm,
             p_allowable=field_model.p_allowable,
+            valid_from=field_model.valid_from,
+            valid_to=field_model.valid_to,
         )
 
 

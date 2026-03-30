@@ -1,4 +1,4 @@
-from .field import FieldCreate, FieldOverview, FieldRead, FieldUpdate, FieldWaterBalanceSummary
+from .field import FieldCreate, FieldOverview, FieldRead, FieldReplant, FieldUpdate, FieldWaterBalanceSummary
 from .irrigation import IrrigationCreate, IrrigationRead, IrrigationUpdate
 from .variety import VarietyCreate, VarietyRead
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSummary
@@ -7,6 +7,7 @@ __all__ = [
     "FieldCreate",
     "FieldOverview",
     "FieldRead",
+    "FieldReplant",
     "FieldUpdate",
     "FieldWaterBalanceSummary",
     "IrrigationCreate",

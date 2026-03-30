@@ -1,7 +1,8 @@
-import type { FieldCreate, FieldUpdate, VarietyCreate } from './generated/api'
+import type { FieldCreate, FieldReplant, FieldUpdate, VarietyCreate } from './generated/api'
 
 export type FieldCreatePayload = FieldCreate
 export type FieldUpdatePayload = FieldUpdate
+export type FieldReplantPayload = FieldReplant
 export type VarietyCreatePayload = VarietyCreate
 
 export type IrrigationCreatePayload = {
@@ -14,14 +15,23 @@ export type IrrigationCreatePayload = {
 type ActionFieldId =
   | keyof FieldCreatePayload
   | keyof FieldUpdatePayload
+  | keyof FieldReplantPayload
   | keyof IrrigationCreatePayload
   | keyof VarietyCreatePayload
 
 type ActionPayload =
   | FieldCreatePayload
   | FieldUpdatePayload
+  | FieldReplantPayload
   | IrrigationCreatePayload
   | VarietyCreatePayload
+
+export type SecondaryCreateAction = {
+  submitLabel: string
+  endpoint: string
+  method?: 'post' | 'put'
+  buildPayload: (values: Record<string, string>) => ActionPayload
+}
 
 export type CreateActionField =
   | {
@@ -52,6 +62,7 @@ export type CreateActionConfig = {
   method?: 'post' | 'put'
   fields: CreateActionField[]
   buildPayload: (values: Record<string, string>) => ActionPayload
+  secondaryAction?: SecondaryCreateAction
 }
 
 export type FieldOption = {

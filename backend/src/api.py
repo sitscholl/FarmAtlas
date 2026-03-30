@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from .schemas import (
     FieldCreate,
     FieldOverview,
+    FieldReplant,
     FieldRead,
     FieldUpdate,
     FieldWaterBalanceSummary,
@@ -78,8 +79,6 @@ def _validate_field_id(field_id: int):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 def _serialize_field(field) -> FieldRead:
-    if getattr(field, "current_version", None) is None:
-        raise ValueError(f"Field {getattr(field, 'id', 'unknown')} has no current version")
     return FieldRead.model_validate(field)
 
 
@@ -206,6 +205,22 @@ async def update_field(background_tasks: BackgroundTasks, field_id: int, field: 
         return _serialize_field(updated_field)
     except Exception as e:
         logger.exception(f"Updating field {field_id} failed: {e}")
+        _raise_write_http_error(e, not_found_prefixes=("Could not find any field with id",))
+
+@app.post("/api/fields/{field_id}/replant", response_model=FieldRead, status_code=status.HTTP_201_CREATED)
+async def replant_field(background_tasks: BackgroundTasks, field_id: int, field: FieldReplant):
+    _validate_field_id(field_id)
+    try:
+        new_field = runtime.db.field_service.replant(
+            field_id=field_id,
+            valid_from=field.valid_from,
+            updates=field.model_dump(exclude={"valid_from"}),
+        )
+        if new_field.active:
+            background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", new_field.id)
+        return _serialize_field(new_field)
+    except Exception as e:
+        logger.exception(f"Replanting field {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("Could not find any field with id",))
 
 @app.delete("/api/fields/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
