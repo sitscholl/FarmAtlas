@@ -12,6 +12,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import declarative_base, relationship
+import datetime
 
 Base = declarative_base()
 
@@ -60,13 +61,77 @@ class Field(Base):
     def __repr__(self) -> str:
         return f"Field(id={self.id!r}, name={self.name!r})"
 
+    @property
+    def current_version(self) -> "FieldVersion | None":
+        today = datetime.date.today()
+        candidates = [
+            version
+            for version in self.versions
+            if version.valid_from <= today and (version.valid_to is None or version.valid_to >= today)
+        ]
+        if candidates:
+            return max(candidates, key=lambda version: version.valid_from)
+        if self.versions:
+            return max(self.versions, key=lambda version: version.valid_from)
+        return None
+
+    @property
+    def variety(self) -> str | None:
+        version = self.current_version
+        return None if version is None or version.variety is None else version.variety.name
+
+    @property
+    def planting_year(self) -> int | None:
+        version = self.current_version
+        return None if version is None else version.planting_year
+
+    @property
+    def area_ha(self) -> float | None:
+        version = self.current_version
+        return None if version is None else version.area_ha
+
+    @property
+    def tree_count(self) -> int | None:
+        version = self.current_version
+        return None if version is None else version.tree_count
+
+    @property
+    def tree_height(self) -> float | None:
+        version = self.current_version
+        return None if version is None else version.tree_height
+
+    @property
+    def row_distance(self) -> float | None:
+        version = self.current_version
+        return None if version is None else version.row_distance
+
+    @property
+    def tree_distance(self) -> float | None:
+        version = self.current_version
+        return None if version is None else version.tree_distance
+
+    @property
+    def running_metre(self) -> float | None:
+        version = self.current_version
+        return None if version is None else version.running_metre
+
+    @property
+    def herbicide_free(self) -> bool | None:
+        version = self.current_version
+        return None if version is None else version.herbicide_free
+
+    @property
+    def active(self) -> bool:
+        version = self.current_version
+        return bool(version is not None and version.valid_to is None)
+
 
 class FieldVersion(Base):
     __tablename__ = "field_versions"
     __table_args__ = (
         UniqueConstraint("field_id", "valid_from", name="uq_field_versions_field_valid_from"),
         CheckConstraint(
-            "valid_to IS NULL OR valid_to > valid_from",
+            "valid_to IS NULL OR valid_to >= valid_from",
             name="ck_field_versions_valid_range",
         ),
         Index(

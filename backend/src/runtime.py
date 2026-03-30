@@ -132,9 +132,9 @@ class RuntimeContext:
     def get_field(self, field_id: int) -> FieldContext:
         with self.db.session_scope() as session:
             field_model = self.db.fields.get_by_id(session, field_id)
-        if field_model is None:
-            raise ValueError(f"Unknown field id: {field_id}")
-        return FieldContext.from_model(field_model)
+            if field_model is None:
+                raise ValueError(f"Unknown field id: {field_id}")
+            return FieldContext.from_model(field_model)
 
     def get_fields_by_ids(self, field_ids: list[int] | None = None) -> list[FieldContext]:
         if field_ids is None:
