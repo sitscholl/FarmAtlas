@@ -35,11 +35,11 @@ class Field(Base):
     reference_provider = Column(String, nullable=False)
     reference_station = Column(String, nullable=False)
 
-    soil_type = Column(String, nullable=False)
+    soil_type = Column(String, nullable=True)
     soil_weight = Column(String, nullable=True)
-    humus_pct = Column(Float, nullable=False)
-    effective_root_depth_cm = Column(Float, nullable=False)
-    p_allowable = Column(Float, nullable=False)  # Fraction depleted before stress.
+    humus_pct = Column(Float, nullable=True)
+    effective_root_depth_cm = Column(Float, nullable=True)
+    p_allowable = Column(Float, nullable=True)  # Fraction depleted before stress.
 
     versions = relationship(
         "FieldVersion",

@@ -51,10 +51,10 @@ export function buildFieldEditInitialValues(
     reference_provider: field.reference_provider,
     reference_station: field.reference_station,
     area_ha: String(field.area_ha ?? ''),
-    soil_type: field.soil_type,
+    soil_type: field.soil_type ?? '',
     soil_weight: field.soil_weight ?? '',
-    humus_pct: String(field.humus_pct),
-    effective_root_depth_cm: String(field.effective_root_depth_cm),
-    p_allowable: String(field.p_allowable),
+    humus_pct: String(field.humus_pct ?? ''),
+    effective_root_depth_cm: String(field.effective_root_depth_cm ?? ''),
+    p_allowable: String(field.p_allowable ?? ''),
   }
 }

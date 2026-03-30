@@ -18,6 +18,19 @@ from ..water_content import estimate_available_water_storage_capacity
 logger = logging.getLogger(__name__)
 
 
+def _missing_soil_parameters(field: FieldState) -> list[str]:
+    missing: list[str] = []
+    if field.soil_type is None:
+        missing.append("soil_type")
+    if field.humus_pct is None:
+        missing.append("humus_pct")
+    if field.effective_root_depth_cm is None:
+        missing.append("effective_root_depth_cm")
+    if field.p_allowable is None:
+        missing.append("p_allowable")
+    return missing
+
+
 @dataclass
 class WaterBalanceWorkflow:
     db: Database
@@ -141,6 +154,11 @@ class WaterBalanceWorkflow:
             raise ValueError("Station data cannot be empty when calculating the water balance.")
         if not isinstance(station_data.index, pd.DatetimeIndex):
             raise TypeError("Station data index must be a pandas DatetimeIndex.")
+        missing_soil_parameters = _missing_soil_parameters(field)
+        if missing_soil_parameters:
+            raise ValueError(
+                f"Field {field.name} is missing required soil parameters: {', '.join(missing_soil_parameters)}"
+            )
 
         if field.soil_water_estimate is None:
             field.soil_water_estimate = estimate_available_water_storage_capacity(
@@ -280,6 +298,14 @@ class WaterBalanceWorkflow:
 
         if station is None:
             logger.warning("No meteo station data available for field %s", field.name)
+            return None
+        missing_soil_parameters = _missing_soil_parameters(field)
+        if missing_soil_parameters:
+            logger.warning(
+                "Missing soil parameters for field %s (%s). Skipping water balance",
+                field.name,
+                ", ".join(missing_soil_parameters),
+            )
             return None
 
         field.soil_water_estimate = estimate_available_water_storage_capacity(

@@ -59,7 +59,7 @@ export const fieldCreateAction: CreateActionConfig = {
     },
     { id: 'reference_provider', label: 'Provider', type: 'text', defaultValue: 'sbr', required: true },
     { id: 'reference_station', label: 'Referenzstation', type: 'text', defaultValue: '103', required: true },
-    { id: 'soil_type', label: 'Bodenart', type: 'text', placeholder: 'lehm', required: true },
+    { id: 'soil_type', label: 'Bodenart', type: 'text', placeholder: 'lehm', required: false },
     {
       id: 'soil_weight',
       label: 'Bodenschwere',
@@ -73,9 +73,9 @@ export const fieldCreateAction: CreateActionConfig = {
       ],
       required: false,
     },
-    { id: 'humus_pct', label: 'Humusgehalt (%)', type: 'number', placeholder: '3', step: '0.1', required: true },
-    { id: 'effective_root_depth_cm', label: 'Effektive Wurzeltiefe (cm)', type: 'number', defaultValue: 30, step: '1', required: true },
-    { id: 'p_allowable', label: 'Entziehbarer Wasseranteil (%)', type: 'number', defaultValue: 0.70, step: '0.01', required: true },
+    { id: 'humus_pct', label: 'Humusgehalt (%)', type: 'number', placeholder: '3', step: '0.1', required: false },
+    { id: 'effective_root_depth_cm', label: 'Effektive Wurzeltiefe (cm)', type: 'number', defaultValue: 30, step: '1', required: false },
+    { id: 'p_allowable', label: 'Entziehbarer Wasseranteil (%)', type: 'number', defaultValue: 0.70, step: '0.01', required: false },
   ],
   buildPayload: (values) => ({
     name: values.name.trim(),
@@ -91,12 +91,12 @@ export const fieldCreateAction: CreateActionConfig = {
     active: values.active === 'true',
     reference_provider: values.reference_provider.trim(),
     reference_station: values.reference_station.trim(),
-    soil_type: values.soil_type.trim(),
+    soil_type: toOptionalText(values.soil_type),
     soil_weight: toOptionalText(values.soil_weight),
-    humus_pct: Number(values.humus_pct),
+    humus_pct: toOptionalNumber(values.humus_pct),
     area_ha: Number(values.area_ha),
-    effective_root_depth_cm: Number(values.effective_root_depth_cm),
-    p_allowable: Number(values.p_allowable),
+    effective_root_depth_cm: toOptionalNumber(values.effective_root_depth_cm),
+    p_allowable: toOptionalNumber(values.p_allowable),
   }),
 }
 

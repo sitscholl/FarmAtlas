@@ -86,12 +86,12 @@ class FieldRepository:
         planting_year: int,
         reference_provider: str,
         reference_station: str,
-        soil_type: str,
+        soil_type: str | None,
         soil_weight: str | None,
-        humus_pct: float,
+        humus_pct: float | None,
         area_ha: float,
-        effective_root_depth_cm: float,
-        p_allowable: float,
+        effective_root_depth_cm: float | None,
+        p_allowable: float | None,
         section: str | None = None,
         tree_count: int | None = None,
         tree_height: float | None = None,
@@ -107,11 +107,11 @@ class FieldRepository:
             section=self._normalize_section(section),
             reference_provider=str(reference_provider),
             reference_station=str(reference_station),
-            soil_type=str(soil_type),
+            soil_type=None if soil_type in (None, "") else str(soil_type),
             soil_weight=None if soil_weight in (None, "") else str(soil_weight),
-            humus_pct=float(humus_pct),
-            effective_root_depth_cm=float(effective_root_depth_cm),
-            p_allowable=float(p_allowable),
+            humus_pct=None if humus_pct is None else float(humus_pct),
+            effective_root_depth_cm=None if effective_root_depth_cm is None else float(effective_root_depth_cm),
+            p_allowable=None if p_allowable is None else float(p_allowable),
         )
         session.add(field)
         session.flush()
@@ -158,7 +158,10 @@ class FieldRepository:
                 raise ValueError(f"Invalid key {field_key} in update_field. Choose one of {self.UPDATE_ALLOWLIST}")
 
             if field_key in self.STABLE_UPDATE_ALLOWLIST:
-                stable_updates[field_key] = self._normalize_section(new_value) if field_key == "section" else new_value
+                if field_key in {"section", "soil_type", "soil_weight"}:
+                    stable_updates[field_key] = self._normalize_section(new_value)
+                else:
+                    stable_updates[field_key] = new_value
                 continue
 
             versioned_updates[field_key] = new_value

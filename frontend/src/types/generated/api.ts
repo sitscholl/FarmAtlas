@@ -17,12 +17,12 @@ export type FieldCreate = {
   active?: boolean
   reference_provider: string
   reference_station: string
-  soil_type: string
+  soil_type?: string | null
   soil_weight?: string | null
-  humus_pct: number
+  humus_pct?: number | null
   area_ha: number
-  effective_root_depth_cm: number
-  p_allowable: number
+  effective_root_depth_cm?: number | null
+  p_allowable?: number | null
 }
 
 export type FieldOverview = {
@@ -46,12 +46,12 @@ export type FieldOverview = {
   active: boolean
   reference_provider: string
   reference_station: string
-  soil_type: string
+  soil_type: string | null
   soil_weight: string | null
-  humus_pct: number
+  humus_pct: number | null
   area_ha: number
-  effective_root_depth_cm: number
-  p_allowable: number
+  effective_root_depth_cm: number | null
+  p_allowable: number | null
   id: number
 }
 
@@ -69,12 +69,12 @@ export type FieldRead = {
   active: boolean
   reference_provider: string
   reference_station: string
-  soil_type: string
+  soil_type: string | null
   soil_weight: string | null
-  humus_pct: number
+  humus_pct: number | null
   area_ha: number
-  effective_root_depth_cm: number
-  p_allowable: number
+  effective_root_depth_cm: number | null
+  p_allowable: number | null
   id: number
 }
 
@@ -92,12 +92,12 @@ export type FieldUpdate = {
   active?: boolean
   reference_provider: string
   reference_station: string
-  soil_type: string
+  soil_type?: string | null
   soil_weight?: string | null
-  humus_pct: number
+  humus_pct?: number | null
   area_ha: number
-  effective_root_depth_cm: number
-  p_allowable: number
+  effective_root_depth_cm?: number | null
+  p_allowable?: number | null
   effective_from?: string | null
 }
 

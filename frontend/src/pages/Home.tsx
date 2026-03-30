@@ -18,7 +18,11 @@ import {
 } from '../lib/fieldForm'
 import { type FieldOverview } from '../types/generated/api'
 
-function formatNumber(value: number, digits = 1) {
+function formatNumber(value: number | null, digits = 1) {
+  if (value === null) {
+    return 'n/a'
+  }
+
   return new Intl.NumberFormat('de-DE', {
     maximumFractionDigits: digits,
     minimumFractionDigits: 0,
@@ -75,7 +79,7 @@ function buildSubtitle(field: FieldOverview) {
   return [
     field.section ? `Abschnitt: ${field.section}` : null,
     `Sorte: ${field.variety}`,
-    `Bodenart: ${field.soil_type}`,
+    `Bodenart: ${field.soil_type ?? 'n/a'}`,
     field.soil_weight ? `Bodenschwere: ${field.soil_weight}` : null,
   ]
     .filter((part): part is string => part !== null)

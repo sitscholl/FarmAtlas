@@ -125,12 +125,12 @@ def _build_field_payload(
         "active": True,
         "reference_provider": _required_text(row, "reference_provider"),
         "reference_station": _required_text(row, "reference_station"),
-        "soil_type": _required_text(row, "soil_type"),
+        "soil_type": _optional_text(row.get("soil_type")),
         "soil_weight": _optional_text(row.get("soil_weight")),
-        "humus_pct": _required_float(row, "humus_pct"),
+        "humus_pct": _optional_float(row.get("humus_pct")),
         "area_ha": area_value,
-        "effective_root_depth_cm": _required_float(row, "effective_root_depth_cm"),
-        "p_allowable": _required_float(row, "p_allowable"),
+        "effective_root_depth_cm": _optional_float(row.get("effective_root_depth_cm")),
+        "p_allowable": _optional_float(row.get("p_allowable")),
     }
     return payload
 

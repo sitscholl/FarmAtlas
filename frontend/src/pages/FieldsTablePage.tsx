@@ -141,7 +141,7 @@ export default function FieldsTablePage() {
       {
         id: 'soil_type',
         header: 'Bodenart',
-        cell: (field) => field.soil_type,
+        cell: (field) => field.soil_type ?? 'n/a',
       },
       {
         id: 'soil_weight',

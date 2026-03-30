@@ -29,12 +29,12 @@ class FieldContext:
     active: bool
     reference_provider: str
     reference_station: str
-    soil_type: str
+    soil_type: str | None
     soil_weight: str | None
-    humus_pct: float
+    humus_pct: float | None
     area_ha: float
-    effective_root_depth_cm: float
-    p_allowable: float
+    effective_root_depth_cm: float | None
+    p_allowable: float | None
 
     @classmethod
     def from_model(cls, field_model: Field) -> "FieldContext":
@@ -88,11 +88,11 @@ class FieldState:
         return self.field.reference_provider
 
     @property
-    def soil_type(self) -> str:
+    def soil_type(self) -> str | None:
         return self.field.soil_type
 
     @property
-    def humus_pct(self) -> float:
+    def humus_pct(self) -> float | None:
         return self.field.humus_pct
 
     @property
@@ -104,7 +104,7 @@ class FieldState:
         return self.field.soil_weight
 
     @property
-    def effective_root_depth_cm(self) -> float:
+    def effective_root_depth_cm(self) -> float | None:
         return self.field.effective_root_depth_cm
 
     @property

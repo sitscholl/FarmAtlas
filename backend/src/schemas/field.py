@@ -19,12 +19,12 @@ class FieldBase(BaseModel):
     active: bool = True
     reference_provider: str
     reference_station: str
-    soil_type: str
+    soil_type: str | None = None
     soil_weight: str | None = None
-    humus_pct: float
+    humus_pct: float | None = None
     area_ha: float
-    effective_root_depth_cm: float
-    p_allowable: float
+    effective_root_depth_cm: float | None = None
+    p_allowable: float | None = None
 
 
 class FieldCreate(FieldBase):
@@ -45,7 +45,11 @@ class FieldRead(FieldBase, ORMModel):
     running_metre: float | None
     herbicide_free: bool | None
     active: bool
+    soil_type: str | None
     soil_weight: str | None
+    humus_pct: float | None
+    effective_root_depth_cm: float | None
+    p_allowable: float | None
 
 
 class FieldWaterBalanceSummary(BaseModel):
