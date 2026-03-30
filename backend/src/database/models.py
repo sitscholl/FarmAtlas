@@ -21,14 +21,20 @@ class Field(Base):
     __tablename__ = "fields"
     __table_args__ = (
         Index(
-            "uq_fields_identity",
+            "uq_fields_unique_name",
+            "unique_name",
+            unique=True,
+        ),
+        Index(
+            "ix_fields_name_section",
             "name",
             text("coalesce(section, '')"),
-            unique=True,
         ),
     )
 
     id = Column(Integer, primary_key=True)
+    unique_name = Column(String, nullable=False)
+    group = Column(String, nullable=False)
     name = Column(String, nullable=False)
     section = Column(String, nullable=True)
 
@@ -59,7 +65,7 @@ class Field(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Field(id={self.id!r}, name={self.name!r})"
+        return f"Field(id={self.id!r}, unique_name={self.unique_name!r})"
 
     @property
     def current_version(self) -> "FieldVersion | None":

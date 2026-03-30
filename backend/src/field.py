@@ -16,6 +16,8 @@ class FieldResults:
 @dataclass
 class FieldContext:
     id: int
+    unique_name: str
+    group: str
     name: str
     section: str | None
     variety: str
@@ -40,6 +42,8 @@ class FieldContext:
     def from_model(cls, field_model: Field) -> "FieldContext":
         return cls(
             id=field_model.id,
+            unique_name=field_model.unique_name,
+            group=field_model.group,
             name=field_model.name,
             section=field_model.section,
             variety=field_model.variety,

@@ -42,7 +42,7 @@ function buildInitialValues(
 function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   return fields.map((field) => ({
     value: String(field.id),
-    label: `${field.name}${field.section ? ` (${field.section})` : ''}`,
+    label: field.unique_name,
   }))
 }
 

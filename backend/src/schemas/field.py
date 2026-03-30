@@ -6,6 +6,8 @@ from .base import ORMModel
 
 
 class FieldBase(BaseModel):
+    unique_name: str
+    group: str
     name: str
     section: str | None = None
     variety: str

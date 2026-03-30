@@ -4,6 +4,8 @@
  */
 
 export type FieldCreate = {
+  unique_name: string
+  group: string
   name: string
   section?: string | null
   variety: string
@@ -33,6 +35,8 @@ export type FieldOverview = {
   readily_available_water: number | null
   below_raw: boolean | null
   safe_ratio: number | null
+  unique_name: string
+  group: string
   name: string
   section: string | null
   variety: string
@@ -56,6 +60,8 @@ export type FieldOverview = {
 }
 
 export type FieldRead = {
+  unique_name: string
+  group: string
   name: string
   section: string | null
   variety: string
@@ -79,6 +85,8 @@ export type FieldRead = {
 }
 
 export type FieldUpdate = {
+  unique_name: string
+  group: string
   name: string
   section?: string | null
   variety: string

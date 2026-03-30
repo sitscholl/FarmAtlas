@@ -37,6 +37,8 @@ export function buildFieldEditInitialValues(
 
   return {
     effective_from: new Date().toISOString().slice(0, 10),
+    unique_name: field.unique_name,
+    group: field.group,
     name: field.name,
     section: field.section ?? '',
     variety: field.variety,

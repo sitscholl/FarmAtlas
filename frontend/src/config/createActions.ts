@@ -25,6 +25,8 @@ export const fieldCreateAction: CreateActionConfig = {
   endpoint: '/fields',
   method: 'post',
   fields: [
+    { id: 'unique_name', label: 'Eindeutiger Name', type: 'text', placeholder: 'Dietlacker Cosmic', required: true },
+    { id: 'group', label: 'Gruppe', type: 'text', placeholder: 'Ostblock', required: true },
     { id: 'name', label: 'Name', type: 'text', placeholder: 'Parzellenname', required: true },
     { id: 'section', label: 'Abschnitt', type: 'text', placeholder: 'Nord', required: false },
     { id: 'variety', label: 'Sorte', type: 'select', optionsSource: 'varieties', required: true },
@@ -78,6 +80,8 @@ export const fieldCreateAction: CreateActionConfig = {
     { id: 'p_allowable', label: 'Entziehbarer Wasseranteil (%)', type: 'number', defaultValue: 0.70, step: '0.01', required: false },
   ],
   buildPayload: (values) => ({
+    unique_name: values.unique_name.trim(),
+    group: values.group.trim(),
     name: values.name.trim(),
     section: toOptionalText(values.section),
     variety: values.variety.trim(),

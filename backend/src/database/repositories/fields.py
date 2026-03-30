@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 class FieldRepository:
     STABLE_UPDATE_ALLOWLIST = {
+        "unique_name",
+        "group",
         "name",
         "section",
         "reference_provider",
@@ -42,6 +44,12 @@ class FieldRepository:
 
     def _normalize_section(self, section: str | None) -> str | None:
         return None if section in (None, "") else str(section)
+
+    def _normalize_required_text(self, value: Any) -> str:
+        text = str(value).strip()
+        if text == "":
+            raise ValueError("Expected a non-empty text value")
+        return text
 
     def _get_variety_by_name(self, session: Session, variety_name: str) -> models.Variety:
         variety = (
@@ -81,6 +89,8 @@ class FieldRepository:
         self,
         session: Session,
         *,
+        unique_name: str,
+        group: str,
         name: str,
         variety: str,
         planting_year: int,
@@ -103,10 +113,12 @@ class FieldRepository:
     ) -> models.Field:
         variety_model = self._get_variety_by_name(session, variety)
         field = models.Field(
-            name=str(name),
+            unique_name=self._normalize_required_text(unique_name),
+            group=self._normalize_required_text(group),
+            name=self._normalize_required_text(name),
             section=self._normalize_section(section),
-            reference_provider=str(reference_provider),
-            reference_station=str(reference_station),
+            reference_provider=self._normalize_required_text(reference_provider),
+            reference_station=self._normalize_required_text(reference_station),
             soil_type=None if soil_type in (None, "") else str(soil_type),
             soil_weight=None if soil_weight in (None, "") else str(soil_weight),
             humus_pct=None if humus_pct is None else float(humus_pct),
@@ -160,6 +172,8 @@ class FieldRepository:
             if field_key in self.STABLE_UPDATE_ALLOWLIST:
                 if field_key in {"section", "soil_type", "soil_weight"}:
                     stable_updates[field_key] = self._normalize_section(new_value)
+                elif field_key in {"unique_name", "group", "name", "reference_provider", "reference_station"}:
+                    stable_updates[field_key] = self._normalize_required_text(new_value)
                 else:
                     stable_updates[field_key] = new_value
                 continue
