@@ -35,6 +35,14 @@ function formatNumber(value: number | null | undefined, digits = 1) {
   }).format(value)
 }
 
+function getLocalIsoDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
   return data.map((point, index) => {
     const nextPoint = data[index + 1]
@@ -125,7 +133,7 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
     (point) => point.evapotranspiration_negative !== null,
   )
   const hasForecast = chartData.some((point) => point.value_type === 'forecast')
-  const today = new Date().toLocaleDateString('en-CA')
+  const today = getLocalIsoDate()
   const hasTodayMarker = chartData.some((point) => point.date === today)
   const latestObserved =
     [...data].reverse().find((point) => point.value_type !== 'forecast') ?? data[data.length - 1]
