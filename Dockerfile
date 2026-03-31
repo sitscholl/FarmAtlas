@@ -5,6 +5,7 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
+ENV FARMATLAS_SKIP_GENERATE_TYPES=1
 RUN npm run build
 
 FROM python:3.13-slim AS backend-builder
