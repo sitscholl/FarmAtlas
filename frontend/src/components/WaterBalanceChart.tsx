@@ -70,6 +70,7 @@ function extendChartRange(
   }
 
   const paddedData = [...data]
+  const lastPoint = data[data.length - 1]
   let nextDate = addDaysToIsoDate(lastDate, 1)
   while (nextDate <= reservedEndDate) {
     paddedData.push({
@@ -79,10 +80,10 @@ function extendChartRange(
       evapotranspiration: 0,
       incoming: 0,
       net: 0,
-      soil_water_content: null,
-      available_water_storage: data[data.length - 1].available_water_storage,
-      water_deficit: null,
-      readily_available_water: data[data.length - 1].readily_available_water,
+      soil_water_content: lastPoint.soil_water_content,
+      available_water_storage: lastPoint.available_water_storage,
+      water_deficit: lastPoint.water_deficit,
+      readily_available_water: lastPoint.readily_available_water,
       safe_ratio: null,
       below_raw: null,
       value_type: null,
