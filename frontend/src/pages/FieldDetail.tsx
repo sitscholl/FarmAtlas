@@ -6,7 +6,7 @@ import WaterBalanceChart from '../components/WaterBalanceChart'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import { type FieldOverview, type WaterBalanceSeriesPoint } from '../types/generated/api'
 
-const FORECAST_DAYS = 6
+const FORECAST_DAYS = 5
 
 type DetailMetric = {
   label: string
@@ -242,7 +242,7 @@ export default function FieldDetail() {
         </div>
 
         <div className="mt-10">
-          <WaterBalanceChart data={series} />
+          <WaterBalanceChart data={series} reservedForecastDays={FORECAST_DAYS} />
           {isForecastLoading ? (
             <p className="mt-3 text-sm text-slate-500">
               Lade Prognosedaten...

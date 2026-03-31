@@ -15,6 +15,7 @@ import { type WaterBalanceSeriesPoint } from '../types/generated/api'
 
 type WaterBalanceChartProps = {
   data: WaterBalanceSeriesPoint[]
+  reservedForecastDays?: number
 }
 
 type ChartRow = WaterBalanceSeriesPoint & {
@@ -41,6 +42,56 @@ function getLocalIsoDate() {
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function addDaysToIsoDate(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function extendChartRange(
+  data: WaterBalanceSeriesPoint[],
+  reservedForecastDays: number,
+): WaterBalanceSeriesPoint[] {
+  if (data.length === 0 || reservedForecastDays <= 0) {
+    return data
+  }
+
+  const today = getLocalIsoDate()
+  const reservedEndDate = addDaysToIsoDate(today, reservedForecastDays)
+  const lastDate = data[data.length - 1]?.date
+
+  if (!lastDate || lastDate >= reservedEndDate) {
+    return data
+  }
+
+  const paddedData = [...data]
+  let nextDate = addDaysToIsoDate(lastDate, 1)
+  while (nextDate <= reservedEndDate) {
+    paddedData.push({
+      date: nextDate,
+      precipitation: 0,
+      irrigation: 0,
+      evapotranspiration: 0,
+      incoming: 0,
+      net: 0,
+      soil_water_content: null,
+      available_water_storage: data[data.length - 1].available_water_storage,
+      water_deficit: null,
+      readily_available_water: data[data.length - 1].readily_available_water,
+      safe_ratio: null,
+      below_raw: null,
+      value_type: null,
+      model: null,
+    })
+    nextDate = addDaysToIsoDate(nextDate, 1)
+  }
+
+  return paddedData
 }
 
 function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
@@ -119,7 +170,10 @@ function TooltipContent({
   )
 }
 
-export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
+export default function WaterBalanceChart({
+  data,
+  reservedForecastDays = 0,
+}: WaterBalanceChartProps) {
   if (data.length === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
@@ -128,7 +182,8 @@ export default function WaterBalanceChart({ data }: WaterBalanceChartProps) {
     )
   }
 
-  const chartData = buildChartData(data)
+  const displayData = extendChartRange(data, reservedForecastDays)
+  const chartData = buildChartData(displayData)
   const hasEvapotranspiration = chartData.some(
     (point) => point.evapotranspiration_negative !== null,
   )
