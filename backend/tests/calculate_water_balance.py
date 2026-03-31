@@ -24,8 +24,14 @@ def build_runtime(temp_db_path: Path) -> RuntimeContext:
 
 
 def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: int) -> list[FieldContext]:
+    with runtime.db.session_scope() as session:
+        existing_variety = runtime.db.varieties.get_by_name(session, "Example")
+        if existing_variety is None:
+            runtime.db.varieties.create(session, name="Example", group="test")
+
     field_specs = [
         {
+            "group": 'A',
             "name": "Synthetic Field A",
             "variety": "Example",
             "planting_year": 1900,
@@ -39,6 +45,7 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "p_allowable": 0.45,
         },
         {
+            "group": 'B',
             "name": "Synthetic Field B",
             "variety": "Example",
             "planting_year": 1900,
