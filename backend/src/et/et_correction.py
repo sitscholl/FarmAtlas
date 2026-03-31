@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Mapping, Sequence
+from typing import Literal, Mapping, Sequence
 
+import numpy as np
 import pandas as pd
 
 
@@ -37,17 +38,51 @@ def _align_timestamp_timezone(ts: pd.Timestamp | None, tzinfo) -> pd.Timestamp |
 @dataclass(frozen=True)
 class KcPeriod:
     name: str
-    value: float
     start: datetime | date | str
     end: datetime | date | str | None = None
+    kind: Literal["constant", "linear"] = "constant"
+    value: float | None = None
+    start_value: float | None = None
+    end_value: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind == "constant":
+            if self.value is None:
+                raise ValueError(f"KcPeriod '{self.name}' requires 'value' for constant periods.")
+            if self.start_value is not None or self.end_value is not None:
+                raise ValueError(
+                    f"KcPeriod '{self.name}' cannot define 'start_value' or 'end_value' for constant periods."
+                )
+            return
+
+        if self.kind == "linear":
+            if self.start_value is None or self.end_value is None:
+                raise ValueError(
+                    f"KcPeriod '{self.name}' requires 'start_value' and 'end_value' for linear periods."
+                )
+            if self.value is not None:
+                raise ValueError(f"KcPeriod '{self.name}' cannot define 'value' for linear periods.")
+            return
+
+        raise ValueError(f"Unsupported KcPeriod kind '{self.kind}' for period '{self.name}'.")
 
     @classmethod
     def from_spec(cls, spec: Mapping[str, object]) -> "KcPeriod":
+        if "kind" in spec:
+            kind = str(spec["kind"])
+        elif "start_value" in spec or "end_value" in spec:
+            kind = "linear"
+        else:
+            kind = "constant"
+
         return cls(
             name=str(spec["name"]),
-            value=float(spec["value"]),
+            kind=kind,
             start=spec["start"],
             end=spec.get("end"),
+            value=float(spec["value"]) if spec.get("value") is not None else None,
+            start_value=float(spec["start_value"]) if spec.get("start_value") is not None else None,
+            end_value=float(spec["end_value"]) if spec.get("end_value") is not None else None,
         )
 
 
@@ -74,7 +109,10 @@ class ETCorrection:
             [
                 {
                     "name": period.name,
+                    "kind": period.kind,
                     "value": period.value,
+                    "start_value": period.start_value,
+                    "end_value": period.end_value,
                     "start": period.start,
                     "end": period.end,
                 }
@@ -109,7 +147,10 @@ class ETCorrection:
             resolved.append(
                 {
                     "name": period.name,
+                    "kind": period.kind,
                     "value": period.value,
+                    "start_value": period.start_value,
+                    "end_value": period.end_value,
                     "start": start,
                     "end": pd.Timestamp(end),
                 }
@@ -142,6 +183,22 @@ class ETCorrection:
         for year in range(start_ts.year, end_ts.year + 1):
             for period in self._resolve_periods_for_year(year, tzinfo=daily_index.tz):
                 mask = (kc.index >= period["start"]) & (kc.index < period["end"])
+                period_index = kc.index[mask]
+                if period["kind"] == "linear":
+                    if len(period_index) == 1:
+                        kc.loc[mask] = float(period["start_value"])
+                    elif len(period_index) > 1:
+                        kc.loc[mask] = pd.Series(
+                            np.linspace(
+                                float(period["start_value"]),
+                                float(period["end_value"]),
+                                len(period_index),
+                            ),
+                            index=period_index,
+                            dtype=float,
+                        )
+                    continue
+
                 kc.loc[mask] = float(period["value"])
 
         return kc
@@ -192,12 +249,31 @@ class ETCorrection:
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     periods = [
-        {"name": "Kc_ini", "value": 0.30, "start": "01-04"},
-        {"name": "Kc_mid", "value": 1.10, "start": "01-06"},
-        {"name": "Kc_end", "value": 0.65, "start": "01-07"},
+        {"name": "Kc_ini", "value": 0.657, "start": "01-03"},
+        {
+            "name": "Kc_dev",
+            "kind": "linear",
+            "start": "10-04",
+            "end": "15-06",
+            "start_value": 0.657,
+            "end_value": 1.008,
+        },
+        {"name": "Kc_mid", "value": 1.013, "start": "15-06", "end": "16-09"},
+        {
+            "name": "Kc_late",
+            "kind": "linear",
+            "start": "16-09",
+            "end": "31-10",
+            "start_value": 1.004,
+            "end_value": 0.833,
+        },
+        {"name": "Kc_end", "value": 0.835, "start": "31-10", "end": "01-11"},
     ]
 
-    corrector = ETCorrection(periods, season_end="01-10")
+    corrector = ETCorrection(periods, season_end="31-10")
     kc = corrector.to_series(pd.date_range("2025-01-01", "2025-12-31", freq="D"))
+    kc.plot()
     print(kc)
