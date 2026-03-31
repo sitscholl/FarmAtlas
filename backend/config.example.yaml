@@ -19,7 +19,7 @@ evapotranspiration:
         # Agricultural Water Management 226:105756, South Tyrol orchard.
         season_end: "31-10"
         periods:
-            - {"name": "Kc_ini", "value": 0.657, "start": "01-03", "end": "10-04"}
+            - {"name": "Kc_ini", "value": 0.657, "start": "15-03", "end": "10-04"}
             - {"name": "Kc_dev", "kind": "linear", "start": "10-04", "end": "15-06", "start_value": 0.657, "end_value": 1.013}
             - {"name": "Kc_mid", "value": 1.013, "start": "15-06", "end": "16-09"}
             - {"name": "Kc_late", "kind": "linear", "start": "16-09", "end": "31-10", "start_value": 1.004, "end_value": 0.835}
