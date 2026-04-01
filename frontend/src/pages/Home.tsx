@@ -109,20 +109,20 @@ export default function Home() {
     [fields, showOnlyFieldsWithStatus],
   )
 
-  const handleDeleteField = async (field: FieldOverview) => {
-    const confirmed = window.confirm(`Soll die Anlage "${field.name}" wirklich geloescht werden?`)
-    if (!confirmed) {
-      return
-    }
+  // const handleDeleteField = async (field: FieldOverview) => {
+  //   const confirmed = window.confirm(`Soll die Anlage "${field.name}" wirklich geloescht werden?`)
+  //   if (!confirmed) {
+  //     return
+  //   }
 
-    try {
-      await api.delete(`/fields/${field.id}`)
-      notifyDataChanged()
-    } catch (error) {
-      console.error(`Error deleting field ${field.id}`, error)
-      setErrorMessage('Die Anlage konnte nicht geloescht werden.')
-    }
-  }
+  //   try {
+  //     await api.delete(`/fields/${field.id}`)
+  //     notifyDataChanged()
+  //   } catch (error) {
+  //     console.error(`Error deleting field ${field.id}`, error)
+  //     setErrorMessage('Die Anlage konnte nicht geloescht werden.')
+  //   }
+  // }
 
   const handleRefreshField = async (field: FieldOverview) => {
     try {
