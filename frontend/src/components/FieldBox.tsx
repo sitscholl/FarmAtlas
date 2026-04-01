@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+import { MdWaterDrop } from "react-icons/md";
+
 export type FieldBoxMetric = {
   label: string
   value: string
@@ -17,7 +19,7 @@ type FieldBoxProps = {
   title: string
   badge: string
   subtitle?: string
-  metrics: FieldBoxMetric[]
+  metrics?: FieldBoxMetric[]
   statusBar?: FieldBoxStatusBar
   to?: string
   actions?: ReactNode
@@ -72,7 +74,7 @@ function FieldBoxContent({
       </div>
 
       {subtitle ? (
-        <p className={`${contentClasses} mt-2 text-sm text-slate-500 whitespace-pre-line`}>{subtitle}</p>
+        <p className={`${contentClasses} text-sm text-slate-500 whitespace-pre-line`}>{subtitle}</p>
       ) : null}
 
       {statusBar ? (
@@ -94,19 +96,21 @@ function FieldBoxContent({
         </div>
       ) : null}
 
-      <div className={`${contentClasses} mt-2 space-y-1 border-t border-black/30 border-slate-100 pt-1`}>
-        {metrics.map((metric) => (
-          <div
-            key={metric.label}
-            className="flex items-baseline justify-between gap-1"
-          >
-            <p className="text-sm text-slate-500">{metric.label}</p>
-            <p className="text-base font-semibold text-slate-900">
-              {metric.value}
-            </p>
-          </div>
-        ))}
-      </div>
+      {metrics ? (
+        <div className={`${contentClasses} mt-2 space-y-1 border-t border-black/30 border-slate-100 pt-1`}>
+          {metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="flex items-baseline justify-between gap-1"
+            >
+              <p className="text-sm text-slate-500">{metric.label}</p>
+              <p className="text-base font-semibold text-slate-900">
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ): null }
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { GoPencil } from 'react-icons/go'
 import { IoWater } from 'react-icons/io5'
 import { GiPlantWatering } from "react-icons/gi";
 import { PiTrashBold } from 'react-icons/pi'
+import { MdWaterDrop } from "react-icons/md";
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
@@ -77,13 +78,11 @@ function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'refe
 
 function buildSubtitle(field: FieldOverview) {
   return [
-    field.section ? `Abschnitt: ${field.section}` : null,
-    `Sorte: ${field.variety}`,
-    `Bodenart: ${field.soil_type ?? 'n/a'}`,
-    field.soil_weight ? `Bodenschwere: ${field.soil_weight}` : null,
+    field.section ? `${field.section}` : null,
+    `${field.variety}`,
   ]
     .filter((part): part is string => part !== null)
-    .join('\n')
+    .join(' ')
 }
 
 export default function Home() {
@@ -195,14 +194,14 @@ export default function Home() {
 
     return (
       <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {fields.map((field) => (
+        {fields.filter((field) => field.active).map((field) => (
           <FieldBox
             key={field.id}
             title={field.name}
             badge={formatReference(field)}
             subtitle={buildSubtitle(field)}
             statusBar={buildSafeRatioBar(field)}
-            metrics={buildFieldMetrics(field)}
+            // metrics={buildFieldMetrics(field)}
             to={`/fields/${field.id}`}
             titleAdornment={
               field.herbicide_free === true ? (
