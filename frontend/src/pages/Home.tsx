@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { GoPencil } from 'react-icons/go'
-import { IoWater } from 'react-icons/io5'
-import { GiPlantWatering } from 'react-icons/gi'
+import { GrClear } from "react-icons/gr";
 import { MdWaterDrop } from 'react-icons/md'
-import { PiTrashBold } from 'react-icons/pi'
+import { LuRefreshCcw } from "react-icons/lu";
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
@@ -193,7 +191,7 @@ export default function Home() {
             Keine aktiven Anlagen mit Statusbalken gefunden.
           </div>
         ) : (
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {visibleFields.map((field) => (
               <FieldBox
                 key={field.id}
@@ -212,7 +210,7 @@ export default function Home() {
                 }
                 actions={
                   <>
-                    <button
+                    {/* <button
                       type="button"
                       onClick={() => setEditingField(field)}
                       className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
@@ -227,22 +225,22 @@ export default function Home() {
                       aria-label={`${field.name} loeschen`}
                     >
                       <PiTrashBold />
-                    </button>
+                    </button> */}
                     <button
                       type="button"
                       onClick={() => void handleRefreshField(field)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
                       aria-label={`${field.name} Wasserbilanz aktualisieren`}
                     >
-                      <IoWater />
+                      <LuRefreshCcw />
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleClearIrrigation(field)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-700 text-white shadow-sm transition hover:bg-rose-800"
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-800 text-white shadow-sm transition hover:bg-rose-800"
                       aria-label={`${field.name} Bewaesserung leeren`}
                     >
-                      <GiPlantWatering />
+                      <GrClear />
                     </button>
                   </>
                 }

@@ -42,7 +42,7 @@ function FieldBoxContent({
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
 
   return (
-    <div className="group relative overflow-hidden rounded-[1.75rem] border p-6 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg border-slate-200/80 hover:border-sky-500">
+    <div className="group relative overflow-hidden border p-6 shadow-md backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg border-slate-200/80 hover:border-sky-500">
       {to ? (
         <Link
           to={to}
@@ -73,7 +73,7 @@ function FieldBoxContent({
       ) : null}
 
       {statusBars && statusBars.length > 0 ? (
-        <div className={`${contentClasses} mt-4 space-y-2`}>
+        <div className={`${contentClasses} pointer-events-auto mt-4 space-y-2`}>
           {statusBars.map((statusBar) => {
             const StatusIcon = statusBar.icon ?? MdWaterDrop
             const statusBarClasses = statusBar.isCritical
@@ -99,7 +99,7 @@ function FieldBoxContent({
                     />
                   </div>
                 </div>
-                <div className="pointer-events-none absolute inset-y-1 right-2 z-20 hidden items-center rounded-lg bg-slate-900 px-2.5 text-xs font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/status:flex group-hover/status:opacity-100">
+                <div className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/status:flex group-hover/status:opacity-100">
                   {statusBar.label}: {statusBar.value}
                 </div>
               </div>
