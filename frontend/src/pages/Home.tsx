@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { GoPencil } from 'react-icons/go'
 import { IoWater } from 'react-icons/io5'
-import { GiPlantWatering } from "react-icons/gi";
+import { GiPlantWatering } from 'react-icons/gi'
+import { MdWaterDrop } from 'react-icons/md'
 import { PiTrashBold } from 'react-icons/pi'
-import { MdWaterDrop } from "react-icons/md";
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import FieldBox, {
-  type FieldBoxMetric,
   type FieldBoxStatusBar,
 } from '../components/FieldBox'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
@@ -18,45 +17,6 @@ import {
   buildFieldEditInitialValues,
 } from '../lib/fieldForm'
 import { type FieldOverview } from '../types/generated/api'
-
-function formatNumber(value: number | null, digits = 1) {
-  if (value === null) {
-    return 'n/a'
-  }
-
-  return new Intl.NumberFormat('de-DE', {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: 0,
-  }).format(value)
-}
-
-function formatOptionalNumber(
-  value: number | null,
-  suffix: string,
-  digits = 1,
-) {
-  if (value === null) {
-    return 'n/a'
-  }
-
-  return `${formatNumber(value, digits)} ${suffix}`.trim()
-}
-
-function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
-  return [
-    { label: 'Flaeche', value: formatOptionalNumber(field.area_ha, 'ha', 2) },
-    { label: 'Pflanzjahr', value: String(field.planting_year) },
-    { label: 'Eff. Wurzeltiefe', value: `${formatNumber(field.effective_root_depth_cm)} cm` },
-    {
-      label: 'Baumzahl',
-      value: field.tree_count === null ? 'n/a' : formatNumber(field.tree_count, 0),
-    },
-    {
-      label: 'Wasserdefizit',
-      value: formatOptionalNumber(field.current_water_deficit, 'mm', 1),
-    },
-  ]
-}
 
 function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined {
   if (field.safe_ratio === null) {
@@ -69,7 +29,14 @@ function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined 
     value: `${ratioPercent}%`,
     percentage: Math.max(0, Math.min(100, ratioPercent)),
     isCritical: field.safe_ratio < 0,
+    icon: MdWaterDrop,
   }
+}
+
+function buildStatusBars(field: FieldOverview): FieldBoxStatusBar[] {
+  return [buildSafeRatioBar(field)].filter(
+    (statusBar): statusBar is FieldBoxStatusBar => statusBar !== undefined,
+  )
 }
 
 function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
@@ -90,6 +57,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
+  const [showOnlyFieldsWithStatus, setShowOnlyFieldsWithStatus] = useState(true)
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -125,6 +93,22 @@ export default function Home() {
   const editInitialValues = useMemo(
     () => buildFieldEditInitialValues(editingField),
     [editingField],
+  )
+
+  const visibleFields = useMemo(
+    () =>
+      fields.filter((field) => {
+        if (!field.active) {
+          return false
+        }
+
+        if (!showOnlyFieldsWithStatus) {
+          return true
+        }
+
+        return buildStatusBars(field).length > 0
+      }),
+    [fields, showOnlyFieldsWithStatus],
   )
 
   const handleDeleteField = async (field: FieldOverview) => {
@@ -193,63 +177,80 @@ export default function Home() {
     }
 
     return (
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {fields.filter((field) => field.active).map((field) => (
-          <FieldBox
-            key={field.id}
-            title={field.name}
-            badge={formatReference(field)}
-            subtitle={buildSubtitle(field)}
-            statusBar={buildSafeRatioBar(field)}
-            // metrics={buildFieldMetrics(field)}
-            to={`/fields/${field.id}`}
-            titleAdornment={
-              field.herbicide_free === true ? (
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
-                  aria-hidden="true"
-                />
-              ) : undefined
-            }
-            actions={
-              <>
-                <button
-                  type="button"
-                  onClick={() => setEditingField(field)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
-                  aria-label={`${field.name} bearbeiten`}
-                >
-                  <GoPencil />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteField(field)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
-                  aria-label={`${field.name} loeschen`}
-                >
-                  <PiTrashBold />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleRefreshField(field)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
-                  aria-label={`${field.name} Wasserbilanz aktualisieren`}
-                >
-                  <IoWater />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleClearIrrigation(field)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-700 text-white shadow-sm transition hover:bg-rose-800"
-                  aria-label={`${field.name} Bewaesserung leeren`}
-                >
-                  <GiPlantWatering />
-                </button>
-              </>
-            }
+      <>
+        <label className="mt-10 inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+          <input
+            type="checkbox"
+            checked={showOnlyFieldsWithStatus}
+            onChange={(event) => setShowOnlyFieldsWithStatus(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
           />
-        ))}
-      </div>
+          Nur Anlagen mit Status anzeigen
+        </label>
+
+        {visibleFields.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
+            Keine aktiven Anlagen mit Statusbalken gefunden.
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleFields.map((field) => (
+              <FieldBox
+                key={field.id}
+                title={field.name}
+                badge={formatReference(field)}
+                subtitle={buildSubtitle(field)}
+                statusBars={buildStatusBars(field)}
+                to={`/fields/${field.id}`}
+                titleAdornment={
+                  field.herbicide_free === true ? (
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
+                      aria-hidden="true"
+                    />
+                  ) : undefined
+                }
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingField(field)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-500"
+                      aria-label={`${field.name} bearbeiten`}
+                    >
+                      <GoPencil />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteField(field)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
+                      aria-label={`${field.name} loeschen`}
+                    >
+                      <PiTrashBold />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRefreshField(field)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
+                      aria-label={`${field.name} Wasserbilanz aktualisieren`}
+                    >
+                      <IoWater />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleClearIrrigation(field)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-700 text-white shadow-sm transition hover:bg-rose-800"
+                      aria-label={`${field.name} Bewaesserung leeren`}
+                    >
+                      <GiPlantWatering />
+                    </button>
+                  </>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </>
     )
   })()
 
