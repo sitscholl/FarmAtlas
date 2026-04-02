@@ -66,9 +66,9 @@ DEFAULT_SOIL_DEFAULTS: dict[str, SoilTypeDefaults] = {
     # More strict mapping would keep this tied to Ss only.
     "sand": SoilTypeDefaults((10.5, 15.5), 1.5, 5.5, ("KA4 lookup: Ss; very low storage, drains quickly",)),
     # More strict mapping would keep this tied to Sl2 only.
-    "schwach lehmiger sand": SoilTypeDefaults((17.0, 19.5), 1.45, 5.5, ("KA4 lookup: Sl2",)),
+    "schwach lehmiger sand": SoilTypeDefaults((17.0, 19.5), 1.5, 5.5, ("KA4 lookup: Sl2",)),
     # More strict mapping would likely split Sl3 and Sl4 instead of grouping them.
-    "lehmiger sand": SoilTypeDefaults((14.5, 22.5), 1.35, 5.0, ("KA4 lookup: Sl3-Sl4",)),
+    "lehmiger sand": SoilTypeDefaults((14.5, 22.5), 1.5, 5.0, ("KA4 lookup: Sl3-Sl4",)),
     "humoser lehmiger sand": SoilTypeDefaults(
         (14.5, 22.5),
         1.5,
@@ -80,25 +80,25 @@ DEFAULT_SOIL_DEFAULTS: dict[str, SoilTypeDefaults] = {
     ),
     # More strict mapping would split the sandy-silt / sandy-clay-silt KA4 classes
     # instead of pooling Slu, Su2-Su4, St2-St3 into one broad label.
-    "schluffiger sand": SoilTypeDefaults((11.5, 27.0), 1.25, 4.5, ("KA4 lookup: Slu, Su2-Su4, St2-St3",)),
+    "schluffiger sand": SoilTypeDefaults((11.5, 27.0), 1.5, 4.5, ("KA4 lookup: Slu, Su2-Su4, St2-St3",)),
     # More strict mapping would separate Us and Uu.
-    "sandiger schluff": SoilTypeDefaults((20.5, 28.5), 1.05, 4.5, ("KA4 lookup: Us, Uu",)),
+    "sandiger schluff": SoilTypeDefaults((20.5, 28.5), 1.5, 4.5, ("KA4 lookup: Us, Uu",)),
     # More strict mapping would separate Uls from Ut2-Ut4 rather than merging them.
-    "schluff": SoilTypeDefaults((23.0, 28.0), 1.0, 4.5, ("KA4 lookup: Uls, Ut2-Ut4",)),
+    "schluff": SoilTypeDefaults((23.0, 28.0), 1.5, 4.5, ("KA4 lookup: Uls, Ut2-Ut4",)),
     # More strict mapping would separate Ls2, Ls3, and Ls4.
-    "sandiger lehm": SoilTypeDefaults((12.0, 20.0), 0.95, 4.0, ("KA4 lookup: Ls2-Ls4",)),
+    "sandiger lehm": SoilTypeDefaults((12.0, 20.0), 2.5, 4.0, ("KA4 lookup: Ls2-Ls4",)),
     # More strict mapping would keep this tied to Lu only.
-    "lehm": SoilTypeDefaults((14.0, 19.5), 0.9, 4.0, ("KA4 lookup: Lu",)),
+    "lehm": SoilTypeDefaults((14.0, 19.5), 2.5, 4.0, ("KA4 lookup: Lu",)),
     # More strict mapping would likely distinguish a silty-loam label from a loamy-silt label.
-    "schluffiger lehm": SoilTypeDefaults((20.5, 26.0), 0.9, 4.0, ("KA4 lookup: approximated from Uls",)),
+    "schluffiger lehm": SoilTypeDefaults((20.5, 26.0), 1.5, 4.0, ("KA4 lookup: approximated from Uls",)),
     # More strict mapping would likely reserve this for Uls only.
-    "lehmiger schluff": SoilTypeDefaults((20.5, 26.0), 0.9, 4.0, ("KA4 lookup: approximated from Uls",)),
+    "lehmiger schluff": SoilTypeDefaults((20.5, 26.0), 1.5, 4.0, ("KA4 lookup: approximated from Uls",)),
     # More strict mapping would separate Lt2, Lt3, and Lts.
-    "toniger lehm": SoilTypeDefaults((8.0, 16.5), 0.8, 3.5, ("KA4 lookup: Lt2, Lt3, Lts",)),
+    "toniger lehm": SoilTypeDefaults((8.0, 16.5), 2.5, 3.5, ("KA4 lookup: Lt2, Lt3, Lts",)),
     # More strict mapping would revisit this label because Ut2-Ut4 are not classic heavy clay classes.
-    "schluffiger ton": SoilTypeDefaults((17.5, 27.5), 0.85, 3.5, ("KA4 lookup: Ut2-Ut4 (broad approximation)",)),
+    "schluffiger ton": SoilTypeDefaults((17.5, 27.5), 1.5, 3.5, ("KA4 lookup: Ut2-Ut4 (broad approximation)",)),
     # More strict mapping would split Tl, Tt, Ts2-Ts4, and Tu2-Tu4 instead of pooling all T* classes.
-    "ton": SoilTypeDefaults((6.5, 17.0), 0.6, 3.0, ("KA4 lookup: Tl, Tt, Ts2-Ts4, Tu2-Tu4; high total water, but less plant-available",)),
+    "ton": SoilTypeDefaults((6.5, 17.0), 2.5, 3.0, ("KA4 lookup: Tl, Tt, Ts2-Ts4, Tu2-Tu4; high total water, but less plant-available",)),
 }
 
 
