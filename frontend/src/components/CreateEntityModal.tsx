@@ -55,6 +55,24 @@ function buildVarietyOptions(varieties: VarietyRead[]): FieldOption[] {
   }))
 }
 
+function getSelectOptions(
+  field: CreateActionField,
+  fieldOptions: FieldOption[],
+  varietyOptions: FieldOption[],
+): FieldOption[] {
+  if (field.type !== 'select') {
+    return []
+  }
+
+  if (field.optionsSource === 'fields') {
+    return fieldOptions
+  }
+  if (field.optionsSource === 'varieties') {
+    return varietyOptions
+  }
+  return field.options ?? []
+}
+
 export default function CreateEntityModal({
   action,
   isOpen,
@@ -90,6 +108,38 @@ export default function CreateEntityModal({
   }, [action, initialValues, isOpen])
 
   useEffect(() => {
+    if (!isOpen || action === null) {
+      return
+    }
+
+    setValues((currentValues) => {
+      const nextValues = { ...currentValues }
+      let changed = false
+
+      for (const field of action.fields) {
+        if (field.type !== 'select') {
+          continue
+        }
+
+        const currentValue = nextValues[String(field.id)] ?? ''
+        if (currentValue !== '') {
+          continue
+        }
+
+        const options = getSelectOptions(field, fieldOptions, varietyOptions)
+        if (options.length === 0) {
+          continue
+        }
+
+        nextValues[String(field.id)] = options[0].value
+        changed = true
+      }
+
+      return changed ? nextValues : currentValues
+    })
+  }, [action, fieldOptions, isOpen, varietyOptions])
+
+  useEffect(() => {
     if (!isOpen || dynamicOptionSources.size === 0) {
       return
     }
@@ -105,16 +155,6 @@ export default function CreateEntityModal({
 
         setFieldOptions(nextFieldOptions)
         setVarietyOptions(nextVarietyOptions)
-        setValues((currentValues) => {
-          const nextValues = { ...currentValues }
-          if (!nextValues.field_id && nextFieldOptions.length > 0) {
-            nextValues.field_id = nextFieldOptions[0].value
-          }
-          if (!nextValues.variety && nextVarietyOptions.length > 0) {
-            nextValues.variety = nextVarietyOptions[0].value
-          }
-          return nextValues
-        })
       } catch (error) {
         console.error('Error loading select options', error)
         setErrorMessage('Die verfuegbaren Optionen konnten nicht geladen werden.')
