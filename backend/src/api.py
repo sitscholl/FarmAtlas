@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime
 import logging
 from pathlib import Path
 
@@ -24,6 +24,9 @@ from .schemas import (
     VarietyRead,
     WaterBalanceSeriesPoint,
     WaterBalanceSummary,
+    IrrigationCommandCreate,
+    IrrigationTarget,
+    IrrigationCommandResult
 )
 from .runtime import RuntimeContext
 from .scheduler import WorkflowScheduler
@@ -143,6 +146,72 @@ def _raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ..
         status_code = 404 if any(detail.startswith(prefix) for prefix in not_found_prefixes) else 400
         raise HTTPException(status_code=status_code, detail=detail) from exc
     raise HTTPException(status_code=500, detail="Unexpected server error.") from exc
+
+def _today_local() -> date:
+    return datetime.now(runtime.timezone).date()
+
+def _get_fields_by_name(field_name: str, *, active_only: bool = True):
+    normalized = field_name.strip().casefold()
+    matches = [
+        field
+        for field in runtime.fields
+        if field.name.strip().casefold() == normalized and (field.active or not active_only)
+    ]
+    if not matches:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not find any {'active ' if active_only else ''}field with name '{field_name}'",
+        )
+    return matches
+
+
+def _build_irrigation_targets() -> list[IrrigationTarget]:
+    grouped: dict[str, list] = {}
+
+    for field in runtime.fields:
+        grouped.setdefault(field.name, []).append(field)
+
+    targets: list[IrrigationTarget] = []
+    for field_name, fields in grouped.items():
+        active_fields = [field for field in fields if field.active]
+        target_fields = active_fields if active_fields else fields
+
+        sections = sorted(
+            {
+                field.section
+                for field in target_fields
+                if field.section is not None and field.section != ""
+            }
+        )
+        varieties = sorted(
+            {
+                field.variety
+                for field in target_fields
+                if getattr(field, "variety", None) is not None
+            }
+        )
+
+        targets.append(
+            IrrigationTarget(
+                field=field_name,
+                active=any(field.active for field in fields),
+                field_ids=[field.id for field in target_fields],
+                field_count=len(target_fields),
+                sections=sections,
+                varieties=varieties,
+            )
+        )
+
+    return sorted(targets, key=lambda target: target.field.casefold())
+
+def _get_irrigation_event_for_field_and_date(field_id: int, target_date: date):
+    with runtime.db.session_scope() as session:
+        events = runtime.db.irrigation.list(session, field_id=field_id)
+
+    for event in events:
+        if event.date == target_date:
+            return event
+    return None
 
 @app.get("/api/health")
 async def health_check():
@@ -333,6 +402,112 @@ async def clear_irrigation_events(field_id: int):
     except Exception as e:
         logger.exception(f"Clearing irrigation events for field with id {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("No field with id",))
+
+@app.get("/api/irrigation/targets", response_model=list[IrrigationTarget])
+async def list_irrigation_targets():
+    return _build_irrigation_targets()
+
+@app.post(
+    "/api/commands/irrigation",
+    response_model=IrrigationCommandResult,
+    status_code=status.HTTP_200_OK,
+)
+async def create_irrigation_command(
+    background_tasks: BackgroundTasks,
+    irrigation_command: IrrigationCommandCreate,
+):
+    target_date = irrigation_command.date or _today_local()
+    matched_fields = _get_fields_by_name(irrigation_command.field, active_only=True)
+
+    created_event_ids: list[int] = []
+    updated_event_ids: list[int] = []
+    unchanged_event_ids: list[int] = []
+    matched_field_ids = [field.id for field in matched_fields]
+
+    try:
+        for field in matched_fields:
+            existing_event = _get_irrigation_event_for_field_and_date(field.id, target_date)
+
+            if existing_event is None:
+                new_event = runtime.db.irrigation_service.create(
+                    field_id=field.id,
+                    date=target_date,
+                    method=irrigation_command.method,
+                    amount=irrigation_command.amount,
+                )
+                created_event_ids.append(new_event.id)
+                background_tasks.add_task(
+                    runtime.run_workflow_for_field,
+                    "water_balance",
+                    field.id,
+                )
+                continue
+
+            if (
+                existing_event.method == irrigation_command.method
+                and existing_event.amount == irrigation_command.amount
+            ):
+                unchanged_event_ids.append(existing_event.id)
+                continue
+
+            updated_event = runtime.db.irrigation_service.update(
+                event_id=existing_event.id,
+                updates={
+                    "field_id": field.id,
+                    "date": target_date,
+                    "method": irrigation_command.method,
+                    "amount": irrigation_command.amount,
+                },
+            )
+            updated_event_ids.append(updated_event.id)
+            background_tasks.add_task(
+                runtime.run_workflow_for_field,
+                "water_balance",
+                field.id,
+            )
+
+        created_count = len(created_event_ids)
+        updated_count = len(updated_event_ids)
+        unchanged_count = len(unchanged_event_ids)
+
+        if created_count > 0 and updated_count == 0 and unchanged_count == 0:
+            status_value = "created"
+        elif updated_count > 0 and created_count == 0 and unchanged_count == 0:
+            status_value = "updated"
+        elif unchanged_count > 0 and created_count == 0 and updated_count == 0:
+            status_value = "unchanged"
+        else:
+            status_value = "ok"
+
+        return IrrigationCommandResult(
+            status=status_value,
+            message=(
+                f"Irrigation command processed for field '{irrigation_command.field}' on "
+                f"{target_date.isoformat()}: created={created_count}, "
+                f"updated={updated_count}, unchanged={unchanged_count}."
+            ),
+            field=irrigation_command.field,
+            date=target_date,
+            method=irrigation_command.method,
+            amount=irrigation_command.amount,
+            matched_field_ids=matched_field_ids,
+            created_event_ids=created_event_ids,
+            updated_event_ids=updated_event_ids,
+            unchanged_event_ids=unchanged_event_ids,
+            created_count=created_count,
+            updated_count=updated_count,
+            unchanged_count=unchanged_count,
+        )
+    except Exception as e:
+        logger.exception(
+            "Processing irrigation command for field name '%s' failed: %s",
+            irrigation_command.field,
+            e,
+        )
+        _raise_write_http_error(
+            e,
+            not_found_prefixes=("No field with id", "Could not find any irrigation event with id"),
+        )
 
 @app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummary])
 async def get_water_balance_summary():
