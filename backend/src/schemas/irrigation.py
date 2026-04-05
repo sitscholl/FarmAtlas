@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from .base import ORMModel
 
@@ -8,7 +8,15 @@ from .base import ORMModel
 class IrrigationBase(BaseModel):
     date: date
     method: str
-    amount: float = 100
+    amount: float = Field(default=100, gt=0)
+
+    @field_validator("method")
+    @classmethod
+    def _normalize_method(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("method must not be empty")
+        return normalized
 
 
 class IrrigationCreate(IrrigationBase):
@@ -26,10 +34,20 @@ class IrrigationRead(IrrigationBase, ORMModel):
 
 
 class IrrigationCommandCreate(BaseModel):
-    field: str
+    model_config = ConfigDict(populate_by_name=True)
+
+    field: str = Field(validation_alias=AliasChoices("field", "field_name"))
     date: date | None = None
     method: str
-    amount: float = 100
+    amount: float = Field(default=100, gt=0)
+
+    @field_validator("field", "method")
+    @classmethod
+    def _normalize_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("value must not be empty")
+        return normalized
 
 
 class IrrigationTarget(BaseModel):
@@ -37,8 +55,8 @@ class IrrigationTarget(BaseModel):
     active: bool
     field_ids: list[int]
     field_count: int
-    sections: list[str] = []
-    varieties: list[str] = []
+    sections: list[str] = Field(default_factory=list)
+    varieties: list[str] = Field(default_factory=list)
 
 
 class IrrigationCommandResult(BaseModel):

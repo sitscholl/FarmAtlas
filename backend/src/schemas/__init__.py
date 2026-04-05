@@ -1,5 +1,12 @@
 from .field import FieldCreate, FieldOverview, FieldRead, FieldReplant, FieldUpdate, FieldWaterBalanceSummary
-from .irrigation import IrrigationCreate, IrrigationRead, IrrigationUpdate
+from .irrigation import (
+    IrrigationCommandCreate,
+    IrrigationCommandResult,
+    IrrigationCreate,
+    IrrigationRead,
+    IrrigationTarget,
+    IrrigationUpdate,
+)
 from .variety import VarietyCreate, VarietyRead
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSummary
 
@@ -11,7 +18,10 @@ __all__ = [
     "FieldUpdate",
     "FieldWaterBalanceSummary",
     "IrrigationCreate",
+    "IrrigationCommandCreate",
+    "IrrigationCommandResult",
     "IrrigationRead",
+    "IrrigationTarget",
     "IrrigationUpdate",
     "VarietyCreate",
     "VarietyRead",

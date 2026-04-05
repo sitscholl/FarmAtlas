@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 from pathlib import Path
 
@@ -204,14 +204,26 @@ def _build_irrigation_targets() -> list[IrrigationTarget]:
 
     return sorted(targets, key=lambda target: target.field.casefold())
 
-def _get_irrigation_event_for_field_and_date(field_id: int, target_date: date):
-    with runtime.db.session_scope() as session:
-        events = runtime.db.irrigation.list(session, field_id=field_id)
+def _get_irrigation_events_for_fields_and_date(field_ids: list[int], target_date: date) -> dict[int, object]:
+    if not field_ids:
+        return {}
 
-    for event in events:
-        if event.date == target_date:
-            return event
-    return None
+    field_id_set = set(field_ids)
+    with runtime.db.session_scope() as session:
+        events = [
+            event
+            for event in runtime.db.irrigation.list(
+                session,
+                start=target_date,
+                end=target_date + timedelta(days=1),
+            )
+            if event.field_id in field_id_set and event.date == target_date
+        ]
+    return {event.field_id: event for event in events}
+
+def _queue_water_balance_refresh(background_tasks: BackgroundTasks, field_ids: list[int]) -> None:
+    for field_id in sorted(set(field_ids)):
+        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
 
 @app.get("/api/health")
 async def health_check():
@@ -418,15 +430,17 @@ async def create_irrigation_command(
 ):
     target_date = irrigation_command.date or _today_local()
     matched_fields = _get_fields_by_name(irrigation_command.field, active_only=True)
+    matched_field_ids = [field.id for field in matched_fields]
+    existing_events_by_field_id = _get_irrigation_events_for_fields_and_date(matched_field_ids, target_date)
 
     created_event_ids: list[int] = []
     updated_event_ids: list[int] = []
     unchanged_event_ids: list[int] = []
-    matched_field_ids = [field.id for field in matched_fields]
+    changed_field_ids: list[int] = []
 
     try:
         for field in matched_fields:
-            existing_event = _get_irrigation_event_for_field_and_date(field.id, target_date)
+            existing_event = existing_events_by_field_id.get(field.id)
 
             if existing_event is None:
                 new_event = runtime.db.irrigation_service.create(
@@ -436,11 +450,7 @@ async def create_irrigation_command(
                     amount=irrigation_command.amount,
                 )
                 created_event_ids.append(new_event.id)
-                background_tasks.add_task(
-                    runtime.run_workflow_for_field,
-                    "water_balance",
-                    field.id,
-                )
+                changed_field_ids.append(field.id)
                 continue
 
             if (
@@ -460,11 +470,9 @@ async def create_irrigation_command(
                 },
             )
             updated_event_ids.append(updated_event.id)
-            background_tasks.add_task(
-                runtime.run_workflow_for_field,
-                "water_balance",
-                field.id,
-            )
+            changed_field_ids.append(field.id)
+
+        _queue_water_balance_refresh(background_tasks, changed_field_ids)
 
         created_count = len(created_event_ids)
         updated_count = len(updated_event_ids)
