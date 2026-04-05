@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date as DateType
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
@@ -6,7 +6,7 @@ from .base import ORMModel
 
 
 class IrrigationBase(BaseModel):
-    date: date
+    date: DateType
     method: str
     amount: float = Field(default=100, gt=0)
 
@@ -37,7 +37,7 @@ class IrrigationCommandCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     field: str = Field(validation_alias=AliasChoices("field", "field_name"))
-    date: date | None = None
+    date: DateType | None = None
     method: str
     amount: float = Field(default=100, gt=0)
 
@@ -63,7 +63,7 @@ class IrrigationCommandResult(BaseModel):
     status: str
     message: str
     field: str
-    date: date
+    date: DateType
     method: str
     amount: float
     matched_field_ids: list[int]
