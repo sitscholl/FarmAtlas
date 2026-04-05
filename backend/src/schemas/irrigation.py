@@ -60,6 +60,7 @@ class IrrigationTarget(BaseModel):
 
 
 class IrrigationCommandResult(BaseModel):
+    success: bool
     status: str
     message: str
     field: str
@@ -67,6 +68,7 @@ class IrrigationCommandResult(BaseModel):
     method: str
     amount: float
     matched_field_ids: list[int]
+    error: str | None = None
 
     created_event_ids: list[int]
     updated_event_ids: list[int]

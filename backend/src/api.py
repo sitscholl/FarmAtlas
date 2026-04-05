@@ -225,6 +225,42 @@ def _queue_water_balance_refresh(background_tasks: BackgroundTasks, field_ids: l
     for field_id in sorted(set(field_ids)):
         background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
 
+def _build_irrigation_command_result(
+    *,
+    success: bool,
+    status_value: str,
+    message: str,
+    irrigation_command: IrrigationCommandCreate,
+    target_date: date,
+    matched_field_ids: list[int] | None = None,
+    created_event_ids: list[int] | None = None,
+    updated_event_ids: list[int] | None = None,
+    unchanged_event_ids: list[int] | None = None,
+    error: str | None = None,
+) -> IrrigationCommandResult:
+    created_event_ids = created_event_ids or []
+    updated_event_ids = updated_event_ids or []
+    unchanged_event_ids = unchanged_event_ids or []
+    matched_field_ids = matched_field_ids or []
+
+    return IrrigationCommandResult(
+        success=success,
+        status=status_value,
+        message=message,
+        field=irrigation_command.field,
+        date=target_date,
+        method=irrigation_command.method,
+        amount=irrigation_command.amount,
+        matched_field_ids=matched_field_ids,
+        error=error,
+        created_event_ids=created_event_ids,
+        updated_event_ids=updated_event_ids,
+        unchanged_event_ids=unchanged_event_ids,
+        created_count=len(created_event_ids),
+        updated_count=len(updated_event_ids),
+        unchanged_count=len(unchanged_event_ids),
+    )
+
 @app.get("/api/health")
 async def health_check():
     try:
@@ -429,16 +465,17 @@ async def create_irrigation_command(
     irrigation_command: IrrigationCommandCreate,
 ):
     target_date = irrigation_command.date or _today_local()
-    matched_fields = _get_fields_by_name(irrigation_command.field, active_only=True)
-    matched_field_ids = [field.id for field in matched_fields]
-    existing_events_by_field_id = _get_irrigation_events_for_fields_and_date(matched_field_ids, target_date)
-
     created_event_ids: list[int] = []
     updated_event_ids: list[int] = []
     unchanged_event_ids: list[int] = []
+    matched_field_ids: list[int] = []
     changed_field_ids: list[int] = []
 
     try:
+        matched_fields = _get_fields_by_name(irrigation_command.field, active_only=True)
+        matched_field_ids = [field.id for field in matched_fields]
+        existing_events_by_field_id = _get_irrigation_events_for_fields_and_date(matched_field_ids, target_date)
+
         for field in matched_fields:
             existing_event = existing_events_by_field_id.get(field.id)
 
@@ -487,24 +524,57 @@ async def create_irrigation_command(
         else:
             status_value = "ok"
 
-        return IrrigationCommandResult(
-            status=status_value,
+        return _build_irrigation_command_result(
+            success=True,
+            status_value=status_value,
             message=(
                 f"Irrigation command processed for field '{irrigation_command.field}' on "
                 f"{target_date.isoformat()}: created={created_count}, "
                 f"updated={updated_count}, unchanged={unchanged_count}."
             ),
-            field=irrigation_command.field,
-            date=target_date,
-            method=irrigation_command.method,
-            amount=irrigation_command.amount,
             matched_field_ids=matched_field_ids,
             created_event_ids=created_event_ids,
             updated_event_ids=updated_event_ids,
             unchanged_event_ids=unchanged_event_ids,
-            created_count=created_count,
-            updated_count=updated_count,
-            unchanged_count=unchanged_count,
+            irrigation_command=irrigation_command,
+            target_date=target_date,
+        )
+    except HTTPException as exc:
+        logger.info(
+            "Irrigation command for field '%s' failed with %s: %s",
+            irrigation_command.field,
+            exc.status_code,
+            exc.detail,
+        )
+        return _build_irrigation_command_result(
+            success=False,
+            status_value="failed",
+            message=str(exc.detail),
+            irrigation_command=irrigation_command,
+            target_date=target_date,
+            matched_field_ids=matched_field_ids,
+            created_event_ids=created_event_ids,
+            updated_event_ids=updated_event_ids,
+            unchanged_event_ids=unchanged_event_ids,
+            error=str(exc.detail),
+        )
+    except ValueError as exc:
+        logger.info(
+            "Irrigation command for field '%s' failed validation: %s",
+            irrigation_command.field,
+            exc,
+        )
+        return _build_irrigation_command_result(
+            success=False,
+            status_value="failed",
+            message=str(exc),
+            irrigation_command=irrigation_command,
+            target_date=target_date,
+            matched_field_ids=matched_field_ids,
+            created_event_ids=created_event_ids,
+            updated_event_ids=updated_event_ids,
+            unchanged_event_ids=unchanged_event_ids,
+            error=str(exc),
         )
     except Exception as e:
         logger.exception(
@@ -512,9 +582,17 @@ async def create_irrigation_command(
             irrigation_command.field,
             e,
         )
-        _raise_write_http_error(
-            e,
-            not_found_prefixes=("No field with id", "Could not find any irrigation event with id"),
+        return _build_irrigation_command_result(
+            success=False,
+            status_value="failed",
+            message="Unexpected server error.",
+            irrigation_command=irrigation_command,
+            target_date=target_date,
+            matched_field_ids=matched_field_ids,
+            created_event_ids=created_event_ids,
+            updated_event_ids=updated_event_ids,
+            unchanged_event_ids=unchanged_event_ids,
+            error=str(e),
         )
 
 @app.get("/api/fields/water-balance/summary", response_model=list[WaterBalanceSummary])
