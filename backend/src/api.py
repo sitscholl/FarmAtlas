@@ -22,6 +22,7 @@ from .schemas import (
     IrrigationUpdate,
     VarietyCreate,
     VarietyRead,
+    VarietyUpdate,
     WaterBalanceSeriesPoint,
     WaterBalanceSummary,
     IrrigationCommandCreate,
@@ -291,6 +292,41 @@ async def create_variety(variety: VarietyCreate):
         return _serialize_variety(new_variety)
     except Exception as e:
         logger.exception(f"Adding variety failed: {e}")
+        _raise_write_http_error(e)
+
+
+@app.put("/api/varieties/{variety_id}", response_model=VarietyRead)
+async def update_variety(variety_id: int, variety: VarietyUpdate):
+    try:
+        with runtime.db.session_scope() as session:
+            updated_variety = runtime.db.varieties.update(
+                session,
+                variety_id,
+                **variety.model_dump(),
+            )
+        if updated_variety is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Could not find any variety with id {variety_id}",
+            )
+        return _serialize_variety(updated_variety)
+    except Exception as e:
+        logger.exception(f"Updating variety {variety_id} failed: {e}")
+        _raise_write_http_error(e)
+
+
+@app.delete("/api/varieties/{variety_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_variety(variety_id: int):
+    try:
+        with runtime.db.session_scope() as session:
+            deleted = runtime.db.varieties.delete(session, variety_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Could not find any variety with id {variety_id}",
+            )
+    except Exception as e:
+        logger.exception(f"Deleting variety {variety_id} failed: {e}")
         _raise_write_http_error(e)
 
 

@@ -39,59 +39,59 @@ export type FieldOverview = {
   safe_ratio: number | null
   group: string
   name: string
-  section: string | null
+  section?: string | null
   variety: string
   planting_year: number
-  tree_count: number | null
-  tree_height: number | null
-  row_distance: number | null
-  tree_distance: number | null
-  running_metre: number | null
-  herbicide_free: boolean | null
-  active: boolean
+  tree_count?: number | null
+  tree_height?: number | null
+  row_distance?: number | null
+  tree_distance?: number | null
+  running_metre?: number | null
+  herbicide_free?: boolean | null
+  active?: boolean
   reference_provider: string
   reference_station: string
-  soil_type: string | null
-  soil_weight: string | null
-  humus_pct: number | null
+  soil_type?: string | null
+  soil_weight?: string | null
+  humus_pct?: number | null
   area_ha: number
-  effective_root_depth_cm: number | null
-  p_allowable: number | null
-  drip_distance: number | null
-  drip_discharge: number | null
-  tree_strip_width: number | null
+  effective_root_depth_cm?: number | null
+  p_allowable?: number | null
+  drip_distance?: number | null
+  drip_discharge?: number | null
+  tree_strip_width?: number | null
   id: number
   valid_from: string
-  valid_to: string | null
+  valid_to?: string | null
 }
 
 export type FieldRead = {
   group: string
   name: string
-  section: string | null
+  section?: string | null
   variety: string
   planting_year: number
-  tree_count: number | null
-  tree_height: number | null
-  row_distance: number | null
-  tree_distance: number | null
-  running_metre: number | null
-  herbicide_free: boolean | null
-  active: boolean
+  tree_count?: number | null
+  tree_height?: number | null
+  row_distance?: number | null
+  tree_distance?: number | null
+  running_metre?: number | null
+  herbicide_free?: boolean | null
+  active?: boolean
   reference_provider: string
   reference_station: string
-  soil_type: string | null
-  soil_weight: string | null
-  humus_pct: number | null
+  soil_type?: string | null
+  soil_weight?: string | null
+  humus_pct?: number | null
   area_ha: number
-  effective_root_depth_cm: number | null
-  p_allowable: number | null
-  drip_distance: number | null
-  drip_discharge: number | null
-  tree_strip_width: number | null
+  effective_root_depth_cm?: number | null
+  p_allowable?: number | null
+  drip_distance?: number | null
+  drip_discharge?: number | null
+  tree_strip_width?: number | null
   id: number
   valid_from: string
-  valid_to: string | null
+  valid_to?: string | null
 }
 
 export type FieldReplant = {
@@ -239,6 +239,16 @@ export type VarietyRead = {
   intercept?: number | null
   specific_weight?: number | null
   id: number
+}
+
+export type VarietyUpdate = {
+  name: string
+  group: string
+  nr_per_kg?: number | null
+  kg_per_box?: number | null
+  slope?: number | null
+  intercept?: number | null
+  specific_weight?: number | null
 }
 
 export type WaterBalanceSeriesPoint = {

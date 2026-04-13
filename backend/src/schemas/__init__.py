@@ -7,7 +7,7 @@ from .irrigation import (
     IrrigationTarget,
     IrrigationUpdate,
 )
-from .variety import VarietyCreate, VarietyRead
+from .variety import VarietyCreate, VarietyRead, VarietyUpdate
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSummary
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "IrrigationUpdate",
     "VarietyCreate",
     "VarietyRead",
+    "VarietyUpdate",
     "WaterBalanceSeriesPoint",
     "WaterBalanceSummary",
 ]

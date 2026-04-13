@@ -50,3 +50,42 @@ class VarietyRepository:
         session.flush()
         logger.debug("Added new variety %s to database", variety.name)
         return variety
+
+    def update(
+        self,
+        session: Session,
+        variety_id: int,
+        *,
+        name: str,
+        group: str,
+        nr_per_kg: float | None = None,
+        kg_per_box: float | None = None,
+        slope: float | None = None,
+        intercept: float | None = None,
+        specific_weight: float | None = None,
+    ) -> models.Variety | None:
+        variety = self.get_by_id(session, variety_id)
+        if variety is None:
+            return None
+
+        variety.name = str(name).strip()
+        variety.group = str(group).strip()
+        variety.nr_per_kg = None if nr_per_kg is None else float(nr_per_kg)
+        variety.kg_per_box = None if kg_per_box is None else float(kg_per_box)
+        variety.slope = None if slope is None else float(slope)
+        variety.intercept = None if intercept is None else float(intercept)
+        variety.specific_weight = (
+            None if specific_weight is None else float(specific_weight)
+        )
+        session.flush()
+        logger.debug("Updated variety %s", variety.name)
+        return variety
+
+    def delete(self, session: Session, variety_id: int) -> bool:
+        variety = self.get_by_id(session, variety_id)
+        if variety is None:
+            return False
+        session.delete(variety)
+        session.flush()
+        logger.debug("Deleted variety %s", variety.name)
+        return True

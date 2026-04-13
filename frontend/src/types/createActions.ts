@@ -1,9 +1,16 @@
-import type { FieldCreate, FieldReplant, FieldUpdate, VarietyCreate } from './generated/api'
+import type {
+  FieldCreate,
+  FieldReplant,
+  FieldUpdate,
+  VarietyCreate,
+  VarietyUpdate,
+} from './generated/api'
 
 export type FieldCreatePayload = FieldCreate
 export type FieldUpdatePayload = FieldUpdate
 export type FieldReplantPayload = FieldReplant
 export type VarietyCreatePayload = VarietyCreate
+export type VarietyUpdatePayload = VarietyUpdate
 
 export type IrrigationCreatePayload = {
   field_id: number
@@ -19,6 +26,7 @@ type ActionFieldId =
   | keyof FieldReplantPayload
   | keyof IrrigationCreatePayload
   | keyof VarietyCreatePayload
+  | keyof VarietyUpdatePayload
 
 type ActionPayload =
   | FieldCreatePayload
@@ -26,6 +34,7 @@ type ActionPayload =
   | FieldReplantPayload
   | IrrigationCreatePayload
   | VarietyCreatePayload
+  | VarietyUpdatePayload
 
 export type SecondaryCreateAction = {
   submitLabel: string

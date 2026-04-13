@@ -17,5 +17,9 @@ class VarietyCreate(VarietyBase):
     pass
 
 
+class VarietyUpdate(VarietyBase):
+    pass
+
+
 class VarietyRead(VarietyBase, ORMModel):
     id: int

@@ -5,6 +5,7 @@ import FieldDetail from './pages/FieldDetail'
 import FieldsTablePage from './pages/FieldsTablePage'
 import Home from './pages/Home'
 import IrrigationTablePage from './pages/IrrigationTablePage'
+import VarietyTablePage from './pages/VarietyTablePage'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/fields" element={<FieldsTablePage />} />
           <Route path="/irrigation" element={<IrrigationTablePage />} />
+          <Route path="/variety" element={<VarietyTablePage />} />
           <Route path="/fields/:fieldId" element={<FieldDetail />} />
         </Routes>
       </main>
