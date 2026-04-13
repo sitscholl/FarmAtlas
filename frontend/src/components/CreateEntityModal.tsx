@@ -21,6 +21,9 @@ function calculateDripAmount(field: FieldRead | undefined, duration: string) {
 
   const { drip_distance, drip_discharge, tree_strip_width } = field
   if (
+    drip_distance === undefined ||
+    drip_discharge === undefined ||
+    tree_strip_width === undefined ||
     drip_distance === null ||
     drip_discharge === null ||
     tree_strip_width === null ||

@@ -17,8 +17,8 @@ import {
 } from '../lib/fieldForm'
 import type { FieldOverview } from '../types/generated/api'
 
-function formatNumber(value: number | null, digits = 1) {
-  if (value === null) {
+function formatNumber(value: number | null | undefined, digits = 1) {
+  if (value === null || value === undefined) {
     return 'n/a'
   }
 
@@ -28,8 +28,8 @@ function formatNumber(value: number | null, digits = 1) {
   }).format(value)
 }
 
-function formatBoolean(value: boolean | null) {
-  if (value === null) {
+function formatBoolean(value: boolean | null | undefined) {
+  if (value === null || value === undefined) {
     return 'n/a'
   }
 
@@ -216,7 +216,9 @@ export default function FieldsTablePage() {
 
         const matchesherbicideFree =
           filters.herbicideFree === '' ||
-          (filters.herbicideFree === 'Ja' ? field.herbicide_free : !field.herbicide_free)
+          (filters.herbicideFree === 'Ja'
+            ? field.herbicide_free === true
+            : field.herbicide_free === false)
 
         return matchesQuery && matchesStatus && matchesherbicideFree
       })

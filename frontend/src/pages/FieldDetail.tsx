@@ -14,8 +14,8 @@ type DetailMetric = {
   accent?: boolean
 }
 
-function formatNumber(value: number | null, digits = 1) {
-  if (value === null) {
+function formatNumber(value: number | null | undefined, digits = 1) {
+  if (value === null || value === undefined) {
     return 'n/a'
   }
 
@@ -25,8 +25,8 @@ function formatNumber(value: number | null, digits = 1) {
   }).format(value)
 }
 
-function formatBoolean(value: boolean | null) {
-  if (value === null) {
+function formatBoolean(value: boolean | null | undefined) {
+  if (value === null || value === undefined) {
     return 'n/a'
   }
 
