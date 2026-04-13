@@ -77,6 +77,9 @@ export const fieldCreateAction: CreateActionConfig = {
     { id: 'humus_pct', label: 'Humusgehalt (%)', type: 'number', placeholder: '3', step: '0.1', required: false },
     { id: 'effective_root_depth_cm', label: 'Effektive Wurzeltiefe (cm)', type: 'number', defaultValue: 30, step: '1', required: false },
     { id: 'p_allowable', label: 'Entziehbarer Wasseranteil (%)', type: 'number', defaultValue: 0.70, step: '0.01', required: false },
+    { id: 'drip_distance', label: 'Tropferabstand (m)', type: 'number', defaultValue: 0.4, step: '0.01', required: false },
+    { id: 'drip_discharge', label: 'Tropferleistung (l/h)', type: 'number', defaultValue: 2.1, step: '0.1', required: false },
+    { id: 'tree_strip_width', label: 'Baumstreifenbreite (m)', type: 'number', defaultValue: 1, step: '0.01', required: false },
   ],
   buildPayload: (values) => ({
     group: values.group.trim(),
@@ -99,6 +102,9 @@ export const fieldCreateAction: CreateActionConfig = {
     area_ha: Number(values.area_ha),
     effective_root_depth_cm: toOptionalNumber(values.effective_root_depth_cm),
     p_allowable: toOptionalNumber(values.p_allowable),
+    drip_distance: toOptionalNumber(values.drip_distance),
+    drip_discharge: toOptionalNumber(values.drip_discharge),
+    tree_strip_width: toOptionalNumber(values.tree_strip_width),
   }),
 }
 
@@ -149,13 +155,15 @@ export const irrigationCreateAction: CreateActionConfig = {
       ],
       required: true,
     },
-    { id: 'amount', label: 'Menge (mm)', type: 'number', defaultValue: 100, step: '1', required: true },
+    { id: 'duration', label: 'Dauer (h)', type: 'number', defaultValue: 1, step: '0.5', required: true },
+    { id: 'amount', label: 'Menge (mm)', type: 'number', step: '10', required: false },
   ],
   buildPayload: (values) => ({
     field_id: Number(values.field_id),
     date: values.date,
     method: values.method.trim(),
-    amount: Number(values.amount),
+    duration: Number(values.duration),
+    amount: values.amount.trim() === '' ? null : Number(values.amount),
   }),
 }
 

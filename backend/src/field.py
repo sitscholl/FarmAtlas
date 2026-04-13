@@ -37,6 +37,9 @@ class FieldContext:
     area_ha: float
     effective_root_depth_cm: float | None
     p_allowable: float | None
+    drip_distance: float | None
+    drip_discharge: float | None
+    tree_strip_width: float | None
     valid_from: date
     valid_to: date | None
 
@@ -64,6 +67,9 @@ class FieldContext:
             area_ha=field_model.area_ha,
             effective_root_depth_cm=field_model.effective_root_depth_cm,
             p_allowable=field_model.p_allowable,
+            drip_distance=field_model.drip_distance,
+            drip_discharge=field_model.drip_discharge,
+            tree_strip_width=field_model.tree_strip_width,
             valid_from=field_model.valid_from,
             valid_to=field_model.valid_to,
         )

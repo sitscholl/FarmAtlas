@@ -9,6 +9,31 @@ import {
   type FieldOption,
 } from '../types/createActions'
 
+function calculateDripAmount(field: FieldRead | undefined, duration: string) {
+  if (field === undefined) {
+    return null
+  }
+
+  const hours = Number(duration)
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return null
+  }
+
+  const { drip_distance, drip_discharge, tree_strip_width } = field
+  if (
+    drip_distance === null ||
+    drip_discharge === null ||
+    tree_strip_width === null ||
+    drip_distance <= 0 ||
+    drip_discharge <= 0 ||
+    tree_strip_width <= 0
+  ) {
+    return null
+  }
+
+  return hours * drip_discharge / drip_distance / tree_strip_width
+}
+
 type CreateEntityModalProps = {
   action: CreateActionConfig | null
   isOpen: boolean
@@ -80,6 +105,7 @@ export default function CreateEntityModal({
   onClose,
 }: CreateEntityModalProps) {
   const [values, setValues] = useState<Record<string, string>>({})
+  const [fields, setFields] = useState<FieldRead[]>([])
   const [fieldOptions, setFieldOptions] = useState<FieldOption[]>([])
   const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -104,6 +130,7 @@ export default function CreateEntityModal({
     }
 
     setValues(buildInitialValues(action, initialValues))
+    setFields([])
     setErrorMessage(null)
   }, [action, initialValues, isOpen])
 
@@ -146,14 +173,15 @@ export default function CreateEntityModal({
 
     const fetchAndSeedOptions = async () => {
       try {
-        const nextFieldOptions = dynamicOptionSources.has('fields')
-          ? buildFieldOptions((await api.get<FieldRead[]>('/fields')).data)
+        const nextFields = dynamicOptionSources.has('fields')
+          ? (await api.get<FieldRead[]>('/fields')).data
           : []
         const nextVarietyOptions = dynamicOptionSources.has('varieties')
           ? buildVarietyOptions((await api.get<VarietyRead[]>('/varieties')).data)
           : []
 
-        setFieldOptions(nextFieldOptions)
+        setFields(nextFields)
+        setFieldOptions(buildFieldOptions(nextFields))
         setVarietyOptions(nextVarietyOptions)
       } catch (error) {
         console.error('Error loading select options', error)
@@ -163,6 +191,49 @@ export default function CreateEntityModal({
 
     void fetchAndSeedOptions()
   }, [dynamicOptionSources, isOpen])
+
+  const selectedField = useMemo(
+    () => fields.find((field) => String(field.id) === values.field_id),
+    [fields, values.field_id],
+  )
+
+  useEffect(() => {
+    if (!isOpen || action?.id !== 'irrigation') {
+      return
+    }
+
+    if (values.method !== 'drip') {
+      return
+    }
+
+    const calculatedAmount = calculateDripAmount(selectedField, values.duration ?? '')
+    if (calculatedAmount === null) {
+      return
+    }
+
+    const nextAmount = String(Math.round(calculatedAmount * 100) / 100)
+    if (values.amount === nextAmount) {
+      return
+    }
+
+    setValues((currentValues) => {
+      const refreshedAmount = calculateDripAmount(
+        fields.find((field) => String(field.id) === currentValues.field_id),
+        currentValues.duration ?? '',
+      )
+
+      if (currentValues.method !== 'drip' || refreshedAmount === null) {
+        return currentValues
+      }
+
+      const resolvedAmount = String(Math.round(refreshedAmount * 100) / 100)
+      if (currentValues.amount === resolvedAmount) {
+        return currentValues
+      }
+
+      return { ...currentValues, amount: resolvedAmount }
+    })
+  }, [action?.id, fields, isOpen, selectedField, values.amount, values.duration, values.method])
 
   if (!isOpen || action === null) {
     return null

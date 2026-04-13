@@ -29,6 +29,7 @@ export function buildIrrigationEditInitialValues(
     field_id: String(event.field_id),
     date: event.date,
     method: event.method,
+    duration: String(event.duration),
     amount: String(event.amount),
   }
 }

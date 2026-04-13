@@ -73,5 +73,8 @@ export function buildFieldEditInitialValues(
     humus_pct: String(field.humus_pct ?? ''),
     effective_root_depth_cm: String(field.effective_root_depth_cm ?? ''),
     p_allowable: String(field.p_allowable ?? ''),
+    drip_distance: String(field.drip_distance ?? ''),
+    drip_discharge: String(field.drip_discharge ?? ''),
+    tree_strip_width: String(field.tree_strip_width ?? ''),
   }
 }

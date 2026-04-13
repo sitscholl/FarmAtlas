@@ -46,23 +46,7 @@ class FieldReplant(FieldBase):
 class FieldRead(FieldBase, ORMModel):
     id: int
     valid_from: date
-    valid_to: date | None
-    section: str | None
-    tree_count: int | None
-    tree_height: float | None
-    row_distance: float | None
-    tree_distance: float | None
-    running_metre: float | None
-    herbicide_free: bool | None
-    active: bool
-    soil_type: str | None
-    soil_weight: str | None
-    humus_pct: float | None
-    effective_root_depth_cm: float | None
-    p_allowable: float | None
-    drip_distance: float | None
-    drip_discharge: float | None
-    tree_strip_width: float | None
+    valid_to: date | None = None
 
 
 class FieldWaterBalanceSummary(BaseModel):

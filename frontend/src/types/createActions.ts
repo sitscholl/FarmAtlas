@@ -9,7 +9,8 @@ export type IrrigationCreatePayload = {
   field_id: number
   date: string
   method: string
-  amount: number
+  duration: number
+  amount?: number | null
 }
 
 type ActionFieldId =

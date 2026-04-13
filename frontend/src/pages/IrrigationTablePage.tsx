@@ -16,13 +16,14 @@ import {
 } from '../lib/irrigationForm'
 import type { FieldRead, IrrigationRead } from '../types/generated/api'
 
-type IrrigationColumnKey = 'date' | 'field' | 'section' | 'method' | 'amount'
+type IrrigationColumnKey = 'date' | 'field' | 'section' | 'method' | 'duration' | 'amount'
 
 const visibleIrrigationColumns: IrrigationColumnKey[] = [
   'date',
   'field',
   'section',
   'method',
+  'duration',
   'amount',
 ]
 
@@ -140,6 +141,11 @@ export default function IrrigationTablePage() {
         id: 'method',
         header: 'Methode',
         cell: (event) => formatMethod(event.method),
+      },
+      duration: {
+        id: 'duration',
+        header: 'Dauer (h)',
+        cell: (event) => formatNumber(event.duration, 1),
       },
       amount: {
         id: 'amount',
@@ -320,6 +326,10 @@ export default function IrrigationTablePage() {
                 <p className="mt-1 text-lg font-semibold text-slate-900">
                   {fieldsById[selectedEvent.field_id]?.name ?? `#${selectedEvent.field_id}`}{' '}
                   am {formatDate(selectedEvent.date)}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {formatMethod(selectedEvent.method)} · {formatNumber(selectedEvent.duration, 1)} h ·{' '}
+                  {formatNumber(selectedEvent.amount, 1)} mm
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">

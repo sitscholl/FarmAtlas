@@ -140,6 +140,9 @@ def _build_field_payload(
         "area_ha": area_value,
         "effective_root_depth_cm": _optional_float(row.get("effective_root_depth_cm")),
         "p_allowable": _optional_float(row.get("p_allowable")),
+        "drip_distance": _optional_float(row.get('drip_distance')),
+        "drip_discharge": _optional_float(row.get('drip_discharge')),
+        "tree_strip_width": _optional_float(row.get('tree_strip_width')),
     }
     return payload
 

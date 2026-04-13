@@ -24,6 +24,9 @@ export type FieldCreate = {
   area_ha: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
+  drip_distance?: number | null
+  drip_discharge?: number | null
+  tree_strip_width?: number | null
 }
 
 export type FieldOverview = {
@@ -54,6 +57,9 @@ export type FieldOverview = {
   area_ha: number
   effective_root_depth_cm: number | null
   p_allowable: number | null
+  drip_distance: number | null
+  drip_discharge: number | null
+  tree_strip_width: number | null
   id: number
   valid_from: string
   valid_to: string | null
@@ -80,6 +86,9 @@ export type FieldRead = {
   area_ha: number
   effective_root_depth_cm: number | null
   p_allowable: number | null
+  drip_distance: number | null
+  drip_discharge: number | null
+  tree_strip_width: number | null
   id: number
   valid_from: string
   valid_to: string | null
@@ -106,6 +115,9 @@ export type FieldReplant = {
   area_ha: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
+  drip_distance?: number | null
+  drip_discharge?: number | null
+  tree_strip_width?: number | null
   valid_from: string
 }
 
@@ -130,30 +142,72 @@ export type FieldUpdate = {
   area_ha: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
+  drip_distance?: number | null
+  drip_discharge?: number | null
+  tree_strip_width?: number | null
 }
 
 export type HTTPValidationError = {
   detail?: Array<ValidationError>
 }
 
+export type IrrigationCommandCreate = {
+  field: string
+  date?: string | null
+  method: string
+  duration: number
+  amount?: number | null
+}
+
+export type IrrigationCommandResult = {
+  success: boolean
+  status: string
+  message: string
+  field: string
+  date: string
+  method: string
+  duration: number
+  amount: number | null
+  matched_field_ids: Array<number>
+  error?: string | null
+  created_event_ids: Array<number>
+  updated_event_ids: Array<number>
+  unchanged_event_ids: Array<number>
+  created_count: number
+  updated_count: number
+  unchanged_count: number
+}
+
 export type IrrigationCreate = {
   date: string
   method: string
-  amount?: number
+  duration: number
+  amount?: number | null
 }
 
 export type IrrigationRead = {
   date: string
   method: string
+  duration: number
   amount: number
   id: number
   field_id: number
 }
 
+export type IrrigationTarget = {
+  field: string
+  active: boolean
+  field_ids: Array<number>
+  field_count: number
+  sections?: Array<string>
+  varieties?: Array<string>
+}
+
 export type IrrigationUpdate = {
   date: string
   method: string
-  amount?: number
+  duration: number
+  amount?: number | null
   field_id: number
 }
 

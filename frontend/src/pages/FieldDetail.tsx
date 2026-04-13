@@ -49,13 +49,22 @@ function buildFieldMetrics(field: FieldOverview): DetailMetric[] {
     { label: 'Flaeche', value: `${formatNumber(field.area_ha, 2)} ha` },
     { label: 'Pflanzjahr', value: String(field.planting_year) },
     { label: 'Baumzahl', value: formatNumber(field.tree_count, 0) },
-    { label: 'Baumhoehe', value: `${formatNumber(field.tree_height, 1)} cm` },
+    { label: 'Baumhoehe', value: `${formatNumber(field.tree_height, 1)} m` },
     { label: 'Effektive Wurzeltiefe', value: `${formatNumber(field.effective_root_depth_cm)} cm` },
     { label: 'Reihenabstand', value: `${formatNumber(field.row_distance, 1)} m` },
     { label: 'Baumabstand', value: `${formatNumber(field.tree_distance, 1)} m` },
     { label: 'Laufmeter', value: `${formatNumber(field.running_metre, 1)} m` },
     { label: 'Herbizidfrei', value: formatBoolean(field.herbicide_free) },
     { label: 'Status', value: field.active ? 'Aktiv' : 'Inaktiv' },
+  ]
+}
+
+function buildIrrigationMetrics(field: FieldOverview): DetailMetric[] {
+  return [
+    { label: 'Tropferabstand', value: `${formatNumber(field.drip_distance, 2)} m` },
+    { label: 'Tropferleistung', value: `${formatNumber(field.drip_discharge, 2)} l/h` },
+    { label: 'Baumstreifenbreite', value: `${formatNumber(field.tree_strip_width, 2)} m` },
+    { label: 'Entziehbarer Wasseranteil', value: `${formatNumber(field.p_allowable, 2)}` },
   ]
 }
 
@@ -198,6 +207,7 @@ export default function FieldDetail() {
   }
 
   const fieldMetrics = buildFieldMetrics(field)
+  const irrigationMetrics = buildIrrigationMetrics(field)
   const waterMetrics = buildWaterMetrics(field)
 
   return (
@@ -253,8 +263,9 @@ export default function FieldDetail() {
         <h1 className="mt-12 text-4xl font-semibold text-slate-900">
           Detailinfo
         </h1>
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
           <MetricSection title="Anlage" metrics={fieldMetrics} />
+          <MetricSection title="Bewaesserung" metrics={irrigationMetrics} />
           <MetricSection title="Wasserhaushalt" metrics={waterMetrics} />
         </div>
 
