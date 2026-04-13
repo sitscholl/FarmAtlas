@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class IrrigationRepository:
-    UPDATE_ALLOWLIST = {"field_id", "date", "method", "amount"}
+    UPDATE_ALLOWLIST = {"field_id", "date", "method", "duration", "amount"}
 
     def __init__(
         self,
@@ -73,6 +73,7 @@ class IrrigationRepository:
         field_id: int,
         date: datetime.date,
         method: str,
+        duration: float,
         amount: float,
     ) -> models.Irrigation:
         if isinstance(date, str):
@@ -86,6 +87,7 @@ class IrrigationRepository:
             field_id=field.id,
             date=date,
             method=method,
+            duration=duration,
             amount=amount,
         )
         session.add(event)

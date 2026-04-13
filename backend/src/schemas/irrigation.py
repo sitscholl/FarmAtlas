@@ -8,15 +8,30 @@ from .base import ORMModel
 class IrrigationBase(BaseModel):
     date: DateType
     method: str
-    amount: float = Field(default=100, gt=0)
+    duration: float
+    amount: float | None = None
 
     @field_validator("method")
     @classmethod
     def _normalize_method(cls, value: str) -> str:
-        normalized = value.strip()
+        normalized = value.strip().lower()
         if not normalized:
             raise ValueError("method must not be empty")
         return normalized
+
+    @field_validator("duration")
+    @classmethod
+    def _validate_duration(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("duration must be greater than 0")
+        return value
+
+    @field_validator("amount")
+    @classmethod
+    def _validate_amount(cls, value: float | None) -> float | None:
+        if value is not None and value <= 0:
+            raise ValueError("amount must be greater than 0")
+        return value
 
 
 class IrrigationCreate(IrrigationBase):
@@ -30,6 +45,7 @@ class IrrigationUpdate(IrrigationBase):
 class IrrigationRead(IrrigationBase, ORMModel):
     id: int
     field_id: int
+    duration: float
     amount: float
 
 
@@ -39,15 +55,38 @@ class IrrigationCommandCreate(BaseModel):
     field: str = Field(validation_alias=AliasChoices("field", "field_name"))
     date: DateType | None = None
     method: str
-    amount: float = Field(default=100, gt=0)
+    duration: float
+    amount: float | None = None
 
-    @field_validator("field", "method")
+    @field_validator("field")
     @classmethod
-    def _normalize_text(cls, value: str) -> str:
+    def _normalize_field(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
             raise ValueError("value must not be empty")
         return normalized
+
+    @field_validator("method")
+    @classmethod
+    def _normalize_command_method(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("method must not be empty")
+        return normalized
+
+    @field_validator("duration")
+    @classmethod
+    def _validate_command_duration(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("duration must be greater than 0")
+        return value
+
+    @field_validator("amount")
+    @classmethod
+    def _validate_command_amount(cls, value: float | None) -> float | None:
+        if value is not None and value <= 0:
+            raise ValueError("amount must be greater than 0")
+        return value
 
 
 class IrrigationTarget(BaseModel):
@@ -66,7 +105,8 @@ class IrrigationCommandResult(BaseModel):
     field: str
     date: DateType
     method: str
-    amount: float
+    duration: float
+    amount: float | None
     matched_field_ids: list[int]
     error: str | None = None
 

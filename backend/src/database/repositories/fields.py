@@ -24,6 +24,9 @@ class FieldRepository:
         "area_ha",
         "effective_root_depth_cm",
         "p_allowable",
+        "drip_distance",
+        "drip_discharge",
+        "tree_strip_width",
         "tree_count",
         "tree_height",
         "row_distance",
@@ -128,7 +131,14 @@ class FieldRepository:
                     changed_keys.add(field_key)
                 continue
 
-            if field_key in {"humus_pct", "effective_root_depth_cm", "p_allowable"}:
+            if field_key in {
+                "humus_pct",
+                "effective_root_depth_cm",
+                "p_allowable",
+                "drip_distance",
+                "drip_discharge",
+                "tree_strip_width",
+            }:
                 new_value = None if raw_value is None else float(raw_value)
                 if getattr(field, field_key) != new_value:
                     setattr(field, field_key, new_value)
@@ -198,6 +208,9 @@ class FieldRepository:
         area_ha: float,
         effective_root_depth_cm: float | None,
         p_allowable: float | None,
+        drip_distance: float | None,
+        drip_discharge: float | None,
+        tree_strip_width: float | None,
         section: str | None = None,
         tree_count: int | None = None,
         tree_height: float | None = None,
@@ -232,6 +245,9 @@ class FieldRepository:
             humus_pct=None if humus_pct is None else float(humus_pct),
             effective_root_depth_cm=None if effective_root_depth_cm is None else float(effective_root_depth_cm),
             p_allowable=None if p_allowable is None else float(p_allowable),
+            drip_distance=None if drip_distance is None else float(drip_distance),
+            drip_discharge=None if drip_discharge is None else float(drip_discharge),
+            tree_strip_width=None if tree_strip_width is None else float(tree_strip_width),
         )
         session.add(field)
         session.flush()
@@ -300,6 +316,9 @@ class FieldRepository:
             humus_pct=existing_field.humus_pct,
             effective_root_depth_cm=existing_field.effective_root_depth_cm,
             p_allowable=existing_field.p_allowable,
+            drip_distance=existing_field.drip_distance,
+            drip_discharge=existing_field.drip_discharge,
+            tree_strip_width=existing_field.tree_strip_width,
         )
         session.add(replacement)
         changed_keys = self._apply_updates(session, replacement, updates)

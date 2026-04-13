@@ -31,6 +31,7 @@ class Database:
         )
         self.irrigation_service = IrrigationService(
             self.core,
+            self.fields,
             self.irrigation,
             self.water_balance,
         )

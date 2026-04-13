@@ -63,6 +63,9 @@ class Field(Base):
     humus_pct = Column(Float, nullable=True)
     effective_root_depth_cm = Column(Float, nullable=True)
     p_allowable = Column(Float, nullable=True)  # Fraction depleted before stress.
+    drip_distance = Column(Float, nullable=True) #Distance between drip holes in tube
+    drip_discharge = Column(Float, nullable=True) #amount of water going out from one drip hole in liter per hour
+    tree_strip_width = Column(Float, nullable=True) #width of the area below each drip tube to consider when calculating irrigation amount
 
     variety_ref = relationship("Variety", back_populates="fields")
     irrigation_events = relationship(
@@ -143,7 +146,8 @@ class Irrigation(Base):
     field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
     date = Column(Date, nullable=False)
     method = Column(String, nullable=False)
-    amount = Column(Float, default=100)
+    duration = Column(Float, nullable = False)
+    amount = Column(Float, nullable = False) #amount of irrigation water in mm
 
     field = relationship("Field", back_populates="irrigation_events")
 

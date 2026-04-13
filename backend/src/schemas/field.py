@@ -26,7 +26,10 @@ class FieldBase(BaseModel):
     area_ha: float
     effective_root_depth_cm: float | None = None
     p_allowable: float | None = None
-
+    drip_distance: float | None = None
+    drip_discharge: float | None = None
+    tree_strip_width: float | None = None
+    
 
 class FieldCreate(FieldBase):
     pass
@@ -57,6 +60,9 @@ class FieldRead(FieldBase, ORMModel):
     humus_pct: float | None
     effective_root_depth_cm: float | None
     p_allowable: float | None
+    drip_distance: float | None
+    drip_discharge: float | None
+    tree_strip_width: float | None
 
 
 class FieldWaterBalanceSummary(BaseModel):

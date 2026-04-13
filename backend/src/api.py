@@ -250,6 +250,7 @@ def _build_irrigation_command_result(
         field=irrigation_command.field,
         date=target_date,
         method=irrigation_command.method,
+        duration=irrigation_command.duration,
         amount=irrigation_command.amount,
         matched_field_ids=matched_field_ids,
         error=error,
@@ -389,6 +390,7 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
             field_id = field_id,
             date = irrigation_event.date,
             method= irrigation_event.method,
+            duration = irrigation_event.duration,
             amount = irrigation_event.amount,
         )
         background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
@@ -484,15 +486,23 @@ async def create_irrigation_command(
                     field_id=field.id,
                     date=target_date,
                     method=irrigation_command.method,
+                    duration=irrigation_command.duration,
                     amount=irrigation_command.amount,
                 )
                 created_event_ids.append(new_event.id)
                 changed_field_ids.append(field.id)
                 continue
 
+            resolved_amount = runtime.db.irrigation_service.resolve_amount(
+                field=field,
+                method=irrigation_command.method,
+                duration=irrigation_command.duration,
+                amount=irrigation_command.amount,
+            )
             if (
                 existing_event.method == irrigation_command.method
-                and existing_event.amount == irrigation_command.amount
+                and existing_event.duration == irrigation_command.duration
+                and existing_event.amount == resolved_amount
             ):
                 unchanged_event_ids.append(existing_event.id)
                 continue
@@ -503,6 +513,7 @@ async def create_irrigation_command(
                     "field_id": field.id,
                     "date": target_date,
                     "method": irrigation_command.method,
+                    "duration": irrigation_command.duration,
                     "amount": irrigation_command.amount,
                 },
             )
