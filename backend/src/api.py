@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 import logging
 from pathlib import Path
+from collections import defaultdict
 
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks, Query
 from fastapi.responses import FileResponse
@@ -15,10 +16,12 @@ from .schemas import (
     FieldOverview,
     FieldReplant,
     FieldRead,
+    FieldReadGrouped,
     FieldUpdate,
     FieldWaterBalanceSummary,
     IrrigationCreate,
     IrrigationRead,
+    IrrigationBulkResponse,
     IrrigationUpdate,
     VarietyCreate,
     VarietyRead,
@@ -334,6 +337,16 @@ async def delete_variety(variety_id: int):
 async def list_fields():
     return [_serialize_field(field) for field in runtime.fields]
 
+@app.get("/api/fields/grouped", response_model=FieldReadGrouped)
+async def list_grouped_fields():
+    all_fields = list_fields()
+    grouped_dict = {}
+    for field in all_fields:
+        if field.name not in grouped_dict:
+            grouped_dict[field.name] = defaultdict(defaultdict)
+        grouped_dict[field.name][field.variety][field.section] = field
+    return FieldReadGrouped(grouped_dict)
+
 @app.post("/api/fields", response_model=FieldRead, status_code=status.HTTP_201_CREATED)
 async def create_field(background_tasks: BackgroundTasks, field: FieldCreate):
     try: 
@@ -435,6 +448,32 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
         logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
         _raise_write_http_error(e, not_found_prefixes=("No field with id", "Could not find any irrigation event with id"))
 
+@app.post("/api/irrigation/bulk", response_model=IrrigationBulkResponse, status_code=status.HTTP_201_CREATED)
+async def create_bulk_irrigation_events(background_tasks: BackgroundTasks, field_ids: list[int], irrigation_event: IrrigationCreate):
+    
+    created_event_ids = []
+    created_count = 0
+    skipped_field_ids = []
+    errors = []
+
+    for field_id in field_ids:
+        _validate_field_id(field_id)
+        try: 
+            irrig_event = create_irrigation_event(background_tasks, field_id, irrigation_event)
+            created_event_ids.append(irrig_event.id)
+            created_count += 1
+        except Exception as e:
+            logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
+            skipped_field_ids.append(field_id)
+            errors.append(str(e))
+
+    return IrrigationBulkResponse(
+        created_event_ids = created_event_ids,
+        created_count = created_count,
+        skipped_field_ids = skipped_field_ids,
+        errors = errors
+    )
+            
 @app.put("/api/irrigation/{event_id}", response_model=IrrigationRead)
 async def update_irrigation_event(
     background_tasks: BackgroundTasks,

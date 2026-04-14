@@ -49,6 +49,13 @@ class IrrigationRead(IrrigationBase, ORMModel):
     amount: float
 
 
+class IrrigationBulkResponse(BaseModel):
+    created_event_ids: list[int]
+    created_count: id
+    skipped_field_ids: list[int]
+    errors: list[str]
+
+
 class IrrigationCommandCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
