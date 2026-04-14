@@ -17,6 +17,59 @@ function toOptionalBoolean(value: string) {
   return value === 'true'
 }
 
+function toSelectedFieldIds(value: string) {
+  if (value.trim() === '') {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry) && entry > 0)
+  } catch {
+    return []
+  }
+}
+
+export const irrigationEditFields = [
+  { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
+  { id: 'date', label: 'Datum', type: 'date', required: true },
+  {
+    id: 'method',
+    label: 'Methode',
+    type: 'select',
+    options: [
+      { value: 'drip', label: 'Tropfer' },
+      { value: 'overhead', label: 'Oberkrone' },
+    ],
+    required: true,
+  },
+  { id: 'duration', label: 'Dauer (h)', type: 'number', defaultValue: 1, step: '0.5', required: true },
+  { id: 'amount', label: 'Menge (mm)', type: 'number', step: '10', required: false },
+] as const
+
+export const irrigationCreateFields = [
+  { id: 'field_ids', label: 'Anlagen', type: 'custom', renderer: 'groupedFieldSelector', required: true },
+  { id: 'date', label: 'Datum', type: 'date', required: true },
+  {
+    id: 'method',
+    label: 'Methode',
+    type: 'select',
+    options: [
+      { value: 'drip', label: 'Tropfer' },
+      { value: 'overhead', label: 'Oberkrone' },
+    ],
+    required: true,
+  },
+  { id: 'duration', label: 'Dauer (h)', type: 'number', defaultValue: 1, step: '0.5', required: true },
+  { id: 'amount', label: 'Menge (mm)', type: 'number', step: '10', required: false },
+] as const
+
 export const fieldCreateAction: CreateActionConfig = {
   id: 'field',
   label: 'Anlage hinzufuegen',
@@ -140,26 +193,11 @@ export const irrigationCreateAction: CreateActionConfig = {
   label: 'Bewaesserung eintragen',
   title: 'Bewaesserung eintragen',
   submitLabel: 'Bewaesserung speichern',
-  endpoint: '',
+  endpoint: '/irrigation/bulk',
   method: 'post',
-  fields: [
-    { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
-    { id: 'date', label: 'Datum', type: 'date', required: true },
-    {
-      id: 'method',
-      label: 'Methode',
-      type: 'select',
-      options: [
-        { value: 'drip', label: 'Tropfer' },
-        { value: 'overhead', label: 'Oberkrone' },
-      ],
-      required: true,
-    },
-    { id: 'duration', label: 'Dauer (h)', type: 'number', defaultValue: 1, step: '0.5', required: true },
-    { id: 'amount', label: 'Menge (mm)', type: 'number', step: '10', required: false },
-  ],
+  fields: [...irrigationCreateFields],
   buildPayload: (values) => ({
-    field_id: Number(values.field_id),
+    field_ids: toSelectedFieldIds(values.field_ids ?? ''),
     date: values.date,
     method: values.method.trim(),
     duration: Number(values.duration),

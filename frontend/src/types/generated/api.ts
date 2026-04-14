@@ -94,6 +94,28 @@ export type FieldRead = {
   valid_to?: string | null
 }
 
+export type FieldReadGrouped = {
+  fields: Array<FieldReadGroupedField>
+}
+
+export type FieldReadGroupedField = {
+  name: string
+  active: boolean
+  field_ids: Array<number>
+  varieties: Array<FieldReadGroupedVariety>
+}
+
+export type FieldReadGroupedSection = {
+  section?: string | null
+  field: FieldRead
+}
+
+export type FieldReadGroupedVariety = {
+  variety: string
+  field_ids: Array<number>
+  sections: Array<FieldReadGroupedSection>
+}
+
 export type FieldReplant = {
   group: string
   name: string
@@ -149,6 +171,23 @@ export type FieldUpdate = {
 
 export type HTTPValidationError = {
   detail?: Array<ValidationError>
+}
+
+export type IrrigationBulkCreate = {
+  date: string
+  method: string
+  duration: number
+  amount?: number | null
+  field_ids: Array<number>
+}
+
+export type IrrigationBulkResponse = {
+  created_event_ids: Array<number>
+  created_count: number
+  skipped_field_ids: Array<number>
+  errors_by_field_id?: {
+  [key: string]: string
+}
 }
 
 export type IrrigationCommandCreate = {

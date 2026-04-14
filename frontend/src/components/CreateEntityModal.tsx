@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
 import api from '../api'
+import GroupedFieldSelector from './GroupedFieldSelector'
 import { notifyDataChanged } from '../lib/dataEvents'
 import type { FieldRead, VarietyRead } from '../types/generated/api'
 import {
@@ -60,7 +61,7 @@ function buildInitialValues(
           return [field.id, String(field.defaultValue ?? today)]
         }
 
-        return [field.id, String(field.defaultValue ?? '')]
+        return [field.id, String('defaultValue' in field ? (field.defaultValue ?? '') : '')]
       }),
     ),
     ...initialValues,
@@ -85,9 +86,9 @@ function buildVarietyOptions(varieties: VarietyRead[]): FieldOption[] {
 
 function getSelectOptions(
   field: CreateActionField,
-  fieldOptions: FieldOption[],
-  varietyOptions: FieldOption[],
-): FieldOption[] {
+  fieldOptions: readonly FieldOption[],
+  varietyOptions: readonly FieldOption[],
+): readonly FieldOption[] {
   if (field.type !== 'select') {
     return []
   }
@@ -99,6 +100,25 @@ function getSelectOptions(
     return varietyOptions
   }
   return field.options ?? []
+}
+
+function parseSelectedFieldIds(value: string) {
+  if (value.trim() === '') {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry) && entry > 0)
+  } catch {
+    return []
+  }
 }
 
 export default function CreateEntityModal({
@@ -113,6 +133,16 @@ export default function CreateEntityModal({
   const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const needsFieldCatalog = useMemo(
+    () =>
+      action?.id === 'irrigation' ||
+      action?.fields.some(
+        (field) =>
+          (field.type === 'select' && field.optionsSource === 'fields') ||
+          (field.type === 'custom' && field.renderer === 'groupedFieldSelector'),
+      ) === true,
+    [action],
+  )
 
   const dynamicOptionSources = useMemo(
     () =>
@@ -170,13 +200,17 @@ export default function CreateEntityModal({
   }, [action, fieldOptions, isOpen, varietyOptions])
 
   useEffect(() => {
-    if (!isOpen || dynamicOptionSources.size === 0) {
+    if (!isOpen) {
+      return
+    }
+
+    if (dynamicOptionSources.size === 0 && !needsFieldCatalog) {
       return
     }
 
     const fetchAndSeedOptions = async () => {
       try {
-        const nextFields = dynamicOptionSources.has('fields')
+        const nextFields = needsFieldCatalog || dynamicOptionSources.has('fields')
           ? (await api.get<FieldRead[]>('/fields')).data
           : []
         const nextVarietyOptions = dynamicOptionSources.has('varieties')
@@ -193,11 +227,26 @@ export default function CreateEntityModal({
     }
 
     void fetchAndSeedOptions()
-  }, [dynamicOptionSources, isOpen])
+  }, [dynamicOptionSources, isOpen, needsFieldCatalog])
+
+  const selectedFieldIds = useMemo(
+    () => parseSelectedFieldIds(values.field_ids ?? ''),
+    [values.field_ids],
+  )
 
   const selectedField = useMemo(
-    () => fields.find((field) => String(field.id) === values.field_id),
-    [fields, values.field_id],
+    () => {
+      if (values.field_id) {
+        return fields.find((field) => String(field.id) === values.field_id)
+      }
+
+      if (selectedFieldIds.length === 1) {
+        return fields.find((field) => field.id === selectedFieldIds[0])
+      }
+
+      return undefined
+    },
+    [fields, selectedFieldIds, values.field_id],
   )
 
   useEffect(() => {
@@ -220,8 +269,15 @@ export default function CreateEntityModal({
     }
 
     setValues((currentValues) => {
+      const currentSelectedFieldIds = parseSelectedFieldIds(currentValues.field_ids ?? '')
+      const fieldForCalculation = currentValues.field_id
+        ? fields.find((field) => String(field.id) === currentValues.field_id)
+        : currentSelectedFieldIds.length === 1
+          ? fields.find((field) => field.id === currentSelectedFieldIds[0])
+          : undefined
+
       const refreshedAmount = calculateDripAmount(
-        fields.find((field) => String(field.id) === currentValues.field_id),
+        fieldForCalculation,
         currentValues.duration ?? '',
       )
 
@@ -252,6 +308,23 @@ export default function CreateEntityModal({
     setIsSubmitting(true)
 
     try {
+      const missingRequiredField = action.fields.find((field) => {
+        if (field.required === false) {
+          return false
+        }
+
+        if (field.type !== 'custom') {
+          return false
+        }
+
+        return (values[String(field.id)] ?? '').trim() === ''
+      })
+
+      if (missingRequiredField) {
+        setErrorMessage(`"${missingRequiredField.label}" ist erforderlich.`)
+        return
+      }
+
       const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
       const useSecondaryAction = submitter?.dataset.submitKind === 'secondary'
       const submission = useSecondaryAction && action.secondaryAction ? action.secondaryAction : action
@@ -279,6 +352,20 @@ export default function CreateEntityModal({
   const renderField = (field: CreateActionField) => {
     const commonClasses =
       'mt-2 w-full border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
+
+    if (field.type === 'custom') {
+      if (field.renderer === 'groupedFieldSelector') {
+        return (
+          <GroupedFieldSelector
+            value={values[String(field.id)] ?? ''}
+            onChange={(nextValue) => handleChange(String(field.id), nextValue)}
+            disabled={isSubmitting}
+          />
+        )
+      }
+
+      return null
+    }
 
     if (field.type === 'select') {
       const options =
@@ -343,12 +430,19 @@ export default function CreateEntityModal({
           onSubmit={handleSubmit}
         >
           <div className="grid gap-4 lg:grid-cols-2">
-          {action.fields.map((field) => (
-            <label key={String(field.id)} htmlFor={String(field.id)} className="block">
-              <span className="text-sm font-medium text-slate-700">{field.label}</span>
-              {renderField(field)}
-            </label>
-          ))}
+            {action.fields.map((field) =>
+              field.type === 'custom' ? (
+                <div key={String(field.id)} className="block lg:col-span-2">
+                  <span className="text-sm font-medium text-slate-700">{field.label}</span>
+                  {renderField(field)}
+                </div>
+              ) : (
+                <label key={String(field.id)} htmlFor={String(field.id)} className="block">
+                  <span className="text-sm font-medium text-slate-700">{field.label}</span>
+                  {renderField(field)}
+                </label>
+              ),
+            )}
           </div>
 
           {errorMessage ? (

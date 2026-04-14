@@ -20,19 +20,20 @@ export type IrrigationCreatePayload = {
   amount?: number | null
 }
 
-type ActionFieldId =
-  | keyof FieldCreatePayload
-  | keyof FieldUpdatePayload
-  | keyof FieldReplantPayload
-  | keyof IrrigationCreatePayload
-  | keyof VarietyCreatePayload
-  | keyof VarietyUpdatePayload
+export type IrrigationBulkCreatePayload = {
+  field_ids: number[]
+  date: string
+  method: string
+  duration: number
+  amount?: number | null
+}
 
 type ActionPayload =
   | FieldCreatePayload
   | FieldUpdatePayload
   | FieldReplantPayload
   | IrrigationCreatePayload
+  | IrrigationBulkCreatePayload
   | VarietyCreatePayload
   | VarietyUpdatePayload
 
@@ -45,7 +46,7 @@ export type SecondaryCreateAction = {
 
 export type CreateActionField =
   | {
-      id: ActionFieldId
+      id: string
       label: string
       type: 'text' | 'number' | 'date'
       placeholder?: string
@@ -54,12 +55,19 @@ export type CreateActionField =
       required?: boolean
     }
   | {
-      id: ActionFieldId
+      id: string
       label: string
       type: 'select'
       optionsSource?: 'fields' | 'varieties'
-      options?: FieldOption[]
+      options?: readonly FieldOption[]
       defaultValue?: string | number
+      required?: boolean
+    }
+  | {
+      id: string
+      label: string
+      type: 'custom'
+      renderer: 'groupedFieldSelector'
       required?: boolean
     }
 

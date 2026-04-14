@@ -1,4 +1,4 @@
-import { irrigationCreateAction } from '../config/createActions'
+import { irrigationCreateAction, irrigationEditFields } from '../config/createActions'
 import type { CreateActionConfig } from '../types/createActions'
 import type { IrrigationRead } from '../types/generated/api'
 
@@ -15,6 +15,7 @@ export function buildIrrigationEditAction(
     submitLabel: 'Bewaesserung speichern',
     endpoint: `/irrigation/${event.id}`,
     method: 'put',
+    fields: [...irrigationEditFields],
   }
 }
 
