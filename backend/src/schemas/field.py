@@ -49,8 +49,26 @@ class FieldRead(FieldBase, ORMModel):
     valid_to: date | None = None
 
 
+class FieldReadGroupedSection(BaseModel):
+    section: str | None = None
+    field: FieldRead
+
+
+class FieldReadGroupedVariety(BaseModel):
+    variety: str
+    field_ids: list[int]
+    sections: list[FieldReadGroupedSection]
+
+
+class FieldReadGroupedField(BaseModel):
+    name: str
+    active: bool
+    field_ids: list[int]
+    varieties: list[FieldReadGroupedVariety]
+
+
 class FieldReadGrouped(BaseModel):
-    grouped_fields: dict[str, dict[str, dict[str, FieldRead]]]  #nested dict {name: {variety: {section: Field}}}
+    fields: list[FieldReadGroupedField]
 
 class FieldWaterBalanceSummary(BaseModel):
     water_balance_as_of: date | None

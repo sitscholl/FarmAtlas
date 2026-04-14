@@ -1,12 +1,24 @@
-from .field import FieldCreate, FieldOverview, FieldRead, FieldReadGrouped, FieldReplant, FieldUpdate, FieldWaterBalanceSummary
+from .field import (
+    FieldCreate,
+    FieldOverview,
+    FieldRead,
+    FieldReadGrouped,
+    FieldReadGroupedField,
+    FieldReadGroupedSection,
+    FieldReadGroupedVariety,
+    FieldReplant,
+    FieldUpdate,
+    FieldWaterBalanceSummary,
+)
 from .irrigation import (
+    IrrigationBulkCreate,
+    IrrigationBulkResponse,
     IrrigationCommandCreate,
     IrrigationCommandResult,
     IrrigationCreate,
     IrrigationRead,
     IrrigationTarget,
     IrrigationUpdate,
-    IrrigationBulkResponse,
 )
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSummary
@@ -16,9 +28,13 @@ __all__ = [
     "FieldOverview",
     "FieldRead",
     "FieldReadGrouped",
+    "FieldReadGroupedField",
+    "FieldReadGroupedSection",
+    "FieldReadGroupedVariety",
     "FieldReplant",
     "FieldUpdate",
     "FieldWaterBalanceSummary",
+    "IrrigationBulkCreate",
     "IrrigationCreate",
     "IrrigationCommandCreate",
     "IrrigationCommandResult",

@@ -49,11 +49,24 @@ class IrrigationRead(IrrigationBase, ORMModel):
     amount: float
 
 
+class IrrigationBulkCreate(IrrigationCreate):
+    field_ids: list[int]
+
+    @field_validator("field_ids")
+    @classmethod
+    def _validate_field_ids(cls, value: list[int]) -> list[int]:
+        if not value:
+            raise ValueError("field_ids must contain at least one field id")
+        if any(field_id <= 0 for field_id in value):
+            raise ValueError("field_ids must only contain positive integers")
+        return value
+
+
 class IrrigationBulkResponse(BaseModel):
     created_event_ids: list[int]
-    created_count: id
+    created_count: int
     skipped_field_ids: list[int]
-    errors: list[str]
+    errors_by_field_id: dict[int, str] = Field(default_factory=dict)
 
 
 class IrrigationCommandCreate(BaseModel):

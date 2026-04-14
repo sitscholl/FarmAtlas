@@ -2,8 +2,6 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 import logging
 from pathlib import Path
-from collections import defaultdict
-
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,8 +15,12 @@ from .schemas import (
     FieldReplant,
     FieldRead,
     FieldReadGrouped,
+    FieldReadGroupedField,
+    FieldReadGroupedSection,
+    FieldReadGroupedVariety,
     FieldUpdate,
     FieldWaterBalanceSummary,
+    IrrigationBulkCreate,
     IrrigationCreate,
     IrrigationRead,
     IrrigationBulkResponse,
@@ -95,6 +97,10 @@ def _serialize_irrigation_event(event) -> IrrigationRead:
 
 def _serialize_variety(variety) -> VarietyRead:
     return VarietyRead.model_validate(variety)
+
+
+def _list_serialized_fields() -> list[FieldRead]:
+    return [_serialize_field(field) for field in runtime.fields]
 
 
 def _serialize_field_water_balance_summary(summary: dict[str, object] | None) -> FieldWaterBalanceSummary:
@@ -335,17 +341,48 @@ async def delete_variety(variety_id: int):
 
 @app.get("/api/fields", response_model=list[FieldRead])
 async def list_fields():
-    return [_serialize_field(field) for field in runtime.fields]
+    return _list_serialized_fields()
 
 @app.get("/api/fields/grouped", response_model=FieldReadGrouped)
 async def list_grouped_fields():
-    all_fields = list_fields()
-    grouped_dict = {}
-    for field in all_fields:
-        if field.name not in grouped_dict:
-            grouped_dict[field.name] = defaultdict(defaultdict)
-        grouped_dict[field.name][field.variety][field.section] = field
-    return FieldReadGrouped(grouped_dict)
+    grouped_by_name: dict[str, list[FieldRead]] = {}
+    for field in _list_serialized_fields():
+        grouped_by_name.setdefault(field.name, []).append(field)
+
+    grouped_fields: list[FieldReadGroupedField] = []
+    for field_name in sorted(grouped_by_name, key=str.casefold):
+        fields_for_name = grouped_by_name[field_name]
+        grouped_by_variety: dict[str, list[FieldRead]] = {}
+        for field in fields_for_name:
+            grouped_by_variety.setdefault(field.variety, []).append(field)
+
+        varieties: list[FieldReadGroupedVariety] = []
+        for variety_name in sorted(grouped_by_variety, key=str.casefold):
+            variety_fields = sorted(
+                grouped_by_variety[variety_name],
+                key=lambda field: ((field.section or "").casefold(), field.id),
+            )
+            varieties.append(
+                FieldReadGroupedVariety(
+                    variety=variety_name,
+                    field_ids=[field.id for field in variety_fields],
+                    sections=[
+                        FieldReadGroupedSection(section=field.section, field=field)
+                        for field in variety_fields
+                    ],
+                )
+            )
+
+        grouped_fields.append(
+            FieldReadGroupedField(
+                name=field_name,
+                active=any(bool(field.active) for field in fields_for_name),
+                field_ids=[field.id for field in fields_for_name],
+                varieties=varieties,
+            )
+        )
+
+    return FieldReadGrouped(fields=grouped_fields)
 
 @app.post("/api/fields", response_model=FieldRead, status_code=status.HTTP_201_CREATED)
 async def create_field(background_tasks: BackgroundTasks, field: FieldCreate):
@@ -449,29 +486,45 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
         _raise_write_http_error(e, not_found_prefixes=("No field with id", "Could not find any irrigation event with id"))
 
 @app.post("/api/irrigation/bulk", response_model=IrrigationBulkResponse, status_code=status.HTTP_201_CREATED)
-async def create_bulk_irrigation_events(background_tasks: BackgroundTasks, field_ids: list[int], irrigation_event: IrrigationCreate):
-    
-    created_event_ids = []
-    created_count = 0
-    skipped_field_ids = []
-    errors = []
+async def create_bulk_irrigation_events(
+    background_tasks: BackgroundTasks,
+    irrigation_event: IrrigationBulkCreate,
+):
+    unique_field_ids = sorted(set(irrigation_event.field_ids))
+    created_event_ids: list[int] = []
+    created_field_ids: list[int] = []
+    skipped_field_ids: list[int] = []
+    errors_by_field_id: dict[int, str] = {}
 
-    for field_id in field_ids:
-        _validate_field_id(field_id)
-        try: 
-            irrig_event = create_irrigation_event(background_tasks, field_id, irrigation_event)
-            created_event_ids.append(irrig_event.id)
-            created_count += 1
+    for field_id in unique_field_ids:
+        try:
+            _validate_field_id(field_id)
+            new_event = runtime.db.irrigation_service.create(
+                field_id=field_id,
+                date=irrigation_event.date,
+                method=irrigation_event.method,
+                duration=irrigation_event.duration,
+                amount=irrigation_event.amount,
+            )
+            created_event_ids.append(new_event.id)
+            created_field_ids.append(field_id)
         except Exception as e:
-            logger.exception(f"Adding irrigation event for field with id {field_id} failed: {e}")
+            logger.exception("Adding irrigation event for field with id %s failed: %s", field_id, e)
             skipped_field_ids.append(field_id)
-            errors.append(str(e))
+            if isinstance(e, HTTPException):
+                errors_by_field_id[field_id] = str(e.detail)
+            elif isinstance(e, IntegrityError):
+                errors_by_field_id[field_id] = "Resource already exists or violates a uniqueness constraint."
+            else:
+                errors_by_field_id[field_id] = str(e)
+
+    _queue_water_balance_refresh(background_tasks, created_field_ids)
 
     return IrrigationBulkResponse(
-        created_event_ids = created_event_ids,
-        created_count = created_count,
-        skipped_field_ids = skipped_field_ids,
-        errors = errors
+        created_event_ids=created_event_ids,
+        created_count=len(created_event_ids),
+        skipped_field_ids=skipped_field_ids,
+        errors_by_field_id=errors_by_field_id,
     )
             
 @app.put("/api/irrigation/{event_id}", response_model=IrrigationRead)
