@@ -1,0 +1,68 @@
+.interactiveLink {
+  display: block;
+  font-size: medium;
+  width: 100%;
+  border-radius: 0.5rem;
+  background-color: transparent;
+  transition:
+    background-color 300ms ease,
+    color 300ms ease,
+    transform 300ms ease;
+}
+
+.interactiveLinkLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-base);
+  transition:
+    color 300ms ease,
+    font-weight 300ms ease;
+}
+
+.interactiveLink:hover {
+  background-color: var(--accent-soft);
+  transform: translateX(2px);
+}
+
+.interactiveLink:hover .interactiveLinkLabel {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.sidebarItem {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.45rem 0.5rem;
+  color: var(--text-base);
+}
+
+.sidebarItemActive {
+  background-color: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+}
+
+.sidebarItemActive .interactiveLinkLabel {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.sidebarIcon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  color: var(--text-base);
+}
+
+.sidebarIcon:hover {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.navbarButton {
+  padding: 0.45rem 0.5rem;
+}
+
+.navbarButton:hover {
+  background-color: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+}
