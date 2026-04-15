@@ -127,13 +127,20 @@
   }
 
   html {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     scroll-padding-top: var(--scroll-offset, 7rem);
+    overscroll-behavior-x: none;
   }
 
   body {
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     background: var(--page-bg);
     color: var(--page-fg);
     font-family:
@@ -149,8 +156,27 @@
     color: inherit;
   }
 
+  #root {
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    isolation: isolate;
+  }
+
   * {
     box-sizing: border-box;
+  }
+
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   button svg {

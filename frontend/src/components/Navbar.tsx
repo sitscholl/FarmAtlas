@@ -33,7 +33,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   return (
     <>
       <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 shadow-sm backdrop-blur">
-        <div className="mx-auto flex max-w-full items-center justify-between gap-6 px-6">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -44,7 +44,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               <HiOutlineBars3 className="text-lg" />
             </button>
 
-            <Link className="text-lg font-semibold tracking-tight text-slate-900" to="/">
+            <Link className="truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg" to="/">
               FarmAtlas
             </Link>
           </div>
@@ -60,7 +60,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
             </button>
 
             {isMenuOpen ? (
-              <div className="absolute right-0 top-8 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+              <div className="absolute right-0 top-10 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                 {createActions.map((action) => (
                   <button
                     key={action.id}
