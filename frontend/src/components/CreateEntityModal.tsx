@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { FiX } from 'react-icons/fi'
 
 import api from '../api'
 import GroupedFieldSelector from './GroupedFieldSelector'
@@ -412,9 +413,15 @@ export default function CreateEntityModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-4 backdrop-blur-sm">
-      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
-        <div className="flex shrink-0 items-start justify-between gap-4">
+    <div
+      className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:px-4 sm:py-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex h-dvh w-full flex-col overflow-hidden bg-white sm:max-h-[calc(100vh-2rem)] sm:max-w-xl sm:rounded-[2rem] sm:border sm:border-slate-200 sm:shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:border-b-0 sm:px-6 sm:pt-6 sm:pb-0 sm:p-7">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
               {action.method === 'put' ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
@@ -423,59 +430,78 @@ export default function CreateEntityModal({
               {action.title}
             </h2>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Modal schliessen"
+          >
+            <FiX className="h-5 w-5" />
+          </button>
         </div>
 
         <form
-          className="mt-6 overflow-y-auto pr-1"
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={handleSubmit}
         >
-          <div className="grid gap-4 lg:grid-cols-2">
-            {action.fields.map((field) =>
-              field.type === 'custom' ? (
-                <div key={String(field.id)} className="block lg:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">{field.label}</span>
-                  {renderField(field)}
-                </div>
-              ) : (
-                <label key={String(field.id)} htmlFor={String(field.id)} className="block">
-                  <span className="text-sm font-medium text-slate-700">{field.label}</span>
-                  {renderField(field)}
-                </label>
-              ),
-            )}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:mt-6 sm:px-6 sm:pt-0 sm:pb-0 sm:pr-7">
+            <div className="grid gap-4 lg:grid-cols-2">
+              {action.fields.map((field) =>
+                field.type === 'custom' ? (
+                  <div key={String(field.id)} className="block lg:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">{field.label}</span>
+                    {renderField(field)}
+                  </div>
+                ) : (
+                  <label key={String(field.id)} htmlFor={String(field.id)} className="block">
+                    <span className="text-sm font-medium text-slate-700">{field.label}</span>
+                    {renderField(field)}
+                  </label>
+                ),
+              )}
+            </div>
+
+            {errorMessage ? (
+              <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {errorMessage}
+              </div>
+            ) : null}
           </div>
 
-          {errorMessage ? (
-            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {errorMessage}
-            </div>
-          ) : null}
-
-          <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:mt-6 sm:flex sm:justify-end sm:gap-3 sm:px-6 sm:pt-4 sm:pb-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full border border-slate-200 px-5 py-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              className="hidden rounded-full border border-slate-200 px-5 py-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900 sm:inline-flex"
             >
               Abbrechen
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
-            >
-              {isSubmitting ? 'Speichern...' : action.submitLabel}
-            </button>
-            {action.secondaryAction ? (
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-slate-200 px-5 py-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900 sm:hidden"
+              >
+                Abbrechen
+              </button>
               <button
                 type="submit"
-                data-submit-kind="secondary"
                 disabled={isSubmitting}
-                className="rounded-full bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-amber-200"
+                className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
               >
-                {isSubmitting ? 'Speichern...' : action.secondaryAction.submitLabel}
+                {isSubmitting ? 'Speichern...' : action.submitLabel}
               </button>
-            ) : null}
+              {action.secondaryAction ? (
+                <button
+                  type="submit"
+                  data-submit-kind="secondary"
+                  disabled={isSubmitting}
+                  className="rounded-full bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-amber-200"
+                >
+                  {isSubmitting ? 'Speichern...' : action.secondaryAction.submitLabel}
+                </button>
+              ) : null}
+            </div>
           </div>
         </form>
       </div>
