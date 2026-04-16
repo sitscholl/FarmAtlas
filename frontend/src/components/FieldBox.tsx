@@ -35,8 +35,8 @@ function FieldBoxContent({
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
   const dateFormatter = new Intl.DateTimeFormat('de-DE', {
     day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+    month: 'short',
+    // year: 'numeric',
   })
   const timeFormatter = new Intl.DateTimeFormat('de-DE', {
     hour: '2-digit',
@@ -45,7 +45,7 @@ function FieldBoxContent({
   const dateTimeFormatter = new Intl.DateTimeFormat('de-DE', {
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric',
+    // year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })

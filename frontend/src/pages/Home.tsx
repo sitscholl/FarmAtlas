@@ -55,6 +55,7 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     unit: '%',
     kind: 'number',
     criticalBelow: 0,
+    emptyValueLabel: '-',
     getValue: (field) => (field.safe_ratio === null ? null : Math.round(field.safe_ratio * 100)),
   },
   {
