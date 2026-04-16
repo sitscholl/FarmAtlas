@@ -4,12 +4,16 @@ import { FiMoreVertical } from 'react-icons/fi'
 import type { IconType } from 'react-icons'
 import { LuArrowDown, LuCalendarDays, LuRadioTower } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
+import { FaArrowRight } from "react-icons/fa";
+import { IoMdAdd } from 'react-icons/io'
+import { Link } from 'react-router-dom'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import FieldBox, {
   type FieldBoxMetric,
 } from '../components/FieldBox'
+import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
   buildFieldEditAction,
@@ -175,6 +179,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
+  const [irrigationField, setIrrigationField] = useState<FieldOverview | null>(null)
   const [showOnlyFieldsWithStatus, setShowOnlyFieldsWithStatus] = useState(true)
 
   useEffect(() => {
@@ -211,6 +216,13 @@ export default function Home() {
   const editInitialValues = useMemo(
     () => buildFieldEditInitialValues(editingField),
     [editingField],
+  )
+
+  const irrigationInitialValues = useMemo(
+    () => irrigationField === null
+      ? undefined
+      : { field_ids: JSON.stringify([irrigationField.id]) },
+    [irrigationField],
   )
 
   const visibleFields = useMemo(
@@ -272,7 +284,7 @@ export default function Home() {
   const content = (() => {
     if (isLoading) {
       return (
-        <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:mt-8 sm:px-6 sm:py-10">
+        <div className="mt-6 border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:mt-8 sm:px-6 sm:py-10">
           Loading fields...
         </div>
       )
@@ -280,7 +292,7 @@ export default function Home() {
 
     if (errorMessage !== null) {
       return (
-        <div className="mt-6 rounded-[1.75rem] border border-rose-200 bg-rose-50 px-5 py-8 text-center text-rose-700 sm:mt-8 sm:px-6 sm:py-10">
+        <div className="mt-6 border border-rose-200 bg-rose-50 px-5 py-8 text-center text-rose-700 sm:mt-8 sm:px-6 sm:py-10">
           {errorMessage}
         </div>
       )
@@ -288,7 +300,7 @@ export default function Home() {
 
     if (fields.length === 0) {
       return (
-        <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:mt-8 sm:px-6 sm:py-10">
+        <div className="mt-6 border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:mt-8 sm:px-6 sm:py-10">
           No fields are configured yet.
         </div>
       )
@@ -296,7 +308,7 @@ export default function Home() {
 
       return (
       <>
-        <label className="mt-6 flex w-full items-start gap-3 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm sm:mt-8 sm:inline-flex sm:w-auto sm:items-center sm:rounded-full sm:px-5 sm:py-3">
+        <label className="mt-6 flex w-full items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm sm:mt-8 sm:inline-flex sm:w-auto sm:items-center sm:rounded-full sm:px-5 sm:py-3">
           <input
             type="checkbox"
             checked={showOnlyFieldsWithStatus}
@@ -309,7 +321,7 @@ export default function Home() {
         </label>
 
         {visibleFields.length === 0 ? (
-          <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:px-6 sm:py-10">
+          <div className="mt-6 border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:px-6 sm:py-10">
             Keine aktiven Anlagen mit Wasserbilanz gefunden.
           </div>
         ) : (
@@ -320,7 +332,6 @@ export default function Home() {
                 title={field.name}
                 subtitle={buildSubtitle(field)}
                 metrics={buildFieldMetrics(field)}
-                to={`/fields/${field.id}`}
                 titleAdornment={
                   field.herbicide_free === true ? (
                     <span
@@ -335,6 +346,25 @@ export default function Home() {
                     onRefresh={handleRefreshField}
                     onClearIrrigation={handleClearIrrigation}
                   />
+                }
+                footerActions={
+                  <>
+                    <Link
+                      to={`/fields/${field.id}`}
+                      className="inline-flex items-center gap-1 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                    >
+                      <FaArrowRight className="h-3 w-3" aria-hidden="true" />
+                      <span>Wasserbilanz</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setIrrigationField(field)}
+                      className="inline-flex items-center gap-1 border border-sky-200 bg-sky-50 px-2 py-1 text-sm font-semibold text-sky-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-100"
+                    >
+                      <IoMdAdd className="h-3 w-3" aria-hidden="true" />
+                      <span>Bewaesserung</span>
+                    </button>
+                  </>
                 }
               />
             ))}
@@ -364,6 +394,12 @@ export default function Home() {
         isOpen={editingField !== null}
         initialValues={editInitialValues}
         onClose={() => setEditingField(null)}
+      />
+      <CreateEntityModal
+        action={irrigationCreateAction}
+        isOpen={irrigationField !== null}
+        initialValues={irrigationInitialValues}
+        onClose={() => setIrrigationField(null)}
       />
     </section>
   )

@@ -18,6 +18,7 @@ type FieldBoxProps = {
   metrics?: FieldBoxMetric[]
   to?: string
   actions?: ReactNode
+  footerActions?: ReactNode
   borderClassName?: string
   titleAdornment?: ReactNode
 }
@@ -28,6 +29,7 @@ function FieldBoxContent({
   metrics,
   to,
   actions,
+  footerActions,
   titleAdornment,
 }: FieldBoxProps) {
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
@@ -76,12 +78,12 @@ function FieldBoxContent({
     metric.value < metric.criticalBelow
 
   return (
-    <div className="group relative overflow-visible rounded-[1.75rem] border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-sky-500 hover:shadow-lg sm:p-6">
+    <div className="group relative overflow-visible border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 sm:p-6">
       {to ? (
         <Link
           to={to}
           aria-label={`${title} oeffnen`}
-          className="absolute inset-0 rounded-[1.75rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4"
+          className="absolute inset-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4"
         />
       ) : null}
 
@@ -101,11 +103,11 @@ function FieldBoxContent({
       </div>
 
       {subtitle ? (
-        <p className={`${contentClasses} mt-3 whitespace-pre-line text-sm text-slate-500`}>{subtitle}</p>
+        <p className={`${contentClasses} whitespace-pre-line text-sm text-slate-500`}>{subtitle}</p>
       ) : null}
 
       {metrics && metrics.length > 0 ? (
-        <div className={`${contentClasses} mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-4`}>
+        <div className={`${contentClasses} mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-1`}>
           {metrics.map((metric) => {
             const MetricIcon = metric.icon
             const critical = isMetricCritical(metric)
@@ -130,6 +132,12 @@ function FieldBoxContent({
               </div>
             )
           })}
+        </div>
+      ) : null}
+
+      {footerActions ? (
+        <div className="relative z-10 flex flex-wrap gap-2 pt-2 pointer-events-auto">
+          {footerActions}
         </div>
       ) : null}
     </div>
