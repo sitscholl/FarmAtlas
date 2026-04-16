@@ -54,7 +54,7 @@ export const irrigationEditFields = [
 ] as const
 
 export const irrigationCreateFields = [
-  { id: 'field_ids', label: 'Anlagen', type: 'custom', renderer: 'groupedFieldSelector', required: true },
+  { id: 'field_ids', label: '', type: 'custom', renderer: 'groupedFieldSelector', required: true },
   { id: 'date', label: 'Datum', type: 'date', required: true },
   {
     id: 'method',

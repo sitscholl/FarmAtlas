@@ -66,7 +66,7 @@ function CheckboxRow({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-2xl px-3 py-2 transition hover:bg-slate-50"
+      className="flex items-center gap-3 px-3 py-1 transition hover:bg-slate-50"
       style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
     >
       <input
@@ -202,7 +202,7 @@ export default function GroupedFieldSelector({
   }
 
   return (
-    <div className="mt-2 rounded-[1.5rem] border border-slate-200 bg-white">
+    <div className="mt-2 border border-slate-200 bg-white">
       <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
         <div>
           <div className="text-sm font-medium text-slate-900">Anlagenauswahl</div>
@@ -212,7 +212,7 @@ export default function GroupedFieldSelector({
         </div>
       </div>
 
-      <div className="max-h-80 overflow-y-auto py-2">
+      <div>
         {groupedFields.map((field) => {
           const fieldSelection = getSelectionState(field.field_ids)
           const isFieldExpanded = expandedFieldNames[field.name] ?? false
