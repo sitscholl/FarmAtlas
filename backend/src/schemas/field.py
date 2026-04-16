@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -86,3 +87,23 @@ class FieldIrrigationSummary(BaseModel):
 
 class FieldOverview(FieldRead, FieldWaterBalanceSummary, FieldIrrigationSummary):
     pass
+
+
+FieldOverviewAggregationLevel = Literal["section", "field", "field_variety"]
+
+
+class FieldGroupedOverview(BaseModel):
+    aggregation_level: FieldOverviewAggregationLevel
+    title: str
+    subtitle: str | None = None
+    representative_field_id: int | None = None
+    field_ids: list[int]
+    field_count: int
+    sections: list[str]
+    varieties: list[str]
+    active: bool
+    herbicide_free: bool | None = None
+    reference_station_display: str | None = None
+    effective_root_depth_display: str | None = None
+    safe_ratio: float | None = None
+    last_irrigation_date: date | None = None

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 import logging
@@ -11,7 +12,9 @@ from sqlalchemy.exc import IntegrityError
 
 from .schemas import (
     FieldCreate,
+    FieldGroupedOverview,
     FieldIrrigationSummary,
+    FieldOverviewAggregationLevel,
     FieldOverview,
     FieldReplant,
     FieldRead,
@@ -130,6 +133,152 @@ def _serialize_field_water_balance_summary(summary: dict[str, object] | None) ->
 def _serialize_field_irrigation_summary(last_irrigation_date: date | None) -> FieldIrrigationSummary:
     return FieldIrrigationSummary(last_irrigation_date=last_irrigation_date)
 
+
+def _serialize_field_overview(
+    field,
+    *,
+    summary_by_field_id: dict[int, dict[str, object]],
+    last_irrigation_by_field_id: dict[int, date | None],
+) -> FieldOverview:
+    return FieldOverview.model_validate(
+        _serialize_field(field).model_dump()
+        | _serialize_field_water_balance_summary(summary_by_field_id.get(field.id)).model_dump()
+        | _serialize_field_irrigation_summary(last_irrigation_by_field_id.get(field.id)).model_dump()
+    )
+
+
+def _list_field_overviews(session, *, active_only: bool = False) -> list[FieldOverview]:
+    all_fields = runtime.db.fields.list_all(session)
+    summary_by_field_id = {
+        summary["field_id"]: summary
+        for summary in runtime.db.water_balance.get_summary(session)
+    }
+    last_irrigation_by_field_id = runtime.db.irrigation.get_latest_dates(session)
+    selected_fields = [field for field in all_fields if field.active] if active_only else all_fields
+
+    return [
+        _serialize_field_overview(
+            field,
+            summary_by_field_id=summary_by_field_id,
+            last_irrigation_by_field_id=last_irrigation_by_field_id,
+        )
+        for field in selected_fields
+    ]
+
+
+def _format_number_display(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _build_grouped_overview_subtitle(
+    *,
+    level: FieldOverviewAggregationLevel,
+    varieties: list[str],
+    sections: list[str],
+) -> str | None:
+    if level == "section":
+        parts: list[str] = []
+        if sections:
+            parts.append(", ".join(sections))
+        if varieties:
+            parts.append(", ".join(varieties))
+        return " ".join(parts) or None
+
+    parts: list[str] = []
+    if varieties:
+        parts.append(", ".join(varieties))
+    if sections:
+        section_label = "Abschnitt" if len(sections) == 1 else "Abschnitte"
+        parts.append(f"{len(sections)} {section_label}")
+    return " | ".join(parts) or None
+
+
+def _build_grouped_field_overviews(
+    overviews: list[FieldOverview],
+    *,
+    level: FieldOverviewAggregationLevel,
+) -> list[FieldGroupedOverview]:
+    grouped_items: dict[tuple[str, ...], list[FieldOverview]] = defaultdict(list)
+
+    for overview in overviews:
+        if level == "field":
+            key = (overview.group.strip().casefold(), overview.name.strip().casefold())
+        elif level == "field_variety":
+            key = (
+                overview.group.strip().casefold(),
+                overview.name.strip().casefold(),
+                overview.variety.strip().casefold(),
+            )
+        else:
+            key = (str(overview.id),)
+        grouped_items[key].append(overview)
+
+    grouped_overviews: list[FieldGroupedOverview] = []
+    for items in grouped_items.values():
+        first_item = items[0]
+        sorted_items = sorted(items, key=lambda item: item.id)
+        field_ids = [item.id for item in sorted_items]
+        sections = sorted(
+            {
+                section
+                for section in (item.section.strip() for item in items if item.section)
+                if section != ""
+            }
+        )
+        varieties = sorted({item.variety.strip() for item in items if item.variety.strip() != ""})
+        safe_ratio_values = [item.safe_ratio for item in items if item.safe_ratio is not None]
+        last_irrigation_dates = [item.last_irrigation_date for item in items if item.last_irrigation_date is not None]
+        reference_stations = sorted(
+            {
+                station
+                for station in (item.reference_station.strip() for item in items if item.reference_station)
+                if station != ""
+            }
+        )
+        root_depths = sorted(
+            {
+                float(item.effective_root_depth_cm)
+                for item in items
+                if item.effective_root_depth_cm is not None
+            }
+        )
+        herbicide_values = {item.herbicide_free for item in items if item.herbicide_free is not None}
+        representative_field = min(
+            items,
+            key=lambda item: (
+                item.safe_ratio is None,
+                item.safe_ratio if item.safe_ratio is not None else float("inf"),
+                item.id,
+            ),
+        )
+
+        grouped_overviews.append(
+            FieldGroupedOverview(
+                aggregation_level=level,
+                title=first_item.name,
+                subtitle=_build_grouped_overview_subtitle(
+                    level=level,
+                    varieties=varieties,
+                    sections=sections,
+                ),
+                representative_field_id=representative_field.id,
+                field_ids=field_ids,
+                field_count=len(field_ids),
+                sections=sections,
+                varieties=varieties,
+                active=any(item.active for item in items),
+                herbicide_free=True if herbicide_values == {True} else False if herbicide_values == {False} else None,
+                reference_station_display=reference_stations[0] if len(reference_stations) == 1 else "gemischt" if len(reference_stations) > 1 else None,
+                effective_root_depth_display=_format_number_display(root_depths[0]) if len(root_depths) == 1 else "gemischt" if len(root_depths) > 1 else None,
+                safe_ratio=min(safe_ratio_values) if safe_ratio_values else None,
+                last_irrigation_date=max(last_irrigation_dates) if last_irrigation_dates else None,
+            )
+        )
+
+    return sorted(grouped_overviews, key=lambda item: (item.title.casefold(), item.subtitle or ""))
+
 def _get_irrigation_event(event_id: int):
     with runtime.db.session_scope() as session:
         event = runtime.db.irrigation.get_by_id(session, event_id)
@@ -141,17 +290,15 @@ def _get_irrigation_event(event_id: int):
     return event
 
 def _build_field_overview(field_id: int) -> FieldOverview:
-    field = _validate_field_id(field_id)
     with runtime.db.session_scope() as session:
-        summary_by_field_id = {
-            summary["field_id"]: summary
-            for summary in runtime.db.water_balance.get_summary(session, field_ids=[field_id])
+        overviews_by_id = {
+            overview.id: overview
+            for overview in _list_field_overviews(session)
         }
-        last_irrigation_by_field_id = runtime.db.irrigation.get_latest_dates(session, field_ids=[field_id])
-    field_data = _serialize_field(field).model_dump()
-    summary_data = _serialize_field_water_balance_summary(summary_by_field_id.get(field_id)).model_dump()
-    irrigation_data = _serialize_field_irrigation_summary(last_irrigation_by_field_id.get(field_id)).model_dump()
-    return FieldOverview.model_validate(field_data | summary_data | irrigation_data)
+    overview = overviews_by_id.get(field_id)
+    if overview is None:
+        raise HTTPException(status_code=404, detail=f"Unknown field id: {field_id}")
+    return overview
 
 def _raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...] = ()) -> None:
     if isinstance(exc, HTTPException):
@@ -444,20 +591,16 @@ async def delete_field(field_id: int):
 @app.get("/api/fields/overview", response_model=list[FieldOverview])
 async def get_fields_overview():
     with runtime.db.session_scope() as session:
-        summary_by_field_id = {
-            summary["field_id"]: summary
-            for summary in runtime.db.water_balance.get_summary(session)
-        }
-        last_irrigation_by_field_id = runtime.db.irrigation.get_latest_dates(session)
+        return _list_field_overviews(session)
 
-    return [
-        FieldOverview.model_validate(
-            _serialize_field(field).model_dump()
-            | _serialize_field_water_balance_summary(summary_by_field_id.get(field.id)).model_dump()
-            | _serialize_field_irrigation_summary(last_irrigation_by_field_id.get(field.id)).model_dump()
-        )
-        for field in runtime.fields
-    ]
+
+@app.get("/api/fields/grouped-overview", response_model=list[FieldGroupedOverview])
+async def get_grouped_fields_overview(
+    level: FieldOverviewAggregationLevel = Query("field"),
+):
+    with runtime.db.session_scope() as session:
+        overviews = _list_field_overviews(session, active_only=True)
+    return _build_grouped_field_overviews(overviews, level=level)
 
 @app.get("/api/fields/{field_id}/overview", response_model=FieldOverview)
 async def get_field_overview(field_id: int):

@@ -1,6 +1,8 @@
 from .field import (
     FieldCreate,
+    FieldGroupedOverview,
     FieldIrrigationSummary,
+    FieldOverviewAggregationLevel,
     FieldOverview,
     FieldRead,
     FieldReadGrouped,
@@ -26,7 +28,9 @@ from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSummary
 
 __all__ = [
     "FieldCreate",
+    "FieldGroupedOverview",
     "FieldIrrigationSummary",
+    "FieldOverviewAggregationLevel",
     "FieldOverview",
     "FieldRead",
     "FieldReadGrouped",

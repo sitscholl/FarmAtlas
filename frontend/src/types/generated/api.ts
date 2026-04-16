@@ -29,6 +29,23 @@ export type FieldCreate = {
   tree_strip_width?: number | null
 }
 
+export type FieldGroupedOverview = {
+  aggregation_level: "section" | "field" | "field_variety"
+  title: string
+  subtitle?: string | null
+  representative_field_id?: number | null
+  field_ids: Array<number>
+  field_count: number
+  sections: Array<string>
+  varieties: Array<string>
+  active: boolean
+  herbicide_free?: boolean | null
+  reference_station_display?: string | null
+  effective_root_depth_display?: string | null
+  safe_ratio?: number | null
+  last_irrigation_date?: string | null
+}
+
 export type FieldOverview = {
   last_irrigation_date: string | null
   water_balance_as_of: string | null
