@@ -42,7 +42,7 @@ function FieldBoxContent({
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
 
   return (
-    <div className="group relative overflow-hidden border p-6 shadow-md backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-lg border-slate-200/80 hover:border-sky-500">
+    <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-sky-500 hover:shadow-lg sm:p-6">
       {to ? (
         <Link
           to={to}
@@ -51,25 +51,26 @@ function FieldBoxContent({
         />
       ) : null}
 
-      <div className={`${contentClasses} flex items-start justify-between gap-4`}>
+      {actions ? (
+        <div className="pointer-events-auto absolute right-4 top-4 z-20">
+          {actions}
+        </div>
+      ) : null}
+
+      <div className={`${contentClasses} flex items-start gap-4 pr-12`}>
         <div className="min-w-0 flex-1">
-          {actions ? (
-            <div className="z-20 flex justify-left gap-2 pointer-events-auto">
-              {actions}
-            </div>
-          ) : null}
-          <h3 className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             {titleAdornment}
             <span>{title}</span>
           </h3>
+          <span className="mt-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+            {badge}
+          </span>
         </div>
-        <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-          {badge}
-        </span>
       </div>
 
       {subtitle ? (
-        <p className={`${contentClasses} text-sm text-slate-500 whitespace-pre-line`}>{subtitle}</p>
+        <p className={`${contentClasses} mt-3 whitespace-pre-line text-sm text-slate-500`}>{subtitle}</p>
       ) : null}
 
       {statusBars && statusBars.length > 0 ? (
