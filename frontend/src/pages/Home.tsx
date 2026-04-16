@@ -4,7 +4,7 @@ import { FiMoreVertical } from 'react-icons/fi'
 import type { IconType } from 'react-icons'
 import { LuArrowDown, LuCalendarDays, LuRadioTower } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
-import { FaArrowRight } from "react-icons/fa";
+import { FaArrowRight } from 'react-icons/fa'
 import { IoMdAdd } from 'react-icons/io'
 import { Link } from 'react-router-dom'
 
@@ -19,7 +19,9 @@ import {
   buildFieldEditAction,
   buildFieldEditInitialValues,
 } from '../lib/fieldForm'
-import { type FieldOverview } from '../types/generated/api'
+import { type FieldGroupedOverview, type FieldOverview } from '../types/generated/api'
+
+type AggregationLevel = FieldGroupedOverview['aggregation_level']
 
 type FieldMetricDefinition = {
   key: string
@@ -29,24 +31,23 @@ type FieldMetricDefinition = {
   kind?: FieldBoxMetric['kind']
   criticalBelow?: number
   emptyValueLabel?: string
-  getValue: (field: FieldOverview) => string | number | null | undefined
+  getValue: (field: FieldGroupedOverview) => string | number | null | undefined
 }
 
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
   {
-    key: 'effective_root_depth_cm',
+    key: 'effective_root_depth_display',
     label: 'Wurzeltiefe',
     icon: LuArrowDown,
-    unit: 'cm',
-    kind: 'number',
-    getValue: (field) => field.effective_root_depth_cm,
+    kind: 'text',
+    getValue: (field) => field.effective_root_depth_display,
   },
   {
-    key: 'reference_station',
+    key: 'reference_station_display',
     label: 'Station',
     icon: LuRadioTower,
     kind: 'text',
-    getValue: (field) => field.reference_station,
+    getValue: (field) => field.reference_station_display,
   },
   {
     key: 'safe_ratio',
@@ -56,7 +57,10 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     kind: 'number',
     criticalBelow: 0,
     emptyValueLabel: '-',
-    getValue: (field) => (field.safe_ratio === null ? null : Math.round(field.safe_ratio * 100)),
+    getValue: (field) =>
+      field.safe_ratio === null || field.safe_ratio === undefined
+        ? null
+        : Math.round(field.safe_ratio * 100),
   },
   {
     key: 'last_irrigation_date',
@@ -68,7 +72,13 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
   },
 ]
 
-function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
+const aggregationOptions: Array<{ value: AggregationLevel; label: string }> = [
+  { value: 'field', label: 'Feld' },
+  { value: 'field_variety', label: 'Feld + Sorte' },
+  { value: 'section', label: 'Abschnitt' },
+]
+
+function buildFieldMetrics(field: FieldGroupedOverview): FieldBoxMetric[] {
   return fieldMetricDefinitions.flatMap((definition) => {
     const value = definition.getValue(field)
     if ((value === null || value === undefined || value === '') && definition.emptyValueLabel === undefined) {
@@ -87,19 +97,10 @@ function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   })
 }
 
-function buildSubtitle(field: FieldOverview) {
-  return [
-    field.section ? `${field.section}` : null,
-    `${field.variety}`,
-  ]
-    .filter((part): part is string => part !== null)
-    .join(' ')
-}
-
 type FieldActionsMenuProps = {
-  field: FieldOverview
-  onRefresh: (field: FieldOverview) => Promise<void>
-  onClearIrrigation: (field: FieldOverview) => Promise<void>
+  field: FieldGroupedOverview
+  onRefresh: (field: FieldGroupedOverview) => Promise<void>
+  onClearIrrigation: (field: FieldGroupedOverview) => Promise<void>
 }
 
 function FieldActionsMenu({
@@ -137,7 +138,7 @@ function FieldActionsMenu({
           setIsOpen((currentState) => !currentState)
         }}
         className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:border hover:border-slate-300 hover:text-slate-900"
-        aria-label={`${field.name} Aktionen`}
+        aria-label={`${field.title} Aktionen`}
         aria-expanded={isOpen}
       >
         <FiMoreVertical className="h-5 w-5" />
@@ -176,19 +177,22 @@ function FieldActionsMenu({
 }
 
 export default function Home() {
-  const [fields, setFields] = useState<FieldOverview[]>([])
+  const [fields, setFields] = useState<FieldGroupedOverview[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<FieldOverview | null>(null)
-  const [irrigationField, setIrrigationField] = useState<FieldOverview | null>(null)
+  const [irrigationField, setIrrigationField] = useState<FieldGroupedOverview | null>(null)
   const [showOnlyFieldsWithStatus, setShowOnlyFieldsWithStatus] = useState(true)
+  const [aggregationLevel, setAggregationLevel] = useState<AggregationLevel>('field')
 
   useEffect(() => {
     const fetchFields = async () => {
       try {
-        const response = await api.get<FieldOverview[]>('/fields/overview')
+        const response = await api.get<FieldGroupedOverview[]>('/fields/grouped-overview', {
+          params: { level: aggregationLevel },
+        })
         if (!Array.isArray(response.data)) {
-          throw new TypeError('Expected /fields/overview to return an array.')
+          throw new TypeError('Expected /fields/grouped-overview to return an array.')
         }
         setFields(response.data)
         setErrorMessage(null)
@@ -210,7 +214,7 @@ export default function Home() {
 
     window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged)
     return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
-  }, [])
+  }, [aggregationLevel])
 
   const editAction = useMemo(() => buildFieldEditAction(editingField), [editingField])
 
@@ -222,7 +226,7 @@ export default function Home() {
   const irrigationInitialValues = useMemo(
     () => irrigationField === null
       ? undefined
-      : { field_ids: JSON.stringify([irrigationField.id]) },
+      : { field_ids: JSON.stringify(irrigationField.field_ids) },
     [irrigationField],
   )
 
@@ -237,7 +241,7 @@ export default function Home() {
           return true
         }
 
-        return field.safe_ratio !== null
+        return field.safe_ratio !== null && field.safe_ratio !== undefined
       }),
     [fields, showOnlyFieldsWithStatus],
   )
@@ -257,27 +261,35 @@ export default function Home() {
   //   }
   // }
 
-  const handleRefreshField = async (field: FieldOverview) => {
+  const handleRefreshField = async (field: FieldGroupedOverview) => {
+    if (field.field_ids.length === 0) {
+      return
+    }
+
     try {
-      await api.post(`/fields/${field.id}/water-balance`)
+      await Promise.all(
+        field.field_ids.map((fieldId) => api.post(`/fields/${fieldId}/water-balance`)),
+      )
       notifyDataChanged()
     } catch (error) {
-      console.error(`Error refreshing field ${field.id}`, error)
-      setErrorMessage('Die Wasserbilanz fuer das Feld konnte nicht aktualisiert werden.')
+      console.error(`Error refreshing grouped field ${field.title}`, error)
+      setErrorMessage('Die Wasserbilanz fuer die Anlagen konnte nicht aktualisiert werden.')
     }
   }
 
-  const handleClearIrrigation = async (field: FieldOverview) => {
-    const confirmed = window.confirm(`Sollen alle Bewaesserungseintraege fuer "${field.name}" wirklich geloescht werden?`)
+  const handleClearIrrigation = async (field: FieldGroupedOverview) => {
+    const confirmed = window.confirm(`Sollen alle Bewaesserungseintraege fuer "${field.title}" wirklich geloescht werden?`)
     if (!confirmed) {
       return
     }
 
     try {
-      await api.delete(`/fields/${field.id}/irrigation`)
+      await Promise.all(
+        field.field_ids.map((fieldId) => api.delete(`/fields/${fieldId}/irrigation`)),
+      )
       notifyDataChanged()
     } catch (error) {
-      console.error(`Error clearing irrigation for field ${field.id}`, error)
+      console.error(`Error clearing irrigation for grouped field ${field.title}`, error)
       setErrorMessage('Die Bewaesserungseintraege konnten nicht geloescht werden.')
     }
   }
@@ -309,17 +321,34 @@ export default function Home() {
 
       return (
       <>
-        <label className="mt-6 flex w-full items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm sm:mt-8 sm:inline-flex sm:w-auto sm:items-center sm:rounded-full sm:px-5 sm:py-3">
-          <input
-            type="checkbox"
-            checked={showOnlyFieldsWithStatus}
-            onChange={(event) => setShowOnlyFieldsWithStatus(event.target.checked)}
-            className="mt-0.5 h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 sm:mt-0"
-          />
-          <span>
+        <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex w-full items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm sm:inline-flex sm:w-auto sm:items-center sm:rounded-full sm:px-5 sm:py-3">
+            <input
+              type="checkbox"
+              checked={showOnlyFieldsWithStatus}
+              onChange={(event) => setShowOnlyFieldsWithStatus(event.target.checked)}
+              className="mt-0.5 h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 sm:mt-0"
+            />
             <span className="block font-medium text-slate-900">Nur Anlagen mit Status anzeigen</span>
-          </span>
-        </label>
+          </label>
+
+          <div className="inline-flex w-full border border-slate-200 bg-white p-1 shadow-sm sm:w-auto sm:rounded-full">
+            {aggregationOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setAggregationLevel(option.value)}
+                className={`flex-1 px-4 py-2 text-sm font-semibold transition sm:flex-none sm:rounded-full ${
+                  aggregationLevel === option.value
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {visibleFields.length === 0 ? (
           <div className="mt-6 border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:px-6 sm:py-10">
@@ -329,9 +358,9 @@ export default function Home() {
           <div className="mt-6 grid gap-4 sm:gap-5">
             {visibleFields.map((field) => (
               <FieldBox
-                key={field.id}
-                title={field.name}
-                subtitle={buildSubtitle(field)}
+                key={`${field.aggregation_level}-${field.field_ids.join('-')}`}
+                title={field.title}
+                subtitle={field.subtitle ?? undefined}
                 metrics={buildFieldMetrics(field)}
                 titleAdornment={
                   field.herbicide_free === true ? (
@@ -350,13 +379,15 @@ export default function Home() {
                 }
                 footerActions={
                   <>
-                    <Link
-                      to={`/fields/${field.id}`}
-                      className="inline-flex items-center gap-1 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-                    >
-                      <FaArrowRight className="h-3 w-3" aria-hidden="true" />
-                      <span>Wasserbilanz</span>
-                    </Link>
+                    {field.representative_field_id ? (
+                      <Link
+                        to={`/fields/${field.representative_field_id}`}
+                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        <FaArrowRight className="h-3 w-3" aria-hidden="true" />
+                        <span>Wasserbilanz</span>
+                      </Link>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => setIrrigationField(field)}
