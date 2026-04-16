@@ -9,6 +9,7 @@ export type FieldBoxMetric = {
   unit?: string
   kind?: 'text' | 'number' | 'date' | 'time' | 'datetime'
   criticalBelow?: number
+  tooltip?: string
 }
 
 type FieldBoxProps = {
@@ -75,7 +76,7 @@ function FieldBoxContent({
     metric.value < metric.criticalBelow
 
   return (
-    <div className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-sky-500 hover:shadow-lg sm:p-6">
+    <div className="group relative overflow-visible rounded-[1.75rem] border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-sky-500 hover:shadow-lg sm:p-6">
       {to ? (
         <Link
           to={to}
@@ -112,8 +113,7 @@ function FieldBoxContent({
             return (
               <div
                 key={metric.label}
-                className="flex min-w-0 items-center gap-1.5"
-                title={metric.label}
+                className="group/metric relative flex min-w-0 items-center gap-1.5 pointer-events-auto"
               >
                 {MetricIcon ? (
                   <span className="inline-flex shrink-0 items-center justify-center text-slate-400">
@@ -124,6 +124,9 @@ function FieldBoxContent({
                   {formatMetricValue(metric)}
                   {metric.unit ? <span className="ml-0.5 font-medium text-slate-500">{metric.unit}</span> : null}
                 </p>
+                <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/metric:flex group-hover/metric:opacity-100">
+                  {metric.tooltip ?? metric.label}
+                </div>
               </div>
             )
           })}

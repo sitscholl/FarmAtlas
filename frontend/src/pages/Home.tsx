@@ -24,6 +24,7 @@ type FieldMetricDefinition = {
   unit?: string
   kind?: FieldBoxMetric['kind']
   criticalBelow?: number
+  emptyValueLabel?: string
   getValue: (field: FieldOverview) => string | number | null | undefined
 }
 
@@ -57,6 +58,7 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     label: 'Letzte Bewaesserung',
     icon: LuCalendarDays,
     kind: 'date',
+    emptyValueLabel: '-',
     getValue: (field) => field.last_irrigation_date,
   },
 ]
@@ -64,17 +66,18 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
 function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
   return fieldMetricDefinitions.flatMap((definition) => {
     const value = definition.getValue(field)
-    if (value === null || value === undefined || value === '') {
+    if ((value === null || value === undefined || value === '') && definition.emptyValueLabel === undefined) {
       return []
     }
 
     return [{
       label: definition.label,
       icon: definition.icon,
-      value,
+      value: value === null || value === undefined || value === '' ? definition.emptyValueLabel ?? '' : value,
       unit: definition.unit,
       kind: definition.kind,
       criticalBelow: definition.criticalBelow,
+      tooltip: definition.label,
     }]
   })
 }
