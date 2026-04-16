@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .schemas import (
     FieldCreate,
+    FieldIrrigationSummary,
     FieldOverview,
     FieldReplant,
     FieldRead,
@@ -125,6 +126,10 @@ def _serialize_field_water_balance_summary(summary: dict[str, object] | None) ->
         safe_ratio=summary.get("safe_ratio"),
     )
 
+
+def _serialize_field_irrigation_summary(last_irrigation_date: date | None) -> FieldIrrigationSummary:
+    return FieldIrrigationSummary(last_irrigation_date=last_irrigation_date)
+
 def _get_irrigation_event(event_id: int):
     with runtime.db.session_scope() as session:
         event = runtime.db.irrigation.get_by_id(session, event_id)
@@ -142,9 +147,11 @@ def _build_field_overview(field_id: int) -> FieldOverview:
             summary["field_id"]: summary
             for summary in runtime.db.water_balance.get_summary(session, field_ids=[field_id])
         }
+        last_irrigation_by_field_id = runtime.db.irrigation.get_latest_dates(session, field_ids=[field_id])
     field_data = _serialize_field(field).model_dump()
     summary_data = _serialize_field_water_balance_summary(summary_by_field_id.get(field_id)).model_dump()
-    return FieldOverview.model_validate(field_data | summary_data)
+    irrigation_data = _serialize_field_irrigation_summary(last_irrigation_by_field_id.get(field_id)).model_dump()
+    return FieldOverview.model_validate(field_data | summary_data | irrigation_data)
 
 def _raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...] = ()) -> None:
     if isinstance(exc, HTTPException):
@@ -441,11 +448,13 @@ async def get_fields_overview():
             summary["field_id"]: summary
             for summary in runtime.db.water_balance.get_summary(session)
         }
+        last_irrigation_by_field_id = runtime.db.irrigation.get_latest_dates(session)
 
     return [
         FieldOverview.model_validate(
             _serialize_field(field).model_dump()
             | _serialize_field_water_balance_summary(summary_by_field_id.get(field.id)).model_dump()
+            | _serialize_field_irrigation_summary(last_irrigation_by_field_id.get(field.id)).model_dump()
         )
         for field in runtime.fields
     ]

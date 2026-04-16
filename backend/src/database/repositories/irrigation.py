@@ -1,8 +1,10 @@
 import datetime
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -65,6 +67,31 @@ class IrrigationRepository:
             .limit(1)
             .one_or_none()
         )
+
+    def get_latest_dates(
+        self,
+        session: Session,
+        *,
+        field_ids: Sequence[int] | None = None,
+    ) -> dict[int, datetime.date]:
+        query = (
+            session.query(
+                models.Irrigation.field_id,
+                func.max(models.Irrigation.date).label("last_irrigation_date"),
+            )
+            .group_by(models.Irrigation.field_id)
+        )
+
+        if field_ids is not None:
+            if len(field_ids) == 0:
+                return {}
+            query = query.filter(models.Irrigation.field_id.in_(field_ids))
+
+        return {
+            int(field_id): last_irrigation_date
+            for field_id, last_irrigation_date in query.all()
+            if last_irrigation_date is not None
+        }
 
     def create(
         self,

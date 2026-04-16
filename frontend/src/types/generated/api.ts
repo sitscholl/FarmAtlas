@@ -30,6 +30,7 @@ export type FieldCreate = {
 }
 
 export type FieldOverview = {
+  last_irrigation_date: string | null
   water_balance_as_of: string | null
   current_water_deficit: number | null
   current_soil_water_content: number | null

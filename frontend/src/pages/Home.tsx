@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FiMoreVertical } from 'react-icons/fi'
+import type { IconType } from 'react-icons'
+import { LuArrowDown, LuCalendarDays, LuRadioTower } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import FieldBox, {
-  type FieldBoxStatusBar,
+  type FieldBoxMetric,
 } from '../components/FieldBox'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
@@ -15,29 +17,66 @@ import {
 } from '../lib/fieldForm'
 import { type FieldOverview } from '../types/generated/api'
 
-function buildSafeRatioBar(field: FieldOverview): FieldBoxStatusBar | undefined {
-  if (field.safe_ratio === null) {
-    return undefined
-  }
+type FieldMetricDefinition = {
+  key: string
+  label: string
+  icon: IconType
+  unit?: string
+  kind?: FieldBoxMetric['kind']
+  criticalBelow?: number
+  getValue: (field: FieldOverview) => string | number | null | undefined
+}
 
-  const ratioPercent = Math.round(field.safe_ratio * 100)
-  return {
+const fieldMetricDefinitions: FieldMetricDefinition[] = [
+  {
+    key: 'effective_root_depth_cm',
+    label: 'Wurzeltiefe',
+    icon: LuArrowDown,
+    unit: 'cm',
+    kind: 'number',
+    getValue: (field) => field.effective_root_depth_cm,
+  },
+  {
+    key: 'reference_station',
+    label: 'Station',
+    icon: LuRadioTower,
+    kind: 'text',
+    getValue: (field) => field.reference_station,
+  },
+  {
+    key: 'safe_ratio',
     label: 'Wasserbilanz',
-    value: `${ratioPercent}%`,
-    percentage: Math.max(0, Math.min(100, ratioPercent)),
-    isCritical: field.safe_ratio < 0,
     icon: MdWaterDrop,
-  }
-}
+    unit: '%',
+    kind: 'number',
+    criticalBelow: 0,
+    getValue: (field) => (field.safe_ratio === null ? null : Math.round(field.safe_ratio * 100)),
+  },
+  {
+    key: 'last_irrigation_date',
+    label: 'Letzte Bewaesserung',
+    icon: LuCalendarDays,
+    kind: 'date',
+    getValue: (field) => field.last_irrigation_date,
+  },
+]
 
-function buildStatusBars(field: FieldOverview): FieldBoxStatusBar[] {
-  return [buildSafeRatioBar(field)].filter(
-    (statusBar): statusBar is FieldBoxStatusBar => statusBar !== undefined,
-  )
-}
+function buildFieldMetrics(field: FieldOverview): FieldBoxMetric[] {
+  return fieldMetricDefinitions.flatMap((definition) => {
+    const value = definition.getValue(field)
+    if (value === null || value === undefined || value === '') {
+      return []
+    }
 
-function formatReference(field: Pick<FieldOverview, 'reference_provider' | 'reference_station'>) {
-  return `${field.reference_station}`
+    return [{
+      label: definition.label,
+      icon: definition.icon,
+      value,
+      unit: definition.unit,
+      kind: definition.kind,
+      criticalBelow: definition.criticalBelow,
+    }]
+  })
 }
 
 function buildSubtitle(field: FieldOverview) {
@@ -182,7 +221,7 @@ export default function Home() {
           return true
         }
 
-        return buildStatusBars(field).length > 0
+        return field.safe_ratio !== null
       }),
     [fields, showOnlyFieldsWithStatus],
   )
@@ -268,7 +307,7 @@ export default function Home() {
 
         {visibleFields.length === 0 ? (
           <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:px-6 sm:py-10">
-            Keine aktiven Anlagen mit Statusbalken gefunden.
+            Keine aktiven Anlagen mit Wasserbilanz gefunden.
           </div>
         ) : (
           <div className="mt-6 grid gap-4 sm:gap-5">
@@ -276,9 +315,8 @@ export default function Home() {
               <FieldBox
                 key={field.id}
                 title={field.name}
-                badge={formatReference(field)}
                 subtitle={buildSubtitle(field)}
-                statusBars={buildStatusBars(field)}
+                metrics={buildFieldMetrics(field)}
                 to={`/fields/${field.id}`}
                 titleAdornment={
                   field.herbicide_free === true ? (

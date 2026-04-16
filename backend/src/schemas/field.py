@@ -80,5 +80,9 @@ class FieldWaterBalanceSummary(BaseModel):
     safe_ratio: float | None
 
 
-class FieldOverview(FieldRead, FieldWaterBalanceSummary):
+class FieldIrrigationSummary(BaseModel):
+    last_irrigation_date: date | None
+
+
+class FieldOverview(FieldRead, FieldWaterBalanceSummary, FieldIrrigationSummary):
     pass
