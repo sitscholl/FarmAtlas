@@ -394,8 +394,8 @@ export default function Home() {
 
     return (
       <>
-        <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex w-full items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm sm:inline-flex sm:w-auto sm:items-center sm:px-5 sm:py-3">
+        <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between border border-slate-200 bg-white">
+          <label className="flex w-full items-start gap-3 px-4 py-4 text-sm text-slate-700 shadow-sm sm:inline-flex sm:w-auto sm:items-center sm:px-5 sm:py-3">
             <input
               type="checkbox"
               checked={showOnlyFieldsWithStatus}
