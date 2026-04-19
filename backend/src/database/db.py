@@ -1,6 +1,13 @@
 from .core import DatabaseCore
-from .repositories import FieldRepository, IrrigationRepository, VarietyRepository, WaterBalanceRepository
-from .services import FieldService, IrrigationService
+from .repositories import (
+    FieldRepository,
+    IrrigationRepository,
+    PlantingRepository,
+    SectionRepository,
+    VarietyRepository,
+    WaterBalanceRepository,
+)
+from .services import FieldService, IrrigationService, PlantingService, SectionService
 
 
 class Database:
@@ -19,6 +26,8 @@ class Database:
         self.engine = self.core.engine
 
         self.fields = FieldRepository()
+        self.plantings = PlantingRepository(self.fields)
+        self.sections = SectionRepository(self.plantings)
         self.varieties = VarietyRepository()
         self.water_balance = WaterBalanceRepository(self.fields)
         self.irrigation = IrrigationRepository(self.fields)
@@ -34,6 +43,14 @@ class Database:
             self.fields,
             self.irrigation,
             self.water_balance,
+        )
+        self.planting_service = PlantingService(
+            self.core,
+            self.plantings,
+        )
+        self.section_service = SectionService(
+            self.core,
+            self.sections,
         )
 
     def session_scope(self):

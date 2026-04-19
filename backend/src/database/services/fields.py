@@ -1,6 +1,3 @@
-from typing import Any
-
-from .. import models
 from ..core import DatabaseCore
 from ..repositories import FieldRepository, WaterBalanceRepository
 
@@ -19,14 +16,17 @@ class FieldService:
         self._water_balance = water_balance
         self._water_balance_trigger_fields = water_balance_trigger_fields
 
-    def update(self, field_id: int, updates: dict[str, Any]) -> models.Field:
+    def create(self, **kwargs):
+        with self._core.session_scope() as session:
+            return self._fields.create(session, **kwargs)
+
+    def update(self, field_id: int, updates: dict[str, Any]):
         with self._core.session_scope() as session:
             updated_field, changed_keys = self._fields.update(session, field_id, updates)
             if changed_keys & self._water_balance_trigger_fields:
                 self._water_balance.clear_for_field(session, updated_field.id)
             return updated_field
 
-    def replant(self, field_id: int, *, valid_from, updates: dict[str, Any]) -> models.Field:
+    def delete(self, field_id: int) -> bool:
         with self._core.session_scope() as session:
-            new_field, _ = self._fields.replant(session, field_id, valid_from=valid_from, updates=updates)
-            return new_field
+            return self._fields.delete(session, field_id)
