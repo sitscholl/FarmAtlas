@@ -47,7 +47,7 @@ class SectionContext:
     planting_id: int
     variety: str
     planting_year: int
-    area_m2: float
+    area: float
     tree_count: int | None
     tree_height: float | None
     row_distance: float | None
