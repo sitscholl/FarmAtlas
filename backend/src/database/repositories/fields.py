@@ -21,7 +21,7 @@ class FieldRepository:
         "soil_type",
         "soil_weight",
         "humus_pct",
-        "area_ha",
+        "area",
         "effective_root_depth_cm",
         "p_allowable",
         "drip_distance",
@@ -145,10 +145,10 @@ class FieldRepository:
                     changed_keys.add(field_key)
                 continue
 
-            if field_key == "area_ha":
+            if field_key == "area":
                 new_value = float(raw_value)
-                if field.area_ha != new_value:
-                    field.area_ha = new_value
+                if field.area != new_value:
+                    field.area = new_value
                     changed_keys.add(field_key)
                 continue
 
@@ -205,7 +205,7 @@ class FieldRepository:
         soil_type: str | None,
         soil_weight: str | None,
         humus_pct: float | None,
-        area_ha: float,
+        area: float,
         effective_root_depth_cm: float | None,
         p_allowable: float | None,
         drip_distance: float | None,
@@ -229,7 +229,7 @@ class FieldRepository:
             section=self._normalize_optional_text(section),
             variety_id=variety_model.id,
             planting_year=int(planting_year),
-            area_ha=float(area_ha),
+            area=float(area),
             tree_count=None if tree_count is None else int(tree_count),
             tree_height=None if tree_height is None else float(tree_height),
             row_distance=None if row_distance is None else float(row_distance),
@@ -300,7 +300,7 @@ class FieldRepository:
             section=existing_field.section,
             variety_id=existing_field.variety_id,
             planting_year=existing_field.planting_year,
-            area_ha=existing_field.area_ha,
+            area=existing_field.area,
             tree_count=existing_field.tree_count,
             tree_height=existing_field.tree_height,
             row_distance=existing_field.row_distance,

@@ -33,6 +33,13 @@ function formatBoolean(value: boolean | null | undefined) {
   return value ? 'Ja' : 'Nein'
 }
 
+function squareMetresToHectares(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return value / 10000
+}
+
 function buildSubtitle(field: FieldOverview) {
   return [
     field.section ? `Abschnitt: ${field.section}` : null,
@@ -46,7 +53,7 @@ function buildSubtitle(field: FieldOverview) {
 
 function buildFieldMetrics(field: FieldOverview): DetailMetric[] {
   return [
-    { label: 'Flaeche', value: `${formatNumber(field.area_ha, 2)} ha` },
+    { label: 'Flaeche', value: `${formatNumber(squareMetresToHectares(field.area), 2)} ha` },
     { label: 'Pflanzjahr', value: String(field.planting_year) },
     { label: 'Baumzahl', value: formatNumber(field.tree_count, 0) },
     { label: 'Baumhoehe', value: `${formatNumber(field.tree_height, 1)} m` },

@@ -2,6 +2,13 @@ import { fieldCreateAction } from '../config/createActions'
 import type { CreateActionConfig } from '../types/createActions'
 import type { FieldCreate, FieldOverview, FieldReplant, FieldUpdate } from '../types/generated/api'
 
+function squareMetresToHectares(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value / 10000)
+}
+
 function requireValidFrom(value: string) {
   const trimmed = value.trim()
   if (trimmed === '') {
@@ -67,7 +74,7 @@ export function buildFieldEditInitialValues(
     active: String(field.active),
     reference_provider: field.reference_provider,
     reference_station: field.reference_station,
-    area_ha: String(field.area_ha ?? ''),
+    area_ha: squareMetresToHectares(field.area),
     soil_type: field.soil_type ?? '',
     soil_weight: field.soil_weight ?? '',
     humus_pct: String(field.humus_pct ?? ''),

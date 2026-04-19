@@ -24,7 +24,7 @@ class FieldBase(BaseModel):
     soil_type: str | None = None
     soil_weight: str | None = None
     humus_pct: float | None = None
-    area_ha: float
+    area: float
     effective_root_depth_cm: float | None = None
     p_allowable: float | None = None
     drip_distance: float | None = None

@@ -36,6 +36,13 @@ function formatBoolean(value: boolean | null | undefined) {
   return value ? 'Ja' : 'Nein'
 }
 
+function squareMetresToHectares(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return value / 10000
+}
+
 export default function FieldsTablePage() {
   const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
   const [fields, setFields] = useState<FieldOverview[]>([])
@@ -119,9 +126,9 @@ export default function FieldsTablePage() {
         cell: (field) => field.variety,
       },
       {
-        id: 'area_ha',
+        id: 'area',
         header: 'Flaeche (ha)',
-        cell: (field) => formatNumber(field.area_ha, 2),
+        cell: (field) => formatNumber(squareMetresToHectares(field.area), 2),
       },
       {
         id: 'planting_year',
@@ -275,10 +282,10 @@ export default function FieldsTablePage() {
         content: 'Summe',
       },
       {
-        columnId: 'area_ha',
+        columnId: 'area',
         content: (rows) =>
           formatNumber(
-            rows.reduce((total, field) => total + (field.area_ha ?? 0), 0),
+            rows.reduce((total, field) => total + (squareMetresToHectares(field.area) ?? 0), 0),
             2,
           ),
       },

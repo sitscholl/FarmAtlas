@@ -17,6 +17,10 @@ function toOptionalBoolean(value: string) {
   return value === 'true'
 }
 
+function hectaresToSquareMetres(value: string) {
+  return Number(value) * 10000
+}
+
 function toSelectedFieldIds(value: string) {
   if (value.trim() === '') {
     return []
@@ -152,7 +156,7 @@ export const fieldCreateAction: CreateActionConfig = {
     soil_type: toOptionalText(values.soil_type),
     soil_weight: toOptionalText(values.soil_weight),
     humus_pct: toOptionalNumber(values.humus_pct),
-    area_ha: Number(values.area_ha),
+    area: hectaresToSquareMetres(values.area_ha),
     effective_root_depth_cm: toOptionalNumber(values.effective_root_depth_cm),
     p_allowable: toOptionalNumber(values.p_allowable),
     drip_distance: toOptionalNumber(values.drip_distance),

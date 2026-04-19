@@ -189,8 +189,8 @@ class FieldContext:
         return None if result is None else bool(result)
 
     @property
-    def area_ha(self) -> float:
-        return sum(section.area for section in self.sections) / 10000.0
+    def area(self) -> float:
+        return sum(section.area for section in self.sections)
 
     @property
     def valid_from(self):

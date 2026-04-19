@@ -21,7 +21,7 @@ export type FieldCreate = {
   soil_type?: string | null
   soil_weight?: string | null
   humus_pct?: number | null
-  area_ha: number
+  area: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
   drip_distance?: number | null
@@ -72,7 +72,7 @@ export type FieldOverview = {
   soil_type?: string | null
   soil_weight?: string | null
   humus_pct?: number | null
-  area_ha: number
+  area: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
   drip_distance?: number | null
@@ -101,7 +101,7 @@ export type FieldRead = {
   soil_type?: string | null
   soil_weight?: string | null
   humus_pct?: number | null
-  area_ha: number
+  area: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
   drip_distance?: number | null
@@ -152,7 +152,7 @@ export type FieldReplant = {
   soil_type?: string | null
   soil_weight?: string | null
   humus_pct?: number | null
-  area_ha: number
+  area: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
   drip_distance?: number | null
@@ -179,7 +179,7 @@ export type FieldUpdate = {
   soil_type?: string | null
   soil_weight?: string | null
   humus_pct?: number | null
-  area_ha: number
+  area: number
   effective_root_depth_cm?: number | null
   p_allowable?: number | null
   drip_distance?: number | null

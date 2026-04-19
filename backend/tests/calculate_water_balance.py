@@ -41,7 +41,7 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "soil_weight": "leicht",
             "humus_pct": 2.2,
             "effective_root_depth_cm": 35,
-            "area_ha": 1.6,
+            "area": 16000,
             "p_allowable": 0.45,
         },
         {
@@ -55,7 +55,7 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "soil_weight": "mittel",
             "humus_pct": 1.8,
             "effective_root_depth_cm": 45,
-            "area_ha": 2.3,
+            "area": 23000,
             "p_allowable": 0.50,
         },
     ]

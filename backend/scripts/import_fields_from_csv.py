@@ -137,7 +137,7 @@ def _build_field_payload(
         "soil_type": _optional_text(row.get("soil_type")),
         "soil_weight": _optional_text(row.get("soil_weight")),
         "humus_pct": _optional_float(row.get("humus_pct")),
-        "area_ha": area_value,
+        "area": area_value,
         "effective_root_depth_cm": _optional_float(row.get("effective_root_depth_cm")),
         "p_allowable": _optional_float(row.get("p_allowable")),
         "drip_distance": _optional_float(row.get('drip_distance')),
@@ -297,7 +297,7 @@ def parse_args() -> argparse.Namespace:
         "--area-unit",
         choices=("sqm", "ha"),
         default="sqm",
-        help="Unit of the CSV area_ha column. 'sqm' converts to hectares before POSTing. Default: sqm",
+        help="Unit of the CSV area_ha column. 'ha' converts to m^2 before POSTing. Default: sqm",
     )
     parser.add_argument(
         "--running-metre-unit",
