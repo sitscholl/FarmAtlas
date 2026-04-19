@@ -21,6 +21,13 @@ function hectaresToSquareMetres(value: string) {
   return Number(value) * 10000
 }
 
+function squareMetresToHectares(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value / 10000)
+}
+
 function toSelectedFieldIds(value: string) {
   if (value.trim() === '') {
     return []
@@ -54,7 +61,7 @@ export const irrigationEditFields = [
     required: true,
   },
   { id: 'duration', label: 'Dauer (h)', type: 'number', defaultValue: 1, step: '0.5', required: true },
-  { id: 'amount', label: 'Menge (mm)', type: 'number', step: '10', required: false },
+  { id: 'amount', label: 'Menge (mm)', type: 'number', step: '0.1', required: false },
 ] as const
 
 export const irrigationCreateFields = [
@@ -71,7 +78,7 @@ export const irrigationCreateFields = [
     required: true,
   },
   { id: 'duration', label: 'Dauer (h)', type: 'number', defaultValue: 1, step: '0.5', required: true },
-  { id: 'amount', label: 'Menge (mm)', type: 'number', step: '10', required: false },
+  { id: 'amount', label: 'Menge (mm)', type: 'number', step: '0.1', required: false },
 ] as const
 
 export const fieldCreateAction: CreateActionConfig = {
@@ -84,39 +91,9 @@ export const fieldCreateAction: CreateActionConfig = {
   fields: [
     { id: 'group', label: 'Gruppe', type: 'text', placeholder: 'Ostblock', required: true },
     { id: 'name', label: 'Name', type: 'text', placeholder: 'Parzellenname', required: true },
-    { id: 'section', label: 'Abschnitt', type: 'text', placeholder: 'Nord', required: false },
-    { id: 'variety', label: 'Sorte', type: 'select', optionsSource: 'varieties', required: true },
-    { id: 'area_ha', label: 'Flaeche (ha)', type: 'number', placeholder: '1', step: '0.1', required: true },
-    { id: 'planting_year', label: 'Pflanzjahr', type: 'number', placeholder: '2018', step: '1', required: true },
-    { id: 'tree_count', label: 'Baumzahl', type: 'number', placeholder: '250', step: '1', required: false },
-    { id: 'tree_height', label: 'Baumhoehe (m)', type: 'number', placeholder: '3', step: '0.1', required: false },
-    { id: 'row_distance', label: 'Reihenabstand (m)', type: 'number', placeholder: '3.5', step: '0.1', required: false },
-    { id: 'tree_distance', label: 'Pflanzabstand (m)', type: 'number', placeholder: '1.2', step: '0.1', required: false },
-    { id: 'running_metre', label: 'Laufmeter (m)', type: 'number', placeholder: '450', step: '0.1', required: false },
-    {
-      id: 'herbicide_free',
-      label: 'Herbizidfrei',
-      type: 'select',
-      options: [
-        { value: '', label: 'Keine Angabe' },
-        { value: 'true', label: 'Ja' },
-        { value: 'false', label: 'Nein' },
-      ],
-      required: false,
-    },
-    {
-      id: 'active',
-      label: 'Status',
-      type: 'select',
-      options: [
-        { value: 'true', label: 'Aktiv' },
-        { value: 'false', label: 'Inaktiv' },
-      ],
-      defaultValue: 'true',
-      required: true,
-    },
     { id: 'reference_provider', label: 'Provider', type: 'text', defaultValue: 'sbr', required: true },
     { id: 'reference_station', label: 'Referenzstation', type: 'text', defaultValue: '103', required: true },
+    { id: 'elevation', label: 'Hoehe (m)', type: 'number', defaultValue: 0, step: '1', required: true },
     { id: 'soil_type', label: 'Bodenart', type: 'text', placeholder: 'lehm', required: false },
     {
       id: 'soil_weight',
@@ -133,35 +110,104 @@ export const fieldCreateAction: CreateActionConfig = {
     },
     { id: 'humus_pct', label: 'Humusgehalt (%)', type: 'number', placeholder: '3', step: '0.1', required: false },
     { id: 'effective_root_depth_cm', label: 'Effektive Wurzeltiefe (cm)', type: 'number', defaultValue: 30, step: '1', required: false },
-    { id: 'p_allowable', label: 'Entziehbarer Wasseranteil (%)', type: 'number', defaultValue: 0.70, step: '0.01', required: false },
+    { id: 'p_allowable', label: 'Entziehbarer Wasseranteil', type: 'number', defaultValue: 0.7, step: '0.01', required: false },
     { id: 'drip_distance', label: 'Tropferabstand (m)', type: 'number', defaultValue: 0.4, step: '0.01', required: false },
     { id: 'drip_discharge', label: 'Tropferleistung (l/h)', type: 'number', defaultValue: 2.1, step: '0.1', required: false },
     { id: 'tree_strip_width', label: 'Baumstreifenbreite (m)', type: 'number', defaultValue: 1, step: '0.01', required: false },
+    {
+      id: 'valve_open',
+      label: 'Ventil offen',
+      type: 'select',
+      options: [
+        { value: 'true', label: 'Ja' },
+        { value: 'false', label: 'Nein' },
+      ],
+      defaultValue: 'true',
+      required: true,
+    },
   ],
   buildPayload: (values) => ({
     group: values.group.trim(),
     name: values.name.trim(),
-    section: toOptionalText(values.section),
+    reference_provider: values.reference_provider.trim(),
+    reference_station: values.reference_station.trim(),
+    elevation: Number(values.elevation),
+    soil_type: toOptionalText(values.soil_type),
+    soil_weight: toOptionalText(values.soil_weight),
+    humus_pct: toOptionalNumber(values.humus_pct),
+    effective_root_depth_cm: toOptionalNumber(values.effective_root_depth_cm),
+    p_allowable: toOptionalNumber(values.p_allowable),
+    drip_distance: toOptionalNumber(values.drip_distance),
+    drip_discharge: toOptionalNumber(values.drip_discharge),
+    tree_strip_width: toOptionalNumber(values.tree_strip_width),
+    valve_open: values.valve_open === 'true',
+  }),
+}
+
+export const plantingCreateAction: CreateActionConfig = {
+  id: 'planting',
+  label: 'Pflanzung hinzufuegen',
+  title: 'Neue Pflanzung',
+  submitLabel: 'Pflanzung anlegen',
+  endpoint: '/plantings',
+  method: 'post',
+  fields: [
+    { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
+    { id: 'variety', label: 'Sorte', type: 'select', optionsSource: 'varieties', required: true },
+    { id: 'valid_from', label: 'Gueltig ab', type: 'date', required: true },
+    { id: 'valid_to', label: 'Gueltig bis', type: 'date', required: false },
+  ],
+  buildPayload: (values) => ({
+    field_id: Number(values.field_id),
     variety: values.variety.trim(),
+    valid_from: values.valid_from,
+    valid_to: toOptionalText(values.valid_to),
+  }),
+}
+
+export const sectionCreateAction: CreateActionConfig = {
+  id: 'section',
+  label: 'Abschnitt hinzufuegen',
+  title: 'Neuer Abschnitt',
+  submitLabel: 'Abschnitt anlegen',
+  endpoint: '/sections',
+  method: 'post',
+  fields: [
+    { id: 'name', label: 'Name', type: 'text', placeholder: 'Nord', required: true },
+    { id: 'planting_year', label: 'Pflanzjahr', type: 'number', step: '1', required: true },
+    { id: 'area_ha', label: 'Flaeche (ha)', type: 'number', step: '0.01', required: true },
+    { id: 'tree_count', label: 'Baumzahl', type: 'number', step: '1', required: false },
+    { id: 'tree_height', label: 'Baumhoehe (m)', type: 'number', step: '0.1', required: false },
+    { id: 'row_distance', label: 'Reihenabstand (m)', type: 'number', step: '0.1', required: false },
+    { id: 'tree_distance', label: 'Baumabstand (m)', type: 'number', step: '0.1', required: false },
+    { id: 'running_metre', label: 'Laufmeter (m)', type: 'number', step: '0.1', required: false },
+    {
+      id: 'herbicide_free',
+      label: 'Herbizidfrei',
+      type: 'select',
+      options: [
+        { value: '', label: 'Keine Angabe' },
+        { value: 'true', label: 'Ja' },
+        { value: 'false', label: 'Nein' },
+      ],
+      required: false,
+    },
+    { id: 'valid_from', label: 'Gueltig ab', type: 'date', required: true },
+    { id: 'valid_to', label: 'Gueltig bis', type: 'date', required: false },
+  ],
+  buildPayload: (values) => ({
+    planting_id: Number(values.planting_id),
+    name: values.name.trim(),
     planting_year: Number(values.planting_year),
+    area: hectaresToSquareMetres(values.area_ha),
     tree_count: toOptionalNumber(values.tree_count),
     tree_height: toOptionalNumber(values.tree_height),
     row_distance: toOptionalNumber(values.row_distance),
     tree_distance: toOptionalNumber(values.tree_distance),
     running_metre: toOptionalNumber(values.running_metre),
     herbicide_free: toOptionalBoolean(values.herbicide_free),
-    active: values.active === 'true',
-    reference_provider: values.reference_provider.trim(),
-    reference_station: values.reference_station.trim(),
-    soil_type: toOptionalText(values.soil_type),
-    soil_weight: toOptionalText(values.soil_weight),
-    humus_pct: toOptionalNumber(values.humus_pct),
-    area: hectaresToSquareMetres(values.area_ha),
-    effective_root_depth_cm: toOptionalNumber(values.effective_root_depth_cm),
-    p_allowable: toOptionalNumber(values.p_allowable),
-    drip_distance: toOptionalNumber(values.drip_distance),
-    drip_discharge: toOptionalNumber(values.drip_discharge),
-    tree_strip_width: toOptionalNumber(values.tree_strip_width),
+    valid_from: values.valid_from,
+    valid_to: toOptionalText(values.valid_to),
   }),
 }
 
@@ -197,7 +243,7 @@ export const irrigationCreateAction: CreateActionConfig = {
   label: 'Bewaesserung eintragen',
   title: 'Bewaesserung eintragen',
   submitLabel: 'Bewaesserung speichern',
-  endpoint: '/irrigation/bulk',
+  endpoint: '/irrigation/bulk/upsert',
   method: 'post',
   fields: [...irrigationCreateFields],
   buildPayload: (values) => ({
@@ -210,3 +256,5 @@ export const irrigationCreateAction: CreateActionConfig = {
 }
 
 export const createActions: CreateActionConfig[] = [fieldCreateAction, varietyCreateAction, irrigationCreateAction]
+
+export { squareMetresToHectares }

@@ -1,4 +1,4 @@
-from .field import CadastralParcelRead, FieldCreate, FieldDetailRead, FieldRead, FieldUpdate
+from .field import CadastralParcelRead, FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, FieldUpdate
 from .irrigation import (
     IrrigationBulkCreate,
     IrrigationBulkResponse,
@@ -17,6 +17,7 @@ __all__ = [
     "FieldCreate",
     "FieldDetailRead",
     "FieldRead",
+    "FieldSummaryRead",
     "FieldUpdate",
     "IrrigationBulkCreate",
     "IrrigationBulkResponse",

@@ -12,6 +12,7 @@ from ..scheduler import WorkflowScheduler
 from ..schemas import (
     FieldDetailRead,
     FieldRead,
+    FieldSummaryRead,
     IrrigationRead,
     PlantingRead,
     SectionRead,
@@ -19,6 +20,7 @@ from ..schemas import (
     WaterBalanceSeriesPoint,
     WaterBalanceSummary,
 )
+from ..field import FieldContext
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,46 @@ def serialize_field(field) -> FieldRead:
 
 def serialize_field_detail(field) -> FieldDetailRead:
     return FieldDetailRead.model_validate(field)
+
+
+def serialize_field_summary(
+    field,
+    *,
+    water_balance_summary: WaterBalanceSummary,
+    last_irrigation_date,
+) -> FieldSummaryRead:
+    field_context = FieldContext.from_model(field)
+    planting_years = [section.planting_year for section in field_context.sections]
+    return FieldSummaryRead(
+        id=field.id,
+        group=field.group,
+        name=field.name,
+        reference_provider=field.reference_provider,
+        reference_station=field.reference_station,
+        elevation=float(field.elevation),
+        soil_type=field.soil_type,
+        soil_weight=field.soil_weight,
+        humus_pct=None if field.humus_pct is None else float(field.humus_pct),
+        effective_root_depth_cm=None if field.effective_root_depth_cm is None else float(field.effective_root_depth_cm),
+        p_allowable=None if field.p_allowable is None else float(field.p_allowable),
+        drip_distance=None if field.drip_distance is None else float(field.drip_distance),
+        drip_discharge=None if field.drip_discharge is None else float(field.drip_discharge),
+        tree_strip_width=None if field.tree_strip_width is None else float(field.tree_strip_width),
+        valve_open=bool(field.valve_open),
+        total_area=float(field_context.area),
+        tree_count=field_context.tree_count,
+        running_metre=field_context.running_metre,
+        active=field_context.active,
+        herbicide_free=field_context.herbicide_free,
+        planting_count=len(field.plantings),
+        section_count=len(field_context.sections),
+        variety_names=sorted({planting.variety for planting in field_context.plantings}),
+        section_names=sorted({section.name for section in field_context.sections}),
+        planting_year_min=min(planting_years) if planting_years else None,
+        planting_year_max=max(planting_years) if planting_years else None,
+        last_irrigation_date=None if last_irrigation_date is None else last_irrigation_date.isoformat(),
+        water_balance_summary=water_balance_summary,
+    )
 
 
 def serialize_planting(planting) -> PlantingRead:

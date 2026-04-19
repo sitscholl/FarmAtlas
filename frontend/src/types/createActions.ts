@@ -1,14 +1,20 @@
 import type {
   FieldCreate,
-  FieldReplant,
   FieldUpdate,
+  PlantingCreate,
+  PlantingUpdate,
+  SectionCreate,
+  SectionUpdate,
   VarietyCreate,
   VarietyUpdate,
 } from './generated/api'
 
 export type FieldCreatePayload = FieldCreate
 export type FieldUpdatePayload = FieldUpdate
-export type FieldReplantPayload = FieldReplant
+export type PlantingCreatePayload = PlantingCreate
+export type PlantingUpdatePayload = PlantingUpdate
+export type SectionCreatePayload = SectionCreate
+export type SectionUpdatePayload = SectionUpdate
 export type VarietyCreatePayload = VarietyCreate
 export type VarietyUpdatePayload = VarietyUpdate
 
@@ -31,7 +37,10 @@ export type IrrigationBulkCreatePayload = {
 type ActionPayload =
   | FieldCreatePayload
   | FieldUpdatePayload
-  | FieldReplantPayload
+  | PlantingCreatePayload
+  | PlantingUpdatePayload
+  | SectionCreatePayload
+  | SectionUpdatePayload
   | IrrigationCreatePayload
   | IrrigationBulkCreatePayload
   | VarietyCreatePayload
@@ -72,7 +81,7 @@ export type CreateActionField =
     }
 
 export type CreateActionConfig = {
-  id: 'field' | 'irrigation' | 'variety'
+  id: 'field' | 'planting' | 'section' | 'irrigation' | 'variety'
   label: string
   title: string
   submitLabel: string

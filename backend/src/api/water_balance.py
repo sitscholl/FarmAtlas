@@ -24,6 +24,12 @@ async def get_water_balance_summary():
     return [WaterBalanceSummary(**summary) for summary in summaries]
 
 
+@router.get("/api/fields/{field_id}/water-balance/summary", response_model=WaterBalanceSummary)
+async def get_field_water_balance_summary(field_id: int):
+    validate_field_id(field_id)
+    return get_water_balance_summary_for_field(field_id)
+
+
 @router.get("/api/fields/{field_id}/water-balance/series", response_model=list[WaterBalanceSeriesPoint])
 async def get_field_water_balance_series(
     field_id: int,

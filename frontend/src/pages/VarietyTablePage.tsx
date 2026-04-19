@@ -14,7 +14,7 @@ import {
   buildVarietyEditAction,
   buildVarietyEditInitialValues,
 } from '../lib/varietyForm'
-import type { FieldRead, VarietyRead } from '../types/generated/api'
+import type { FieldSummaryRead, VarietyRead } from '../types/generated/api'
 
 function formatNumber(value: number | null | undefined, digits = 2) {
   if (value === null || value === undefined) {
@@ -30,7 +30,7 @@ function formatNumber(value: number | null | undefined, digits = 2) {
 export default function VarietyTablePage() {
   const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
   const [varieties, setVarieties] = useState<VarietyRead[]>([])
-  const [fields, setFields] = useState<FieldRead[]>([])
+  const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedVarietyId, setSelectedVarietyId] = useState<number | null>(null)
@@ -45,7 +45,7 @@ export default function VarietyTablePage() {
       try {
         const [varietiesResponse, fieldsResponse] = await Promise.all([
           api.get<VarietyRead[]>('/varieties'),
-          api.get<FieldRead[]>('/fields'),
+          api.get<FieldSummaryRead[]>('/fields/summary'),
         ])
 
         setVarieties(varietiesResponse.data)
@@ -89,7 +89,9 @@ export default function VarietyTablePage() {
 
   const usageCountByVariety = useMemo(() => {
     return fields.reduce<Record<string, number>>((counts, field) => {
-      counts[field.variety] = (counts[field.variety] ?? 0) + 1
+      field.variety_names.forEach((varietyName) => {
+        counts[varietyName] = (counts[varietyName] ?? 0) + 1
+      })
       return counts
     }, {})
   }, [fields])

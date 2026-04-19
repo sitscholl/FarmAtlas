@@ -59,7 +59,11 @@ function buildInitialValues(
       action.fields.map((field) => {
         if (field.type === 'date') {
           const today = new Date().toISOString().slice(0, 10)
-          return [field.id, String(field.defaultValue ?? today)]
+          const defaultValue =
+            field.required === false
+              ? field.defaultValue ?? ''
+              : field.defaultValue ?? today
+          return [field.id, String(defaultValue)]
         }
 
         return [field.id, String('defaultValue' in field ? (field.defaultValue ?? '') : '')]
@@ -72,8 +76,8 @@ function buildInitialValues(
 function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   return fields.map((field) => ({
     value: String(field.id),
-    label: [field.name, field.section, field.variety, String(field.planting_year)]
-      .filter((part) => part && String(part).trim() !== '')
+    label: [field.group, field.name]
+      .filter((part) => String(part).trim() !== '')
       .join(' | '),
   }))
 }

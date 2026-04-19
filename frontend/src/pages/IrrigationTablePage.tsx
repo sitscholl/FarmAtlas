@@ -16,12 +16,12 @@ import {
 } from '../lib/irrigationForm'
 import type { FieldRead, IrrigationRead } from '../types/generated/api'
 
-type IrrigationColumnKey = 'date' | 'field' | 'section' | 'method' | 'duration' | 'amount'
+type IrrigationColumnKey = 'date' | 'field' | 'group' | 'method' | 'duration' | 'amount'
 
 const visibleIrrigationColumns: IrrigationColumnKey[] = [
   'date',
   'field',
-  'section',
+  'group',
   'method',
   'duration',
   'amount',
@@ -111,9 +111,7 @@ export default function IrrigationTablePage() {
           field.id,
           {
             name: field.name,
-            section: field.section,
-            variety: field.variety,
-            planting_year: field.planting_year,
+            group: field.group,
           },
         ]),
       ),
@@ -132,10 +130,10 @@ export default function IrrigationTablePage() {
         header: 'Anlage',
         cell: (event) => fieldsById[event.field_id]?.name ?? `#${event.field_id}`,
       },
-      section: {
-        id: 'section',
-        header: 'Abschnitt',
-        cell: (event) => fieldsById[event.field_id]?.section ?? 'n/a',
+      group: {
+        id: 'group',
+        header: 'Gruppe',
+        cell: (event) => fieldsById[event.field_id]?.group ?? 'n/a',
       },
       method: {
         id: 'method',
@@ -170,8 +168,8 @@ export default function IrrigationTablePage() {
             .slice()
             .sort((left, right) => left.name.localeCompare(right.name, 'de-DE'))
             .map((field) => ({
-              label: [field.name, field.section, field.variety, String(field.planting_year)]
-                .filter((part) => part && String(part).trim() !== '')
+              label: [field.group, field.name]
+                .filter((part) => String(part).trim() !== '')
                 .join(' | '),
               value: String(field.id),
             })),

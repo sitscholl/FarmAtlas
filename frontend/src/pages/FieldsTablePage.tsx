@@ -1,21 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { GoPencil } from 'react-icons/go'
-import { PiTrashBold } from 'react-icons/pi'
 
 import api from '../api'
-import CreateEntityModal from '../components/CreateEntityModal'
 import DataTable, {
   type DataTableColumn,
   type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
-import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
-import {
-  buildFieldEditAction,
-  buildFieldEditInitialValues,
-} from '../lib/fieldForm'
-import type { FieldOverview } from '../types/generated/api'
+import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
+import type { FieldSummaryRead } from '../types/generated/api'
 
 function formatNumber(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
@@ -44,12 +37,9 @@ function squareMetresToHectares(value: number | null | undefined) {
 }
 
 export default function FieldsTablePage() {
-  const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
-  const [fields, setFields] = useState<FieldOverview[]>([])
+  const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null)
-  const [editingField, setEditingField] = useState<FieldOverview | null>(null)
   const [filters, setFilters] = useState({
     query: '',
     status: 'active',
@@ -59,9 +49,9 @@ export default function FieldsTablePage() {
   useEffect(() => {
     const fetchFields = async () => {
       try {
-        const response = await api.get<FieldOverview[]>('/fields/overview')
+        const response = await api.get<FieldSummaryRead[]>('/fields/summary')
         if (!Array.isArray(response.data)) {
-          throw new TypeError('Expected /fields/overview to return an array.')
+          throw new TypeError('Expected /fields/summary to return an array.')
         }
 
         setFields(response.data)
@@ -86,22 +76,7 @@ export default function FieldsTablePage() {
     return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [])
 
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (interactiveAreaRef.current === null) {
-        return
-      }
-
-      if (!interactiveAreaRef.current.contains(event.target as Node)) {
-        setSelectedFieldId(null)
-      }
-    }
-
-    window.addEventListener('mousedown', handlePointerDown)
-    return () => window.removeEventListener('mousedown', handlePointerDown)
-  }, [])
-
-  const columns = useMemo<DataTableColumn<FieldOverview>[]>(
+  const columns = useMemo<DataTableColumn<FieldSummaryRead>[]>(
     () => [
       {
         id: 'name',
@@ -116,24 +91,29 @@ export default function FieldsTablePage() {
         ),
       },
       {
-        id: 'section',
-        header: 'Abschnitt',
-        cell: (field) => field.section ?? 'n/a',
+        id: 'group',
+        header: 'Gruppe',
+        cell: (field) => field.group,
       },
       {
-        id: 'variety',
-        header: 'Sorte',
-        cell: (field) => field.variety,
+        id: 'varieties',
+        header: 'Sorten',
+        cell: (field) => field.variety_names.join(', ') || 'n/a',
       },
       {
         id: 'area',
         header: 'Flaeche (ha)',
-        cell: (field) => formatNumber(squareMetresToHectares(field.area), 2),
+        cell: (field) => formatNumber(squareMetresToHectares(field.total_area), 2),
       },
       {
-        id: 'planting_year',
-        header: 'Pflanzjahr',
-        cell: (field) => String(field.planting_year),
+        id: 'plantings',
+        header: 'Pflanzungen',
+        cell: (field) => formatNumber(field.planting_count, 0),
+      },
+      {
+        id: 'sections',
+        header: 'Abschnitte',
+        cell: (field) => formatNumber(field.section_count, 0),
       },
       {
         id: 'tree_count',
@@ -141,19 +121,17 @@ export default function FieldsTablePage() {
         cell: (field) => formatNumber(field.tree_count, 0),
       },
       {
-        id: 'tree_height',
-        header: 'Baumhoehe',
-        cell: (field) => `${formatNumber(field.tree_height, 1)} m`,
+        id: 'station',
+        header: 'Station',
+        cell: (field) => field.reference_station,
       },
       {
-        id: 'soil_type',
-        header: 'Bodenart',
-        cell: (field) => field.soil_type ?? 'n/a',
-      },
-      {
-        id: 'soil_weight',
-        header: 'Bodenschwere',
-        cell: (field) => field.soil_weight ?? 'n/a',
+        id: 'water_balance',
+        header: 'Wasserbilanz',
+        cell: (field) =>
+          field.water_balance_summary.safe_ratio === null || field.water_balance_summary.safe_ratio === undefined
+            ? 'n/a'
+            : `${formatNumber(field.water_balance_summary.safe_ratio * 100, 0)} %`,
       },
       {
         id: 'herbicide_free',
@@ -176,7 +154,7 @@ export default function FieldsTablePage() {
         label: 'Suche',
         type: 'text',
         value: filters.query,
-        placeholder: 'Name, Sorte oder Station',
+        placeholder: 'Name, Gruppe oder Station',
       },
       {
         id: 'status',
@@ -195,10 +173,10 @@ export default function FieldsTablePage() {
         type: 'select',
         value: filters.herbicideFree,
         options: [
-          {label: 'Alle', value: ''},
-          {label: 'Ja', value: 'Ja'},
-          {label: 'Nein', value: 'Nein'},
-        ]
+          { label: 'Alle', value: '' },
+          { label: 'Ja', value: 'Ja' },
+          { label: 'Nein', value: 'Nein' },
+        ],
       },
     ],
     [filters],
@@ -212,7 +190,7 @@ export default function FieldsTablePage() {
       .filter((field) => {
         const matchesQuery =
           normalizedQuery === '' ||
-          [field.name, field.variety, field.reference_station, field.reference_provider]
+          [field.name, field.group, field.reference_station, field.reference_provider, field.variety_names.join(' ')]
             .join(' ')
             .toLowerCase()
             .includes(normalizedQuery)
@@ -221,31 +199,15 @@ export default function FieldsTablePage() {
           filters.status === '' ||
           (filters.status === 'active' ? field.active : !field.active)
 
-        const matchesherbicideFree =
+        const matchesHerbicideFree =
           filters.herbicideFree === '' ||
           (filters.herbicideFree === 'Ja'
             ? field.herbicide_free === true
             : field.herbicide_free === false)
 
-        return matchesQuery && matchesStatus && matchesherbicideFree
+        return matchesQuery && matchesStatus && matchesHerbicideFree
       })
   }, [fields, filters])
-
-  const selectedField = useMemo(
-    () => filteredFields.find((field) => field.id === selectedFieldId) ?? null,
-    [filteredFields, selectedFieldId],
-  )
-
-  useEffect(() => {
-    if (selectedFieldId === null) {
-      return
-    }
-
-    const stillExists = filteredFields.some((field) => field.id === selectedFieldId)
-    if (!stillExists) {
-      setSelectedFieldId(null)
-    }
-  }, [filteredFields, selectedFieldId])
 
   const handleFilterChange = (filterId: string, value: string) => {
     setFilters((current) => ({ ...current, [filterId]: value }))
@@ -259,23 +221,7 @@ export default function FieldsTablePage() {
     })
   }
 
-  const handleDeleteField = async (field: FieldOverview) => {
-    const confirmed = window.confirm(`Soll die Anlage "${field.name}" wirklich geloescht werden?`)
-    if (!confirmed) {
-      return
-    }
-
-    try {
-      await api.delete(`/fields/${field.id}`)
-      setSelectedFieldId(null)
-      notifyDataChanged()
-    } catch (error) {
-      console.error(`Error deleting field ${field.id}`, error)
-      setErrorMessage('Die Anlage konnte nicht geloescht werden.')
-    }
-  }
-
-  const summaryCells = useMemo<DataTableSummaryCell<FieldOverview>[]>(
+  const summaryCells = useMemo<DataTableSummaryCell<FieldSummaryRead>[]>(
     () => [
       {
         columnId: 'name',
@@ -285,7 +231,7 @@ export default function FieldsTablePage() {
         columnId: 'area',
         content: (rows) =>
           formatNumber(
-            rows.reduce((total, field) => total + (squareMetresToHectares(field.area) ?? 0), 0),
+            rows.reduce((total, field) => total + (squareMetresToHectares(field.total_area) ?? 0), 0),
             2,
           ),
       },
@@ -301,12 +247,6 @@ export default function FieldsTablePage() {
     [],
   )
 
-  const editAction = useMemo(() => buildFieldEditAction(editingField), [editingField])
-  const editInitialValues = useMemo(
-    () => buildFieldEditInitialValues(editingField),
-    [editingField],
-  )
-
   return (
     <section className="w-full max-w-7xl">
       <div className="px-3 py-4 sm:px-6 sm:py-6 lg:p-8">
@@ -319,49 +259,18 @@ export default function FieldsTablePage() {
               Anlagen
             </h1>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             {filteredFields.length} / {fields.length} Eintraege
           </div>
         </div>
 
-        <div ref={interactiveAreaRef} className="mt-8">
-          {selectedField ? (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border border-slate-200 bg-slate-50 px-4 py-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Ausgewaehlte Anlage
-                </p>
-                <p className="mt-1 text-lg font-semibold text-slate-900">
-                  {selectedField.name}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingField(selectedField)}
-                  className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-500"
-                >
-                  <GoPencil />
-                  Bearbeiten
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteField(selectedField)}
-                  className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
-                >
-                  <PiTrashBold />
-                  Loeschen
-                </button>
-              </div>
-            </div>
-          ) : null}
-
+        <div className="mt-8">
           {isLoading ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
+            <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
               Lade Felddaten...
             </div>
           ) : errorMessage ? (
-            <div className="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-12 text-center text-rose-700">
+            <div className="border border-rose-200 bg-rose-50 px-6 py-12 text-center text-rose-700">
               {errorMessage}
             </div>
           ) : (
@@ -374,19 +283,10 @@ export default function FieldsTablePage() {
               onFilterChange={handleFilterChange}
               onResetFilters={handleResetFilters}
               summaryCells={summaryCells}
-              selectedRowKey={selectedFieldId}
-              onRowSelect={(field) => setSelectedFieldId(field?.id ?? null)}
             />
           )}
         </div>
       </div>
-
-      <CreateEntityModal
-        action={editAction}
-        isOpen={editingField !== null}
-        initialValues={editInitialValues}
-        onClose={() => setEditingField(null)}
-      />
     </section>
   )
 }
