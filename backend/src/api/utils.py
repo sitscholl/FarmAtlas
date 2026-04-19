@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta
+from datetime import datetime
 import logging
 from pathlib import Path
 
@@ -12,10 +12,7 @@ from ..scheduler import WorkflowScheduler
 from ..schemas import (
     FieldDetailRead,
     FieldRead,
-    IrrigationCommandCreate,
-    IrrigationCommandResult,
     IrrigationRead,
-    IrrigationTarget,
     PlantingRead,
     SectionRead,
     VarietyRead,
@@ -86,10 +83,6 @@ def raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...
     raise HTTPException(status_code=500, detail="Unexpected server error.") from exc
 
 
-def today_local() -> date:
-    return datetime.now(runtime.timezone).date()
-
-
 def get_irrigation_event(event_id: int):
     with runtime.db.session_scope() as session:
         event = runtime.db.irrigation.get_by_id(session, event_id)
@@ -101,120 +94,9 @@ def get_irrigation_event(event_id: int):
     return event
 
 
-def get_fields_by_name(field_name: str, *, active_only: bool = True):
-    normalized = field_name.strip().casefold()
-    matches = [
-        field
-        for field in runtime.fields
-        if field.name.strip().casefold() == normalized and (field.active or not active_only)
-    ]
-    if not matches:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Could not find any {'active ' if active_only else ''}field with name '{field_name}'",
-        )
-    return matches
-
-
-def get_irrigation_events_for_fields_and_date(field_ids: list[int], target_date: date) -> dict[int, object]:
-    if not field_ids:
-        return {}
-
-    field_id_set = set(field_ids)
-    with runtime.db.session_scope() as session:
-        events = [
-            event
-            for event in runtime.db.irrigation.list(
-                session,
-                start=target_date,
-                end=target_date + timedelta(days=1),
-            )
-            if event.field_id in field_id_set and event.date == target_date
-        ]
-    return {event.field_id: event for event in events}
-
-
 def queue_water_balance_refresh(background_tasks: BackgroundTasks, field_ids: list[int]) -> None:
     for field_id in sorted(set(field_ids)):
         background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
-
-
-def build_irrigation_targets() -> list[IrrigationTarget]:
-    grouped: dict[str, list] = {}
-
-    for field in runtime.fields:
-        grouped.setdefault(field.name, []).append(field)
-
-    targets: list[IrrigationTarget] = []
-    for field_name, fields in grouped.items():
-        active_fields = [field for field in fields if field.active]
-        target_fields = active_fields if active_fields else fields
-
-        sections = sorted(
-            {
-                field.section
-                for field in target_fields
-                if field.section is not None and field.section != ""
-            }
-        )
-        varieties = sorted(
-            {
-                field.variety
-                for field in target_fields
-                if getattr(field, "variety", None) is not None
-            }
-        )
-
-        targets.append(
-            IrrigationTarget(
-                field=field_name,
-                active=any(field.active for field in fields),
-                field_ids=[field.id for field in target_fields],
-                field_count=len(target_fields),
-                sections=sections,
-                varieties=varieties,
-            )
-        )
-
-    return sorted(targets, key=lambda target: target.field.casefold())
-
-
-def build_irrigation_command_result(
-    *,
-    success: bool,
-    status_value: str,
-    message: str,
-    irrigation_command: IrrigationCommandCreate,
-    target_date: date,
-    matched_field_ids: list[int] | None = None,
-    created_event_ids: list[int] | None = None,
-    updated_event_ids: list[int] | None = None,
-    unchanged_event_ids: list[int] | None = None,
-    error: str | None = None,
-) -> IrrigationCommandResult:
-    created_event_ids = created_event_ids or []
-    updated_event_ids = updated_event_ids or []
-    unchanged_event_ids = unchanged_event_ids or []
-    matched_field_ids = matched_field_ids or []
-
-    return IrrigationCommandResult(
-        success=success,
-        status=status_value,
-        message=message,
-        field=irrigation_command.field,
-        date=target_date,
-        method=irrigation_command.method,
-        duration=irrigation_command.duration,
-        amount=irrigation_command.amount,
-        matched_field_ids=matched_field_ids,
-        error=error,
-        created_event_ids=created_event_ids,
-        updated_event_ids=updated_event_ids,
-        unchanged_event_ids=unchanged_event_ids,
-        created_count=len(created_event_ids),
-        updated_count=len(updated_event_ids),
-        unchanged_count=len(unchanged_event_ids),
-    )
 
 
 def serialize_water_balance_series(records) -> list[WaterBalanceSeriesPoint]:
