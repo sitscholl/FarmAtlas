@@ -147,12 +147,13 @@ class Section(Base, ValidityRangeMixin):
         Index(
             "uq_sections_planting_valid_from",
             "planting_id",
-            "valid_from",
+            "name",
             unique=True,
         ),
     )
 
     id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
     planting_id = Column(Integer, ForeignKey("plantings.id"), nullable=False)
 
     planting_year = Column(Integer, nullable=False)

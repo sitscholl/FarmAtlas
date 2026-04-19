@@ -44,6 +44,7 @@ class PlantingContext:
 @dataclass(frozen=True)
 class SectionContext:
     id: int
+    name: str
     planting_id: int
     variety: str
     planting_year: int
@@ -96,6 +97,7 @@ class FieldContext:
         sections = [
             SectionContext(
                 id=section.id,
+                name=section.name,
                 planting_id=section.planting_id,
                 variety=section.variety.name if section.variety is not None else "",
                 planting_year=section.planting_year,
@@ -152,8 +154,9 @@ class FieldContext:
         return None if result is None else str(result)
 
     @property
-    def section(self) -> None:
-        return None
+    def section(self) -> str | None:
+        result = _single_or_none([section.name for section in self.sections])
+        return None if result is None else str(result)
 
     @property
     def planting_year(self) -> int | None:
