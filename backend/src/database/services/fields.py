@@ -1,6 +1,7 @@
+from typing import Any
+
 from ..core import DatabaseCore
 from ..repositories import FieldRepository, WaterBalanceRepository
-
 
 class FieldService:
     def __init__(
