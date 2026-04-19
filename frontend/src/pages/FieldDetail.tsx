@@ -6,7 +6,6 @@ import { IoMdAdd } from 'react-icons/io'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
-import WaterBalanceChart from '../components/WaterBalanceChart'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
@@ -26,11 +25,8 @@ import {
   type FieldDetailRead,
   type PlantingDetailRead,
   type SectionRead,
-  type WaterBalanceSeriesPoint,
   type WaterBalanceSummary,
 } from '../types/generated/api'
-
-const FORECAST_DAYS = 5
 
 type DetailMetric = {
   label: string
@@ -277,9 +273,7 @@ export default function FieldDetail() {
   const { fieldId } = useParams()
   const [fieldDetail, setFieldDetail] = useState<FieldDetailRead | null>(null)
   const [waterSummary, setWaterSummary] = useState<WaterBalanceSummary | null>(null)
-  const [series, setSeries] = useState<WaterBalanceSeriesPoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isForecastLoading, setIsForecastLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [activeAction, setActiveAction] = useState<CreateActionConfig | null>(null)
   const [activeInitialValues, setActiveInitialValues] = useState<Record<string, string> | undefined>(undefined)
@@ -297,10 +291,9 @@ export default function FieldDetail() {
       }
 
       try {
-        const [detailResponse, summaryResponse, seriesResponse] = await Promise.all([
+        const [detailResponse, summaryResponse] = await Promise.all([
           api.get<FieldDetailRead>(`/fields/${fieldId}`),
           api.get<WaterBalanceSummary>(`/fields/${fieldId}/water-balance/summary`),
-          api.get<WaterBalanceSeriesPoint[]>(`/fields/${fieldId}/water-balance/series`),
         ])
         if (!isActive) {
           return
@@ -308,29 +301,8 @@ export default function FieldDetail() {
 
         setFieldDetail(detailResponse.data)
         setWaterSummary(summaryResponse.data)
-        setSeries(seriesResponse.data)
         setErrorMessage(null)
         setIsLoading(false)
-
-        setIsForecastLoading(true)
-        try {
-          const forecastResponse = await api.get<WaterBalanceSeriesPoint[]>(
-            `/fields/${fieldId}/water-balance/series`,
-            {
-              params: { forecast_days: FORECAST_DAYS },
-            },
-          )
-          if (!isActive) {
-            return
-          }
-          setSeries(forecastResponse.data)
-        } catch (error) {
-          console.error('Error fetching forecast water-balance data', error)
-        } finally {
-          if (isActive) {
-            setIsForecastLoading(false)
-          }
-        }
       } catch (error) {
         if (!isActive) {
           return
@@ -345,7 +317,6 @@ export default function FieldDetail() {
 
     const handleDataChanged = () => {
       setIsLoading(true)
-      setIsForecastLoading(false)
       void fetchDetail()
     }
 
@@ -492,15 +463,6 @@ export default function FieldDetail() {
               Anlage loeschen
             </button>
           </div>
-        </div>
-
-        <div className="mt-10">
-          <WaterBalanceChart data={series} reservedForecastDays={FORECAST_DAYS} />
-          {isForecastLoading ? (
-            <p className="mt-3 text-sm text-slate-500">
-              Lade Prognosedaten...
-            </p>
-          ) : null}
         </div>
 
         <h2 className="mt-12 text-4xl font-semibold text-slate-900">

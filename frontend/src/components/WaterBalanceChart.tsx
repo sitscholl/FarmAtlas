@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useEffect, useState } from 'react'
 
 import { type WaterBalanceSeriesPoint } from '../types/generated/api'
 
@@ -175,6 +176,21 @@ export default function WaterBalanceChart({
   data,
   reservedForecastDays = 0,
 }: WaterBalanceChartProps) {
+  const [showTooltip, setShowTooltip] = useState(true)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 767px), (pointer: coarse)')
+    const update = () => setShowTooltip(!mediaQuery.matches)
+
+    update()
+    mediaQuery.addEventListener('change', update)
+    return () => mediaQuery.removeEventListener('change', update)
+  }, [])
+
   if (data.length === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
@@ -236,7 +252,7 @@ export default function WaterBalanceChart({
                   label={{ value: 'Heute', position: 'top', fill: '#475569', fontSize: 11 }}
                 />
               ) : null}
-              <Tooltip content={<TooltipContent />} />
+              {showTooltip ? <Tooltip content={<TooltipContent />} /> : null}
               <Legend wrapperStyle={{ paddingTop: 8, fontSize: '12px' }} />
               <Line
                 type="monotone"

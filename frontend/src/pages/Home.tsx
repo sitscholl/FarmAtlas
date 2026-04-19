@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
+import { FiMoreVertical, FiX } from 'react-icons/fi'
 import { LuArrowDown, LuCalendarDays, LuRadioTower, LuTrees } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
 import { FaArrowRight } from 'react-icons/fa'
@@ -10,9 +11,12 @@ import { Link } from 'react-router-dom'
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
+import WaterBalanceChart from '../components/WaterBalanceChart'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
-import { type FieldSummaryRead } from '../types/generated/api'
+import { type FieldSummaryRead, type WaterBalanceSeriesPoint } from '../types/generated/api'
+
+const FORECAST_DAYS = 5
 
 type FieldMetricDefinition = {
   key: string
@@ -23,6 +27,13 @@ type FieldMetricDefinition = {
   criticalBelow?: number
   emptyValueLabel?: string
   getValue: (field: FieldSummaryRead) => string | number | null | undefined
+}
+
+type WaterBalanceModalState = {
+  field: FieldSummaryRead
+  data: WaterBalanceSeriesPoint[]
+  isLoading: boolean
+  errorMessage: string | null
 }
 
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
@@ -105,11 +116,146 @@ function buildSubtitle(field: FieldSummaryRead) {
     .join('\n')
 }
 
+function FieldActionsMenu({
+  field,
+  onRefresh,
+  onClearIrrigation,
+}: {
+  field: FieldSummaryRead
+  onRefresh: (field: FieldSummaryRead) => Promise<void>
+  onClearIrrigation: (field: FieldSummaryRead) => Promise<void>
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) {
+        return
+      }
+
+      setIsOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [isOpen])
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          setIsOpen((currentState) => !currentState)
+        }}
+        className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:border hover:border-slate-300 hover:text-slate-900"
+        aria-label={`${field.name} Aktionen`}
+        aria-expanded={isOpen}
+      >
+        <FiMoreVertical className="h-5 w-5" />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute right-0 top-full z-30 mt-2 min-w-56 border border-slate-200 bg-white p-2 shadow-xl">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setIsOpen(false)
+              void onRefresh(field)
+            }}
+            className="flex w-full px-4 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+          >
+            Wasserbilanz aktualisieren
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setIsOpen(false)
+              void onClearIrrigation(field)
+            }}
+            className="flex w-full px-4 py-2 text-left text-sm font-medium text-rose-700 transition hover:bg-rose-50 hover:text-rose-800"
+          >
+            Bewaesserungen loeschen
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function WaterBalanceModal({
+  state,
+  onClose,
+}: {
+  state: WaterBalanceModalState | null
+  onClose: () => void
+}) {
+  if (state === null) {
+    return null
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:px-4 sm:py-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex h-dvh w-full flex-col overflow-hidden bg-white sm:max-h-[calc(100vh-2rem)] sm:max-w-6xl sm:border sm:border-slate-200 sm:shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 sm:pt-6 sm:pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+              Wasserbilanz
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-slate-900">
+              {state.field.name}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Popup schliessen"
+          >
+            <FiX className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-6 sm:py-6">
+          {state.isLoading ? (
+            <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
+              Lade Wasserbilanz...
+            </div>
+          ) : state.errorMessage ? (
+            <div className="border border-rose-200 bg-rose-50 px-6 py-12 text-center text-rose-700">
+              {state.errorMessage}
+            </div>
+          ) : (
+            <WaterBalanceChart data={state.data} reservedForecastDays={FORECAST_DAYS} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
+  const [waterBalanceModal, setWaterBalanceModal] = useState<WaterBalanceModalState | null>(null)
   const [showOnlyFieldsWithStatus, setShowOnlyFieldsWithStatus] = useState(true)
 
   useEffect(() => {
@@ -189,6 +335,38 @@ export default function Home() {
     }
   }
 
+  const handleOpenWaterBalance = async (field: FieldSummaryRead) => {
+    setWaterBalanceModal({
+      field,
+      data: [],
+      isLoading: true,
+      errorMessage: null,
+    })
+
+    try {
+      const response = await api.get<WaterBalanceSeriesPoint[]>(
+        `/fields/${field.id}/water-balance/series`,
+        {
+          params: { forecast_days: FORECAST_DAYS },
+        },
+      )
+      setWaterBalanceModal({
+        field,
+        data: response.data,
+        isLoading: false,
+        errorMessage: response.data.length === 0 ? 'Keine Wasserbilanzdaten vorhanden.' : null,
+      })
+    } catch (error) {
+      console.error(`Error fetching water balance for field ${field.id}`, error)
+      setWaterBalanceModal({
+        field,
+        data: [],
+        isLoading: false,
+        errorMessage: 'Die Wasserbilanz konnte nicht geladen werden.',
+      })
+    }
+  }
+
   const content = (() => {
     if (isLoading) {
       return (
@@ -248,6 +426,13 @@ export default function Home() {
                     />
                   ) : undefined
                 }
+                actions={
+                  <FieldActionsMenu
+                    field={field}
+                    onRefresh={handleRefreshField}
+                    onClearIrrigation={handleClearIrrigation}
+                  />
+                }
                 footerActions={
                   <>
                     <Link
@@ -265,20 +450,15 @@ export default function Home() {
                       <IoMdAdd className="h-3 w-3" aria-hidden="true" />
                       <span>Bewaesserung</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleRefreshField(field)}
-                      className="inline-flex items-center gap-1 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-                    >
-                      Wasserbilanz
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleClearIrrigation(field)}
-                      className="inline-flex items-center gap-1 border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800"
-                    >
-                      Bewaesserung loeschen
-                    </button>
+                    {field.water_balance_summary.as_of ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenWaterBalance(field)}
+                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        Wasserbilanz
+                      </button>
+                    ) : null}
                   </>
                 }
               />
@@ -309,6 +489,10 @@ export default function Home() {
         isOpen={irrigationField !== null}
         initialValues={irrigationInitialValues}
         onClose={() => setIrrigationField(null)}
+      />
+      <WaterBalanceModal
+        state={waterBalanceModal}
+        onClose={() => setWaterBalanceModal(null)}
       />
     </section>
   )
