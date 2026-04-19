@@ -16,8 +16,30 @@ import datetime
 
 Base = declarative_base()
 
+class _AggregatedAttrs:
+    @property
+    def variety(self) -> str | None:
+        if hasattr(self, 'plantings'):
+            pass
+        else:
+            return self.variety
+    @property
+    def area(self) -> float | None:
+        return (sum(float(i.area) for i in self.sections)) 
+    @property
+    def tree_count(self) -> str | None:
+        return (sum(float(i.tree_count) for i in self.sections)) 
+    #add other atributes that should be aggregated
 
-class Field(Base):
+class _DerivedAttrs:
+    @property
+    def elevation(self):
+        if hasattr(self, 'field'):
+            return self.field.elevation
+        else:
+            return None
+
+class Field(Base, _AggregatedAttrs):
     __tablename__ = "fields"
     __table_args__ = (
         Index(
@@ -42,22 +64,11 @@ class Field(Base):
     id = Column(Integer, primary_key=True)
     group = Column(String, nullable=False)
     name = Column(String, nullable=False)
-    section = Column(String, nullable=True)
-    variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=False)
-    planting_year = Column(Integer, nullable=False)
-    area_ha = Column(Float, nullable=False)
-    tree_count = Column(Integer, nullable=True)
-    tree_height = Column(Float, nullable=True)
-    row_distance = Column(Float, nullable=True)
-    tree_distance = Column(Float, nullable=True)
-    running_metre = Column(Float, nullable=True)
-    herbicide_free = Column(Boolean, nullable=True)
-    valid_from = Column(Date, nullable=False)
-    valid_to = Column(Date, nullable=True)
 
     reference_provider = Column(String, nullable=False)
     reference_station = Column(String, nullable=False)
 
+    elevation = Column(Float, nullable=False)
     soil_type = Column(String, nullable=True)
     soil_weight = Column(String, nullable=True)
     humus_pct = Column(Float, nullable=True)
@@ -66,8 +77,28 @@ class Field(Base):
     drip_distance = Column(Float, nullable=True) #Distance between drip holes in tube
     drip_discharge = Column(Float, nullable=True) #amount of water going out from one drip hole in liter per hour
     tree_strip_width = Column(Float, nullable=True) #width of the area below each drip tube to consider when calculating irrigation amount
+    valve_open = Column(Boolean, default = True, nullable = False) #no irrigation possible when false
 
-    variety_ref = relationship("Variety", back_populates="fields")
+    plantings = relationship(
+        "Planting",
+        back_populates='field',
+        cascade="all, delete-orphan",
+    )
+    sections = relationship(
+        "Section",
+        back_populates='field',
+        cascade="all, delete-orphan",
+    )
+    parcels = relationship(
+        "CadastralParcel",
+        back_populates='field',
+        cascade="all, delete-orphan",
+    )
+    varieties = relationship(
+        "Variety",
+        back_populates='fields',
+        cascade="all, delete-orphan",
+    )
     irrigation_events = relationship(
         "Irrigation",
         back_populates="field",
@@ -79,18 +110,55 @@ class Field(Base):
         cascade="all, delete-orphan",
     )
 
-    def __repr__(self) -> str:
-        return f"Field(id={self.id!r}, name={self.name!r}, variety_id={self.variety_id!r})"
+class Planting(Base, _AggregatedAttrs, _DerivedAttrs):
+    __tablename__ = "planting"
 
-    @property
-    def variety(self) -> str | None:
-        return None if self.variety_ref is None else self.variety_ref.name
+    id = Column(Integer, primary_key=True)
+    field_id = Column(Integer, ForeignKey('fields.id'), nullable = False)
+    variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=False)
+
+    field = relationship("Field", back_populates='plantings')
+    variety = relationship("Variety", back_populates="plantings")
+    sections = relationship("Section", back_populates="planting")
+
+class Section(Base, _DerivedAttrs):
+    __tablename__ = "section"
+
+    id = Column(Integer, primary_key=True)
+    planting_id = Column(Integer, ForeignKey('planting.id'), nullable=False)
+    
+    planting_year = Column(Integer, nullable=False)
+    area = Column(Float, nullable=False)  #in m²; landw. nuttzfl von katasterliste, entspricht lafis fläche
+    tree_count = Column(Integer, nullable=True)
+    tree_height = Column(Float, nullable=True)
+    row_distance = Column(Float, nullable=True)
+    tree_distance = Column(Float, nullable=True)
+    running_metre = Column(Float, nullable=True)
+    herbicide_free = Column(Boolean, nullable=True)
+    
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=True)
+
+    field = relationship("Field", back_populates='sections')
+    planting = relationship("Planting", back_populates='sections')
+    variety = relationship("Variety", back_populates="sections")
 
     @property
     def active(self) -> bool:
         today = datetime.date.today()
         return self.valid_from <= today and (self.valid_to is None or self.valid_to >= today)
 
+class CadastralParcel(Base, _DerivedAttrs):
+    __tablename__ = 'cadastral_parcel'
+
+    id = Column(Integer, primary_key=True)
+    field_id = Column(Integer, ForeignKey('fields.id'), nullable = False)
+
+    parcel_id = Column(String, nullable = False)
+    municipality_id = Column(String, nullable = False)
+    area = Column(Float, nullable = False)
+
+    field = relationship("Field", back_populates='parcels')
 
 class Variety(Base):
     __tablename__ = "varieties"
@@ -105,7 +173,9 @@ class Variety(Base):
     intercept = Column(Float, nullable=True)
     specific_weight = Column(Float, nullable=True)  # g/cm^3
 
-    fields = relationship("Field", back_populates="variety_ref")
+    fields = relationship("Field", back_populates="varieties")
+    plantings = relationship("Planting", back_populates='variety')
+    sections = relationship("Section", back_populates='variety')
     nutrient_requirements = relationship(
         "NutrientRequirement",
         back_populates="variety",
