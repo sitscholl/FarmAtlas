@@ -6,11 +6,10 @@ import {
   Line,
   ReferenceLine,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { type WaterBalanceSeriesPoint } from '../types/generated/api'
 
@@ -24,6 +23,13 @@ type ChartRow = WaterBalanceSeriesPoint & {
   evapotranspiration_negative: number | null
   soil_water_content_observed: number | null
   soil_water_content_forecast: number | null
+}
+
+type TooltipRow = {
+  key: string
+  label: string
+  color: string
+  value: number
 }
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -121,84 +127,59 @@ function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
   })
 }
 
-function TooltipContent({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean
-  payload?: Array<{ dataKey?: string; value?: number; color?: string; name?: string }>
-  label?: string
-}) {
-  if (!active || !payload || payload.length === 0) {
-    return null
+function buildTooltipRows(point: ChartRow): TooltipRow[] {
+  const rows: TooltipRow[] = []
+
+  if (point.soil_water_content_observed !== null) {
+    rows.push({
+      key: 'soil_water_content_observed',
+      label: 'Bodenwassergehalt',
+      color: '#0f172a',
+      value: point.soil_water_content_observed,
+    })
+  } else if (point.soil_water_content_forecast !== null) {
+    rows.push({
+      key: 'soil_water_content_forecast',
+      label: 'Bodenwassergehalt Prognose',
+      color: '#0f172a',
+      value: point.soil_water_content_forecast,
+    })
   }
 
-  const rows = payload.filter(
-    (entry) =>
-      entry.value !== undefined &&
-      entry.dataKey !== 'available_water_storage' &&
-      entry.dataKey !== 'raw_threshold',
-  )
-
-  if (rows.length === 0) {
-    return null
+  if (point.precipitation !== 0) {
+    rows.push({
+      key: 'precipitation',
+      label: 'Niederschlag',
+      color: '#0682b77d',
+      value: point.precipitation,
+    })
   }
 
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg">
-      <p className="text-sm font-semibold text-slate-900">{label}</p>
-      <div className="mt-3 space-y-2">
-        {rows.map((entry) => (
-          <div key={`${label}-${entry.dataKey}`} className="flex items-center justify-between gap-4 text-sm">
-            <span className="flex items-center gap-2 text-slate-600">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: entry.color ?? '#94a3b8' }}
-              />
-              {entry.name}
-            </span>
-            <span className="font-medium text-slate-900">
-              {formatNumber(
-                entry.dataKey === 'evapotranspiration_negative'
-                  ? Math.abs(entry.value ?? 0)
-                  : entry.value,
-              )} mm
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  if (point.irrigation !== 0) {
+    rows.push({
+      key: 'irrigation',
+      label: 'Bewaesserung',
+      color: '#259a057a',
+      value: point.irrigation,
+    })
+  }
+
+  if (point.evapotranspiration_negative !== null && point.evapotranspiration_negative !== 0) {
+    rows.push({
+      key: 'evapotranspiration_negative',
+      label: 'Evapotranspiration',
+      color: '#f59e0b99',
+      value: Math.abs(point.evapotranspiration_negative),
+    })
+  }
+
+  return rows
 }
 
 export default function WaterBalanceChart({
   data,
   reservedForecastDays = 0,
 }: WaterBalanceChartProps) {
-  const [showTooltip, setShowTooltip] = useState(true)
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return
-    }
-
-    const mediaQuery = window.matchMedia('(max-width: 767px), (pointer: coarse)')
-    const update = () => setShowTooltip(!mediaQuery.matches)
-
-    update()
-    mediaQuery.addEventListener('change', update)
-    return () => mediaQuery.removeEventListener('change', update)
-  }, [])
-
-  if (data.length === 0) {
-    return (
-      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
-        No water-balance data available.
-      </div>
-    )
-  }
-
   const displayData = extendChartRange(data, reservedForecastDays)
   const chartData = buildChartData(displayData)
   const hasEvapotranspiration = chartData.some(
@@ -208,7 +189,27 @@ export default function WaterBalanceChart({
   const today = getLocalIsoDate()
   const hasTodayMarker = chartData.some((point) => point.date === today)
   const latestObserved =
-    [...data].reverse().find((point) => point.value_type !== 'forecast') ?? data[data.length - 1]
+    [...data].reverse().find((point) => point.value_type !== 'forecast') ?? data[data.length - 1] ?? null
+  const defaultActiveDate = latestObserved?.date ?? chartData[chartData.length - 1]?.date ?? null
+  const [activeDate, setActiveDate] = useState<string | null>(defaultActiveDate)
+
+  const activePoint = useMemo(() => {
+    const fallbackPoint = chartData.find((point) => point.date === defaultActiveDate) ?? chartData[chartData.length - 1] ?? null
+    if (activeDate === null) {
+      return fallbackPoint
+    }
+    return chartData.find((point) => point.date === activeDate) ?? fallbackPoint
+  }, [activeDate, chartData, defaultActiveDate])
+
+  const activeRows = activePoint === null ? [] : buildTooltipRows(activePoint)
+
+  if (data.length === 0 || activePoint === null) {
+    return (
+      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
+        No water-balance data available.
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm sm:rounded-3xl sm:p-6">
@@ -221,12 +222,26 @@ export default function WaterBalanceChart({
       </div>
 
       <div className="mt-4 overflow-x-auto sm:mt-6">
-        <div className="h-[320px] min-w-[40rem] sm:h-[420px] sm:min-w-0">
+        <div className="h-[320px] w-full min-w-[40rem] sm:h-[420px] sm:min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={chartData}
               margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
               barCategoryGap="80%"
+              onMouseMove={(state: unknown) => {
+                const nextDate =
+                  (state as { activeLabel?: string } | undefined)?.activeLabel ??
+                  (state as { activePayload?: Array<{ payload?: ChartRow }> } | undefined)?.activePayload?.[0]?.payload?.date
+
+                if (nextDate && nextDate !== activeDate) {
+                  setActiveDate(nextDate)
+                }
+              }}
+              onMouseLeave={() => {
+                if (defaultActiveDate !== activeDate) {
+                  setActiveDate(defaultActiveDate)
+                }
+              }}
             >
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
               <XAxis
@@ -252,7 +267,6 @@ export default function WaterBalanceChart({
                   label={{ value: 'Heute', position: 'top', fill: '#475569', fontSize: 11 }}
                 />
               ) : null}
-              {showTooltip ? <Tooltip content={<TooltipContent />} /> : null}
               <Legend wrapperStyle={{ paddingTop: 8, fontSize: '12px' }} />
               <Line
                 type="monotone"
@@ -326,19 +340,30 @@ export default function WaterBalanceChart({
         </div>
       </div>
 
-      <div className="mt-2 grid justify-items-center gap-3 text-center text-sm text-slate-500 sm:grid-cols-3">
-        <p>
-          From <span className="font-medium text-slate-700">{data[0].date}</span>
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <p className="text-sm font-semibold text-slate-900">
+          {activePoint.date}
         </p>
-        <p>
-          To <span className="font-medium text-slate-700">{data[data.length - 1].date}</span>
-        </p>
-        <p>
-          Latest storage{' '}
-          <span className="font-medium text-slate-700">
-            {formatNumber(latestObserved.soil_water_content)} mm
-          </span>
-        </p>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          {activeRows.length === 0 ? (
+            <p className="text-slate-500">Keine Werte fuer diesen Zeitpunkt vorhanden.</p>
+          ) : (
+            activeRows.map((row) => (
+              <div key={`${activePoint.date}-${row.key}`} className="flex items-center justify-between gap-3 border border-slate-100 bg-slate-50 px-3 py-2">
+                <span className="flex items-center gap-2 text-slate-600">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: row.color }}
+                  />
+                  {row.label}
+                </span>
+                <span className="font-medium text-slate-900">
+                  {formatNumber(row.value)} mm
+                </span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )
