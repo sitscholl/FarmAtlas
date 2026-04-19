@@ -114,7 +114,6 @@ def main() -> None:
             for field in populated_fields:
                 print(f"\n=== {field.name} ===")
                 print("Soil water estimate:", field.soil_water_estimate)
-                print("Metrics:", field.metrics)
                 if field.water_balance is None or field.water_balance.empty:
                     print("No water-balance output produced.")
                     continue

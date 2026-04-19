@@ -8,7 +8,7 @@ import yaml
 from .database.db import Database
 from .et import ET0Calculator
 from .et.et_correction import ETCorrection
-from .field import FieldContext, FieldState
+from .field import FieldContext
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
@@ -146,27 +146,22 @@ class RuntimeContext:
             raise ValueError(f"Unknown field ids: {missing_ids}")
         return [fields_by_id[field_id] for field_id in field_ids]
 
-    def create_field_states(self, fields: list[FieldContext] | None = None) -> list[FieldState]:
-        source_fields = self.fields if fields is None else fields
-        return [FieldState.from_context(field) for field in source_fields]
-
     def run_workflow_for_fields(
         self,
         workflow_name: str,
         field_ids: list[int] | None = None,
         **kwargs,
-    ) -> list[FieldState]:
+    ) -> list[FieldContext]:
         fields = self.get_fields_by_ids(field_ids)
-        field_states = self.create_field_states(fields)
         workflow = self.workflows.get(workflow_name)
-        return workflow.run(fields=field_states, **kwargs)
+        return workflow.run(fields=fields, **kwargs)
 
     def run_workflow_for_field(
         self,
         workflow_name: str,
         field_id: int,
         **kwargs,
-    ) -> FieldState | None:
+    ) -> FieldContext | None:
         results = self.run_workflow_for_fields(
             workflow_name=workflow_name,
             field_ids=[field_id],

@@ -7,7 +7,7 @@ import pandas as pd
 
 from ..database.db import Database
 from ..et.base import ET0Calculator
-from ..field import FieldState
+from ..field import FieldContext
 from ..irrigation import FieldIrrigation
 from ..meteo.load import MeteoLoader
 from ..meteo.resample import MeteoResampler
@@ -18,7 +18,7 @@ from ..water_content import estimate_available_water_storage_capacity
 logger = logging.getLogger(__name__)
 
 
-def _missing_soil_parameters(field: FieldState) -> list[str]:
+def _missing_soil_parameters(field: FieldContext) -> list[str]:
     missing: list[str] = []
     if field.soil_type is None:
         missing.append("soil_type")
@@ -44,7 +44,7 @@ class WaterBalanceWorkflow:
 
     def _get_field_run_context(
         self,
-        field: FieldState,
+        field: FieldContext,
         year: int,
         observe_end: pd.Timestamp,
         forecast_end: pd.Timestamp | None,
@@ -98,7 +98,7 @@ class WaterBalanceWorkflow:
 
     def get_cached_water_balance(
         self,
-        field: FieldState,
+        field: FieldContext,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> pd.DataFrame:
@@ -145,7 +145,7 @@ class WaterBalanceWorkflow:
 
     def calculate_water_balance(
         self,
-        field: FieldState,
+        field: FieldContext,
         station_data: pd.DataFrame,
         field_irrigation: FieldIrrigation | None = None,
         initial_storage: float | None = None,
@@ -227,13 +227,7 @@ class WaterBalanceWorkflow:
         else:
             water_balance["value_type"] = "observed"
 
-        current_rows = water_balance.loc[water_balance["value_type"] == "observed"]
-        current_row = current_rows.iloc[-1] if not current_rows.empty else water_balance.iloc[-1]
-
         field.water_balance = water_balance
-        field.metrics["current_soil_water_content"] = float(current_row["soil_water_content"])
-        field.metrics["current_water_deficit"] = float(current_row["water_deficit"])
-        field.metrics["safe_ratio"] = float(current_row["safe_ratio"])
 
         return water_balance
 
@@ -264,7 +258,7 @@ class WaterBalanceWorkflow:
 
     def _set_cached_water_balance(
         self,
-        field: FieldState,
+        field: FieldContext,
         context: dict[str, object],
     ) -> pd.DataFrame | None:
         cached = self.get_cached_water_balance(
@@ -277,7 +271,7 @@ class WaterBalanceWorkflow:
 
     def _run_field(
         self,
-        field: FieldState,
+        field: FieldContext,
         year: int,
         period_end: pd.Timestamp,
         persist: bool = True,
@@ -351,18 +345,18 @@ class WaterBalanceWorkflow:
 
     def run(
         self,
-        fields: list[FieldState],
+        fields: list[FieldContext],
         year: int | None = None,
         persist: bool = True,
         forecast_days: int = 0,
-    ) -> list[FieldState]:
+    ) -> list[FieldContext]:
         if year is None:
             year = pd.Timestamp.now(tz=self.timezone).year
 
         observe_end, forecast_end = self._resolve_period_end(forecast_days)
 
         field_contexts: dict[int, dict[str, object]] = {}
-        fields_by_station: dict[str, list[FieldState]] = {}
+        fields_by_station: dict[str, list[FieldContext]] = {}
 
         for field in fields:
             try:
