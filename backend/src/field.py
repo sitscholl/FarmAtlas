@@ -99,7 +99,7 @@ class FieldContext:
                 id=section.id,
                 name=section.name,
                 planting_id=section.planting_id,
-                variety=section.variety.name if section.variety is not None else "",
+                variety=planting.variety.name if planting.variety is not None else "",
                 planting_year=section.planting_year,
                 area=float(section.area),
                 tree_count=section.tree_count,
