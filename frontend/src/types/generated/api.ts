@@ -158,6 +158,25 @@ export type IrrigationUpdate = {
   field_id: number
 }
 
+export type NutrientRequirementCreate = {
+  variety?: string | null
+  nutrient_code: string
+  requirement_per_kg_yield: number
+}
+
+export type NutrientRequirementRead = {
+  id: number
+  variety?: string | null
+  nutrient_code: string
+  requirement_per_kg_yield: number
+}
+
+export type NutrientRequirementUpdate = {
+  variety?: string | null
+  nutrient_code: string
+  requirement_per_kg_yield: number
+}
+
 export type PlantingCreate = {
   field_id: number
   variety: string

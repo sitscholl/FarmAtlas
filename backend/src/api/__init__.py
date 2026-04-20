@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from .fields import router as fields_router
 from .frontend import router as frontend_router
 from .irrigation import router as irrigation_router
+from .nutrients import router as nutrients_router
 from .plantings import router as plantings_router
 from .sections import router as sections_router
 from .utils import frontend_assets_dir, lifespan, runtime
@@ -51,6 +52,7 @@ async def health_check():
 
 
 app.include_router(varieties_router)
+app.include_router(nutrients_router)
 app.include_router(fields_router)
 app.include_router(plantings_router)
 app.include_router(sections_router)

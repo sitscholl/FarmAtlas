@@ -14,6 +14,7 @@ from ..schemas import (
     FieldRead,
     FieldSummaryRead,
     IrrigationRead,
+    NutrientRequirementRead,
     PlantingRead,
     SectionRead,
     VarietyRead,
@@ -111,6 +112,10 @@ def serialize_irrigation_event(event) -> IrrigationRead:
 
 def serialize_variety(variety) -> VarietyRead:
     return VarietyRead.model_validate(variety)
+
+
+def serialize_nutrient_requirement(nutrient_requirement) -> NutrientRequirementRead:
+    return NutrientRequirementRead.model_validate(nutrient_requirement)
 
 
 def raise_write_http_error(exc: Exception, *, not_found_prefixes: tuple[str, ...] = ()) -> None:

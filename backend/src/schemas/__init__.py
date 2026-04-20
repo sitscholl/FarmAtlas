@@ -7,6 +7,7 @@ from .irrigation import (
     IrrigationRead,
     IrrigationUpdate,
 )
+from .nutrient import NutrientRequirementCreate, NutrientRequirementRead, NutrientRequirementUpdate
 from .planting import PlantingCreate, PlantingDetailRead, PlantingRead, PlantingUpdate
 from .section import SectionCreate, SectionRead, SectionUpdate
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
@@ -25,6 +26,9 @@ __all__ = [
     "IrrigationCreate",
     "IrrigationRead",
     "IrrigationUpdate",
+    "NutrientRequirementCreate",
+    "NutrientRequirementRead",
+    "NutrientRequirementUpdate",
     "PlantingCreate",
     "PlantingDetailRead",
     "PlantingRead",

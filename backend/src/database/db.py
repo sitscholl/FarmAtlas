@@ -2,12 +2,13 @@ from .core import DatabaseCore
 from .repositories import (
     FieldRepository,
     IrrigationRepository,
+    NutrientRequirementRepository,
     PlantingRepository,
     SectionRepository,
     VarietyRepository,
     WaterBalanceRepository,
 )
-from .services import FieldService, IrrigationService, PlantingService, SectionService
+from .services import FieldService, IrrigationService, NutrientRequirementService, PlantingService, SectionService
 
 
 class Database:
@@ -29,6 +30,7 @@ class Database:
         self.plantings = PlantingRepository(self.fields)
         self.sections = SectionRepository(self.plantings)
         self.varieties = VarietyRepository()
+        self.nutrients = NutrientRequirementRepository(self.varieties)
         self.water_balance = WaterBalanceRepository(self.fields)
         self.irrigation = IrrigationRepository(self.fields)
 
@@ -47,6 +49,10 @@ class Database:
         self.planting_service = PlantingService(
             self.core,
             self.plantings,
+        )
+        self.nutrient_service = NutrientRequirementService(
+            self.core,
+            self.nutrients,
         )
         self.section_service = SectionService(
             self.core,
