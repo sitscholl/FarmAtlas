@@ -239,7 +239,9 @@ class NutrientRequirement(Base):
     id = Column(Integer, primary_key=True)
     variety_id = Column(Integer, ForeignKey("varieties.id"), nullable=True, default=None)
     nutrient_code = Column(String, nullable=False)
-    requirement_per_kg_yield = Column(Float, nullable=False)
+    requirement_per_kg_min = Column(Float, nullable=False)
+    requirement_per_kg_mean = Column(Float, nullable=False)
+    requirement_per_kg_max = Column(Float, nullable=False)
 
     variety = relationship("Variety", back_populates="nutrient_requirements")
 

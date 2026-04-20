@@ -10,7 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 class NutrientRequirementRepository:
-    UPDATE_ALLOWLIST = {"variety", "nutrient_code", "requirement_per_kg_yield"}
+    UPDATE_ALLOWLIST = {
+        "variety",
+        "nutrient_code",
+        "requirement_per_kg_min",
+        "requirement_per_kg_mean",
+        "requirement_per_kg_max",
+    }
 
     def __init__(self, variety_repository: VarietyRepository) -> None:
         self._varieties = variety_repository
@@ -32,11 +38,23 @@ class NutrientRequirementRepository:
             raise ValueError("Expected a non-empty value for 'nutrient_code'")
         return code
 
-    def _normalize_requirement(self, value: Any) -> float:
+    def _normalize_requirement(self, value: Any, *, field_name: str) -> float:
         requirement = float(value)
         if requirement <= 0:
-            raise ValueError("requirement_per_kg_yield must be greater than 0")
+            raise ValueError(f"{field_name} must be greater than 0")
         return requirement
+
+    def _validate_requirement_range(
+        self,
+        *,
+        requirement_per_kg_min: float,
+        requirement_per_kg_mean: float,
+        requirement_per_kg_max: float,
+    ) -> None:
+        if requirement_per_kg_min > requirement_per_kg_mean:
+            raise ValueError("requirement_per_kg_min must be less than or equal to requirement_per_kg_mean")
+        if requirement_per_kg_mean > requirement_per_kg_max:
+            raise ValueError("requirement_per_kg_mean must be less than or equal to requirement_per_kg_max")
 
     def _resolve_variety_id(self, session: Session, variety_name: Any) -> int | None:
         normalized_name = self._normalize_optional_variety_name(variety_name)
@@ -67,12 +85,34 @@ class NutrientRequirementRepository:
         *,
         variety: str | None = None,
         nutrient_code: str,
-        requirement_per_kg_yield: float,
+        requirement_per_kg_min: float,
+        requirement_per_kg_mean: float,
+        requirement_per_kg_max: float,
     ) -> models.NutrientRequirement:
+        normalized_min = self._normalize_requirement(
+            requirement_per_kg_min,
+            field_name="requirement_per_kg_min",
+        )
+        normalized_mean = self._normalize_requirement(
+            requirement_per_kg_mean,
+            field_name="requirement_per_kg_mean",
+        )
+        normalized_max = self._normalize_requirement(
+            requirement_per_kg_max,
+            field_name="requirement_per_kg_max",
+        )
+        self._validate_requirement_range(
+            requirement_per_kg_min=normalized_min,
+            requirement_per_kg_mean=normalized_mean,
+            requirement_per_kg_max=normalized_max,
+        )
+
         nutrient_requirement = models.NutrientRequirement(
             variety_id=self._resolve_variety_id(session, variety),
             nutrient_code=self._normalize_nutrient_code(nutrient_code),
-            requirement_per_kg_yield=self._normalize_requirement(requirement_per_kg_yield),
+            requirement_per_kg_min=normalized_min,
+            requirement_per_kg_mean=normalized_mean,
+            requirement_per_kg_max=normalized_max,
         )
         session.add(nutrient_requirement)
         session.flush()
@@ -102,8 +142,8 @@ class NutrientRequirementRepository:
             elif field_key == "nutrient_code":
                 new_value = self._normalize_nutrient_code(raw_value)
                 attr_name = field_key
-            elif field_key == "requirement_per_kg_yield":
-                new_value = self._normalize_requirement(raw_value)
+            elif field_key in {"requirement_per_kg_min", "requirement_per_kg_mean", "requirement_per_kg_max"}:
+                new_value = self._normalize_requirement(raw_value, field_name=field_key)
                 attr_name = field_key
             else:
                 raise ValueError(
@@ -113,6 +153,12 @@ class NutrientRequirementRepository:
             if getattr(nutrient_requirement, attr_name) != new_value:
                 setattr(nutrient_requirement, attr_name, new_value)
                 changed_keys.add(field_key)
+
+        self._validate_requirement_range(
+            requirement_per_kg_min=nutrient_requirement.requirement_per_kg_min,
+            requirement_per_kg_mean=nutrient_requirement.requirement_per_kg_mean,
+            requirement_per_kg_max=nutrient_requirement.requirement_per_kg_max,
+        )
 
         if not changed_keys:
             return nutrient_requirement, changed_keys

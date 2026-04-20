@@ -161,20 +161,26 @@ export type IrrigationUpdate = {
 export type NutrientRequirementCreate = {
   variety?: string | null
   nutrient_code: string
-  requirement_per_kg_yield: number
+  requirement_per_kg_min: number
+  requirement_per_kg_mean: number
+  requirement_per_kg_max: number
 }
 
 export type NutrientRequirementRead = {
   id: number
   variety?: string | null
   nutrient_code: string
-  requirement_per_kg_yield: number
+  requirement_per_kg_min: number
+  requirement_per_kg_mean: number
+  requirement_per_kg_max: number
 }
 
 export type NutrientRequirementUpdate = {
   variety?: string | null
   nutrient_code: string
-  requirement_per_kg_yield: number
+  requirement_per_kg_min: number
+  requirement_per_kg_mean: number
+  requirement_per_kg_max: number
 }
 
 export type PlantingCreate = {
