@@ -238,6 +238,35 @@ export const varietyCreateAction: CreateActionConfig = {
   }),
 }
 
+export const nutrientCreateAction: CreateActionConfig = {
+  id: 'nutrient',
+  label: 'Naehrstoff hinzufuegen',
+  title: 'Neuer Naehrstoffeintrag',
+  submitLabel: 'Naehrstoff speichern',
+  endpoint: '/nutrients',
+  method: 'post',
+  fields: [
+    {
+      id: 'variety',
+      label: 'Sorte',
+      type: 'select',
+      optionsSource: 'varietiesOptional',
+      required: false,
+    },
+    { id: 'nutrient_code', label: 'Code', type: 'text', placeholder: 'N', required: true },
+    { id: 'requirement_per_kg_min', label: 'Min pro kg', type: 'number', step: '0.001', required: true },
+    { id: 'requirement_per_kg_mean', label: 'Mittel pro kg', type: 'number', step: '0.001', required: true },
+    { id: 'requirement_per_kg_max', label: 'Max pro kg', type: 'number', step: '0.001', required: true },
+  ],
+  buildPayload: (values) => ({
+    variety: toOptionalText(values.variety),
+    nutrient_code: values.nutrient_code.trim(),
+    requirement_per_kg_min: Number(values.requirement_per_kg_min),
+    requirement_per_kg_mean: Number(values.requirement_per_kg_mean),
+    requirement_per_kg_max: Number(values.requirement_per_kg_max),
+  }),
+}
+
 export const irrigationCreateAction: CreateActionConfig = {
   id: 'irrigation',
   label: 'Bewaesserung eintragen',
@@ -255,6 +284,6 @@ export const irrigationCreateAction: CreateActionConfig = {
   }),
 }
 
-export const createActions: CreateActionConfig[] = [fieldCreateAction, varietyCreateAction, irrigationCreateAction]
+export const createActions: CreateActionConfig[] = [fieldCreateAction, varietyCreateAction, nutrientCreateAction, irrigationCreateAction]
 
 export { squareMetresToHectares }

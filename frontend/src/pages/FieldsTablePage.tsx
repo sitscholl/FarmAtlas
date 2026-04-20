@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { IoMdAdd } from 'react-icons/io'
 
 import api from '../api'
+import CreateEntityModal from '../components/CreateEntityModal'
 import DataTable, {
   type DataTableColumn,
   type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
+import { fieldCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
 import type { FieldSummaryRead } from '../types/generated/api'
 
@@ -40,6 +43,7 @@ export default function FieldsTablePage() {
   const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [filters, setFilters] = useState({
     query: '',
     status: 'active',
@@ -259,8 +263,18 @@ export default function FieldsTablePage() {
               Anlagen
             </h1>
           </div>
-          <div className="border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            {filteredFields.length} / {fields.length} Eintraege
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+            >
+              <IoMdAdd />
+              Anlage
+            </button>
+            <div className="border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              {filteredFields.length} / {fields.length} Eintraege
+            </div>
           </div>
         </div>
 
@@ -287,6 +301,12 @@ export default function FieldsTablePage() {
           )}
         </div>
       </div>
+
+      <CreateEntityModal
+        action={fieldCreateAction}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
     </section>
   )
 }

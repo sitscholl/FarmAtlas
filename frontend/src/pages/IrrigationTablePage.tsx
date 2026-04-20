@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { GoPencil } from 'react-icons/go'
+import { IoMdAdd } from 'react-icons/io'
 import { PiTrashBold } from 'react-icons/pi'
 
 import api from '../api'
@@ -9,6 +10,7 @@ import DataTable, {
   type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
+import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
   buildIrrigationEditAction,
@@ -50,6 +52,7 @@ export default function IrrigationTablePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
   const [editingEvent, setEditingEvent] = useState<IrrigationRead | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [filters, setFilters] = useState({
     fieldId: '',
     method: '',
@@ -309,8 +312,18 @@ export default function IrrigationTablePage() {
               Bewaesserung
             </h1>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            {filteredEvents.length} / {events.length} Eintraege
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+            >
+              <IoMdAdd />
+              Bewaesserung
+            </button>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              {filteredEvents.length} / {events.length} Eintraege
+            </div>
           </div>
         </div>
 
@@ -376,6 +389,11 @@ export default function IrrigationTablePage() {
         </div>
       </div>
 
+      <CreateEntityModal
+        action={irrigationCreateAction}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
       <CreateEntityModal
         action={editAction}
         isOpen={editingEvent !== null}

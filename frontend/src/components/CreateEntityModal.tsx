@@ -82,17 +82,25 @@ function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   }))
 }
 
-function buildVarietyOptions(varieties: VarietyRead[]): FieldOption[] {
-  return varieties.map((variety) => ({
+function buildVarietyOptions(
+  varieties: VarietyRead[],
+  { includeEmpty = false }: { includeEmpty?: boolean } = {},
+): FieldOption[] {
+  const options = varieties.map((variety) => ({
     value: variety.name,
     label: `${variety.name}${variety.group ? ` (${variety.group})` : ''}`,
   }))
+
+  return includeEmpty
+    ? [{ value: '', label: 'Standardwert' }, ...options]
+    : options
 }
 
 function getSelectOptions(
   field: CreateActionField,
   fieldOptions: readonly FieldOption[],
   varietyOptions: readonly FieldOption[],
+  optionalVarietyOptions: readonly FieldOption[],
 ): readonly FieldOption[] {
   if (field.type !== 'select') {
     return []
@@ -103,6 +111,9 @@ function getSelectOptions(
   }
   if (field.optionsSource === 'varieties') {
     return varietyOptions
+  }
+  if (field.optionsSource === 'varietiesOptional') {
+    return optionalVarietyOptions
   }
   return field.options ?? []
 }
@@ -136,6 +147,7 @@ export default function CreateEntityModal({
   const [fields, setFields] = useState<FieldRead[]>([])
   const [fieldOptions, setFieldOptions] = useState<FieldOption[]>([])
   const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
+  const [optionalVarietyOptions, setOptionalVarietyOptions] = useState<FieldOption[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const needsFieldCatalog = useMemo(
@@ -169,6 +181,9 @@ export default function CreateEntityModal({
 
     setValues(buildInitialValues(action, initialValues))
     setFields([])
+    setFieldOptions([])
+    setVarietyOptions([])
+    setOptionalVarietyOptions([])
     setErrorMessage(null)
   }, [action, initialValues, isOpen])
 
@@ -191,7 +206,7 @@ export default function CreateEntityModal({
           continue
         }
 
-        const options = getSelectOptions(field, fieldOptions, varietyOptions)
+        const options = getSelectOptions(field, fieldOptions, varietyOptions, optionalVarietyOptions)
         if (options.length === 0) {
           continue
         }
@@ -202,7 +217,7 @@ export default function CreateEntityModal({
 
       return changed ? nextValues : currentValues
     })
-  }, [action, fieldOptions, isOpen, varietyOptions])
+  }, [action, fieldOptions, isOpen, optionalVarietyOptions, varietyOptions])
 
   useEffect(() => {
     if (!isOpen) {
@@ -215,16 +230,24 @@ export default function CreateEntityModal({
 
     const fetchAndSeedOptions = async () => {
       try {
+        const varietiesData =
+          dynamicOptionSources.has('varieties') || dynamicOptionSources.has('varietiesOptional')
+            ? (await api.get<VarietyRead[]>('/varieties')).data
+            : []
         const nextFields = needsFieldCatalog || dynamicOptionSources.has('fields')
           ? (await api.get<FieldRead[]>('/fields')).data
           : []
         const nextVarietyOptions = dynamicOptionSources.has('varieties')
-          ? buildVarietyOptions((await api.get<VarietyRead[]>('/varieties')).data)
+          ? buildVarietyOptions(varietiesData)
+          : []
+        const nextOptionalVarietyOptions = dynamicOptionSources.has('varietiesOptional')
+          ? buildVarietyOptions(varietiesData, { includeEmpty: true })
           : []
 
         setFields(nextFields)
         setFieldOptions(buildFieldOptions(nextFields))
         setVarietyOptions(nextVarietyOptions)
+        setOptionalVarietyOptions(nextOptionalVarietyOptions)
       } catch (error) {
         console.error('Error loading select options', error)
         setErrorMessage('Die verfuegbaren Optionen konnten nicht geladen werden.')
@@ -378,6 +401,8 @@ export default function CreateEntityModal({
           ? fieldOptions
           : field.optionsSource === 'varieties'
             ? varietyOptions
+            : field.optionsSource === 'varietiesOptional'
+              ? optionalVarietyOptions
             : (field.options ?? [])
 
       return (

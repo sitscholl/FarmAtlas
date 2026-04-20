@@ -10,55 +10,64 @@ import DataTable, {
   type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
-import { varietyCreateAction } from '../config/createActions'
+import { nutrientCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
-  buildVarietyEditAction,
-  buildVarietyEditInitialValues,
-} from '../lib/varietyForm'
-import type { FieldSummaryRead, VarietyRead } from '../types/generated/api'
+  buildNutrientEditAction,
+  buildNutrientEditInitialValues,
+} from '../lib/nutrientForm'
+import type { NutrientRequirementRead, VarietyRead } from '../types/generated/api'
 
-function formatNumber(value: number | null | undefined, digits = 2) {
+function formatNumber(value: number | null | undefined, digits = 3) {
   if (value === null || value === undefined) {
     return 'n/a'
   }
 
-  return new Intl.NumberFormat('de-DE', {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: 0,
-  }).format(value)
+  if (value === 0) {
+    return '0'
+  }
+
+  const scientific = value.toExponential(digits)
+  const [mantissa, exponent] = scientific.split('e')
+  const normalizedExponent = Number(exponent)
+
+  return `${mantissa.replace('.', ',')}e${normalizedExponent}`
 }
 
-export default function VarietyTablePage() {
+function formatVarietyName(value: string | null | undefined) {
+  return value === null || value === undefined || value.trim() === '' ? 'Standard' : value
+}
+
+export default function NutrientsTablePage() {
   const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
+  const [nutrients, setNutrients] = useState<NutrientRequirementRead[]>([])
   const [varieties, setVarieties] = useState<VarietyRead[]>([])
-  const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [selectedVarietyId, setSelectedVarietyId] = useState<number | null>(null)
-  const [editingVariety, setEditingVariety] = useState<VarietyRead | null>(null)
+  const [selectedNutrientId, setSelectedNutrientId] = useState<number | null>(null)
+  const [editingNutrient, setEditingNutrient] = useState<NutrientRequirementRead | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [filters, setFilters] = useState({
     query: '',
-    group: '',
+    variety: '',
   })
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [varietiesResponse, fieldsResponse] = await Promise.all([
+        const [nutrientsResponse, varietiesResponse] = await Promise.all([
+          api.get<NutrientRequirementRead[]>('/nutrients'),
           api.get<VarietyRead[]>('/varieties'),
-          api.get<FieldSummaryRead[]>('/fields/summary'),
         ])
 
+        setNutrients(nutrientsResponse.data)
         setVarieties(varietiesResponse.data)
-        setFields(fieldsResponse.data)
         setErrorMessage(null)
       } catch (error) {
-        console.error('Error fetching varieties table data', error)
+        console.error('Error fetching nutrient table data', error)
+        setNutrients([])
         setVarieties([])
-        setFields([])
-        setErrorMessage('Die Sortendaten konnten nicht geladen werden.')
+        setErrorMessage('Die Naehrstoffdaten konnten nicht geladen werden.')
       } finally {
         setIsLoading(false)
       }
@@ -82,7 +91,7 @@ export default function VarietyTablePage() {
       }
 
       if (!interactiveAreaRef.current.contains(event.target as Node)) {
-        setSelectedVarietyId(null)
+        setSelectedNutrientId(null)
       }
     }
 
@@ -90,59 +99,35 @@ export default function VarietyTablePage() {
     return () => window.removeEventListener('mousedown', handlePointerDown)
   }, [])
 
-  const usageCountByVariety = useMemo(() => {
-    return fields.reduce<Record<string, number>>((counts, field) => {
-      field.variety_names.forEach((varietyName) => {
-        counts[varietyName] = (counts[varietyName] ?? 0) + 1
-      })
-      return counts
-    }, {})
-  }, [fields])
-
-  const columns = useMemo<DataTableColumn<VarietyRead>[]>(
+  const columns = useMemo<DataTableColumn<NutrientRequirementRead>[]>(
     () => [
       {
-        id: 'name',
+        id: 'nutrient_code',
+        header: 'Code',
+        cell: (nutrient) => <span className="font-semibold text-slate-900">{nutrient.nutrient_code}</span>,
+      },
+      {
+        id: 'variety',
         header: 'Sorte',
-        cell: (variety) => <span className="font-semibold text-slate-900">{variety.name}</span>,
+        cell: (nutrient) => formatVarietyName(nutrient.variety),
       },
       {
-        id: 'group',
-        header: 'Gruppe',
-        cell: (variety) => variety.group,
+        id: 'requirement_per_kg_min',
+        header: 'Min pro kg',
+        cell: (nutrient) => formatNumber(nutrient.requirement_per_kg_min, 3),
       },
       {
-        id: 'field_count',
-        header: 'Anlagen',
-        cell: (variety) => String(usageCountByVariety[variety.name] ?? 0),
+        id: 'requirement_per_kg_mean',
+        header: 'Mittel pro kg',
+        cell: (nutrient) => formatNumber(nutrient.requirement_per_kg_mean, 3),
       },
       {
-        id: 'nr_per_kg',
-        header: 'N pro kg',
-        cell: (variety) => formatNumber(variety.nr_per_kg, 3),
-      },
-      {
-        id: 'kg_per_box',
-        header: 'kg pro Kiste',
-        cell: (variety) => formatNumber(variety.kg_per_box, 2),
-      },
-      {
-        id: 'slope',
-        header: 'Slope',
-        cell: (variety) => formatNumber(variety.slope, 3),
-      },
-      {
-        id: 'intercept',
-        header: 'Intercept',
-        cell: (variety) => formatNumber(variety.intercept, 3),
-      },
-      {
-        id: 'specific_weight',
-        header: 'Spez. Gewicht',
-        cell: (variety) => formatNumber(variety.specific_weight, 3),
+        id: 'requirement_per_kg_max',
+        header: 'Max pro kg',
+        cell: (nutrient) => formatNumber(nutrient.requirement_per_kg_max, 3),
       },
     ],
-    [usageCountByVariety],
+    [],
   )
 
   const tableFilters = useMemo<DataTableFilter[]>(
@@ -152,20 +137,22 @@ export default function VarietyTablePage() {
         label: 'Suche',
         type: 'text',
         value: filters.query,
-        placeholder: 'Name oder Gruppe',
+        placeholder: 'Code oder Sorte',
       },
       {
-        id: 'group',
-        label: 'Gruppe',
+        id: 'variety',
+        label: 'Sorte',
         type: 'select',
-        value: filters.group,
+        value: filters.variety,
         options: [
           { label: 'Alle', value: '' },
-          ...Array.from(new Set(varieties.map((variety) => variety.group)))
-            .sort((left, right) => left.localeCompare(right, 'de-DE'))
-            .map((group) => ({
-              label: group,
-              value: group,
+          { label: 'Standard', value: '__default__' },
+          ...varieties
+            .slice()
+            .sort((left, right) => left.name.localeCompare(right.name, 'de-DE'))
+            .map((variety) => ({
+              label: `${variety.name}${variety.group ? ` (${variety.group})` : ''}`,
+              value: variety.name,
             })),
         ],
       },
@@ -173,37 +160,51 @@ export default function VarietyTablePage() {
     [filters, varieties],
   )
 
-  const filteredVarieties = useMemo(() => {
+  const filteredNutrients = useMemo(() => {
     const normalizedQuery = filters.query.trim().toLowerCase()
 
-    return [...varieties]
-      .sort((left, right) => left.name.localeCompare(right.name, 'de-DE'))
-      .filter((variety) => {
+    return [...nutrients]
+      .sort((left, right) => {
+        const codeCompare = left.nutrient_code.localeCompare(right.nutrient_code, 'de-DE')
+        if (codeCompare !== 0) {
+          return codeCompare
+        }
+
+        return formatVarietyName(left.variety).localeCompare(formatVarietyName(right.variety), 'de-DE')
+      })
+      .filter((nutrient) => {
         const matchesQuery =
           normalizedQuery === '' ||
-          [variety.name, variety.group].join(' ').toLowerCase().includes(normalizedQuery)
+          [nutrient.nutrient_code, nutrient.variety ?? 'Standard']
+            .join(' ')
+            .toLowerCase()
+            .includes(normalizedQuery)
 
-        const matchesGroup = filters.group === '' || variety.group === filters.group
+        const matchesVariety =
+          filters.variety === '' ||
+          (filters.variety === '__default__'
+            ? nutrient.variety === null || nutrient.variety === ''
+            : nutrient.variety === filters.variety)
 
-        return matchesQuery && matchesGroup
+        return matchesQuery && matchesVariety
       })
-  }, [filters, varieties])
+  }, [filters, nutrients])
 
-  const selectedVariety = useMemo(
-    () => filteredVarieties.find((variety) => variety.id === selectedVarietyId) ?? null,
-    [filteredVarieties, selectedVarietyId],
+  const selectedNutrient = useMemo(
+    () => filteredNutrients.find((nutrient) => nutrient.id === selectedNutrientId) ?? null,
+    [filteredNutrients, selectedNutrientId],
   )
 
   useEffect(() => {
-    if (selectedVarietyId === null) {
+    if (selectedNutrientId === null) {
       return
     }
 
-    const stillExists = filteredVarieties.some((variety) => variety.id === selectedVarietyId)
+    const stillExists = filteredNutrients.some((nutrient) => nutrient.id === selectedNutrientId)
     if (!stillExists) {
-      setSelectedVarietyId(null)
+      setSelectedNutrientId(null)
     }
-  }, [filteredVarieties, selectedVarietyId])
+  }, [filteredNutrients, selectedNutrientId])
 
   const handleFilterChange = (filterId: string, value: string) => {
     setFilters((current) => ({ ...current, [filterId]: value }))
@@ -212,45 +213,49 @@ export default function VarietyTablePage() {
   const handleResetFilters = () => {
     setFilters({
       query: '',
-      group: '',
+      variety: '',
     })
   }
 
-  const handleDeleteVariety = async (variety: VarietyRead) => {
-    const confirmed = window.confirm(`Soll die Sorte "${variety.name}" wirklich geloescht werden?`)
+  const handleDeleteNutrient = async (nutrient: NutrientRequirementRead) => {
+    const confirmed = window.confirm(
+      `Soll der Naehrstoffeintrag "${nutrient.nutrient_code}" fuer "${formatVarietyName(nutrient.variety)}" wirklich geloescht werden?`,
+    )
     if (!confirmed) {
       return
     }
 
     try {
-      await api.delete(`/varieties/${variety.id}`)
-      setSelectedVarietyId(null)
+      await api.delete(`/nutrients/${nutrient.id}`)
+      setSelectedNutrientId(null)
       notifyDataChanged()
     } catch (error) {
-      console.error(`Error deleting variety ${variety.id}`, error)
-      setErrorMessage('Die Sorte konnte nicht geloescht werden.')
+      console.error(`Error deleting nutrient requirement ${nutrient.id}`, error)
+      setErrorMessage('Der Naehrstoffeintrag konnte nicht geloescht werden.')
     }
   }
 
-  const summaryCells = useMemo<DataTableSummaryCell<VarietyRead>[]>(
+  const summaryCells = useMemo<DataTableSummaryCell<NutrientRequirementRead>[]>(
     () => [
       {
-        columnId: 'name',
+        columnId: 'nutrient_code',
         content: 'Summe',
       },
       {
-        columnId: 'field_count',
-        content: (rows) =>
-          rows.reduce((total, variety) => total + (usageCountByVariety[variety.name] ?? 0), 0),
+        columnId: 'variety',
+        content: (rows) => rows.length,
       },
     ],
-    [usageCountByVariety],
+    [],
   )
 
-  const editAction = useMemo(() => buildVarietyEditAction(editingVariety), [editingVariety])
+  const editAction = useMemo(
+    () => buildNutrientEditAction(editingNutrient),
+    [editingNutrient],
+  )
   const editInitialValues = useMemo(
-    () => buildVarietyEditInitialValues(editingVariety),
-    [editingVariety],
+    () => buildNutrientEditInitialValues(editingNutrient),
+    [editingNutrient],
   )
 
   return (
@@ -262,7 +267,7 @@ export default function VarietyTablePage() {
               Tabellenansicht
             </p>
             <h1 className="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
-              Sorten
+              Naehrstoffe
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -272,32 +277,32 @@ export default function VarietyTablePage() {
               className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
             >
               <IoMdAdd />
-              Sorte
+              Naehrstoff
             </button>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              {filteredVarieties.length} / {varieties.length} Eintraege
+              {filteredNutrients.length} / {nutrients.length} Eintraege
             </div>
           </div>
         </div>
 
         <div ref={interactiveAreaRef} className="mt-8">
-          {selectedVariety ? (
+          {selectedNutrient ? (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border border-slate-200 bg-slate-50 px-4 py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Ausgewaehlte Sorte
+                  Ausgewaehlter Eintrag
                 </p>
                 <p className="mt-1 text-lg font-semibold text-slate-900">
-                  {selectedVariety.name}
+                  {selectedNutrient.nutrient_code} | {formatVarietyName(selectedNutrient.variety)}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  {selectedVariety.group} | {usageCountByVariety[selectedVariety.name] ?? 0} Anlagen
+                  Min {formatNumber(selectedNutrient.requirement_per_kg_min, 3)} | Mittel {formatNumber(selectedNutrient.requirement_per_kg_mean, 3)} | Max {formatNumber(selectedNutrient.requirement_per_kg_max, 3)}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => setEditingVariety(selectedVariety)}
+                  onClick={() => setEditingNutrient(selectedNutrient)}
                   className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-500"
                 >
                   <GoPencil />
@@ -305,7 +310,7 @@ export default function VarietyTablePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDeleteVariety(selectedVariety)}
+                  onClick={() => void handleDeleteNutrient(selectedNutrient)}
                   className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
                 >
                   <PiTrashBold />
@@ -317,7 +322,7 @@ export default function VarietyTablePage() {
 
           {isLoading ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
-              Lade Sortendaten...
+              Lade Naehrstoffdaten...
             </div>
           ) : errorMessage ? (
             <div className="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-12 text-center text-rose-700">
@@ -326,30 +331,30 @@ export default function VarietyTablePage() {
           ) : (
             <DataTable
               columns={columns}
-              rows={filteredVarieties}
-              getRowKey={(variety) => variety.id}
-              emptyMessage="Keine Sorten gefunden."
+              rows={filteredNutrients}
+              getRowKey={(nutrient) => nutrient.id}
+              emptyMessage="Keine Naehrstoffeintraege gefunden."
               filters={tableFilters}
               onFilterChange={handleFilterChange}
               onResetFilters={handleResetFilters}
               summaryCells={summaryCells}
-              selectedRowKey={selectedVarietyId}
-              onRowSelect={(variety) => setSelectedVarietyId(variety?.id ?? null)}
+              selectedRowKey={selectedNutrientId}
+              onRowSelect={(nutrient) => setSelectedNutrientId(nutrient?.id ?? null)}
             />
           )}
         </div>
       </div>
 
       <CreateEntityModal
-        action={varietyCreateAction}
+        action={nutrientCreateAction}
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />
       <CreateEntityModal
         action={editAction}
-        isOpen={editingVariety !== null}
+        isOpen={editingNutrient !== null}
         initialValues={editInitialValues}
-        onClose={() => setEditingVariety(null)}
+        onClose={() => setEditingNutrient(null)}
       />
     </section>
   )
