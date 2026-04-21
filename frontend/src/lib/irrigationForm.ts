@@ -16,6 +16,13 @@ export function buildIrrigationEditAction(
     endpoint: `/irrigation/${event.id}`,
     method: 'put',
     fields: [...irrigationEditFields],
+    buildPayload: (values) => ({
+      field_id: Number(values.field_id),
+      date: values.date,
+      method: values.method.trim(),
+      duration: Number(values.duration),
+      amount: values.amount.trim() === '' ? null : Number(values.amount),
+    }),
   }
 }
 

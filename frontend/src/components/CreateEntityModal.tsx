@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { FiX } from 'react-icons/fi'
 
 import api from '../api'
@@ -144,6 +144,7 @@ export default function CreateEntityModal({
   onClose,
 }: CreateEntityModalProps) {
   const [values, setValues] = useState<Record<string, string>>({})
+  const hasManualIrrigationAmountRef = useRef(false)
   const [fields, setFields] = useState<FieldRead[]>([])
   const [fieldOptions, setFieldOptions] = useState<FieldOption[]>([])
   const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
@@ -180,6 +181,7 @@ export default function CreateEntityModal({
     }
 
     setValues(buildInitialValues(action, initialValues))
+    hasManualIrrigationAmountRef.current = false
     setFields([])
     setFieldOptions([])
     setVarietyOptions([])
@@ -314,6 +316,10 @@ export default function CreateEntityModal({
       }
 
       const resolvedAmount = String(Math.round(refreshedAmount * 100) / 100)
+      if (hasManualIrrigationAmountRef.current) {
+        return currentValues
+      }
+
       if (currentValues.amount === resolvedAmount) {
         return currentValues
       }
@@ -327,6 +333,14 @@ export default function CreateEntityModal({
   }
 
   const handleChange = (fieldId: string, nextValue: string) => {
+    if (action?.id === 'irrigation') {
+      if (fieldId === 'amount') {
+        hasManualIrrigationAmountRef.current = true
+      } else if (fieldId === 'field_id' || fieldId === 'field_ids' || fieldId === 'duration' || fieldId === 'method') {
+        hasManualIrrigationAmountRef.current = false
+      }
+    }
+
     setValues((currentValues) => ({ ...currentValues, [fieldId]: nextValue }))
   }
 
