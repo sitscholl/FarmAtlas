@@ -78,3 +78,41 @@ class IrrigationBulkUpsertResponse(BaseModel):
     unchanged_count: int
     skipped_field_ids: list[int]
     errors_by_field_id: dict[int, str] = Field(default_factory=dict)
+
+
+class IrrigationFieldNameUpsert(BaseModel):
+    field: str
+    date: DateType = Field(default_factory=DateType.today)
+    method: str
+    duration: float
+    amount: float | None = None
+
+    @field_validator("field")
+    @classmethod
+    def _normalize_field(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("field must not be empty")
+        return normalized
+
+    @field_validator("method")
+    @classmethod
+    def _normalize_method(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("method must not be empty")
+        return normalized
+
+    @field_validator("duration")
+    @classmethod
+    def _validate_duration(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("duration must be greater than 0")
+        return value
+
+    @field_validator("amount")
+    @classmethod
+    def _validate_amount(cls, value: float | None) -> float | None:
+        if value is not None and value <= 0:
+            raise ValueError("amount must be greater than 0")
+        return value

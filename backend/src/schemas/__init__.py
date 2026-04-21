@@ -4,6 +4,7 @@ from .irrigation import (
     IrrigationBulkResponse,
     IrrigationBulkUpsertResponse,
     IrrigationCreate,
+    IrrigationFieldNameUpsert,
     IrrigationRead,
     IrrigationUpdate,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "IrrigationBulkResponse",
     "IrrigationBulkUpsertResponse",
     "IrrigationCreate",
+    "IrrigationFieldNameUpsert",
     "IrrigationRead",
     "IrrigationUpdate",
     "NutrientRequirementCreate",

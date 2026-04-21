@@ -9,6 +9,7 @@ from ..schemas import (
     IrrigationBulkResponse,
     IrrigationBulkUpsertResponse,
     IrrigationCreate,
+    IrrigationFieldNameUpsert,
     IrrigationRead,
     IrrigationUpdate,
 )
@@ -42,6 +43,14 @@ def get_irrigation_events_for_fields_and_date(field_ids: list[int], target_date:
             if event.field_id in field_id_set and event.date == target_date
         ]
     return {event.field_id: event for event in events}
+
+
+def get_field_by_name(field_name: str):
+    with runtime.db.session_scope() as session:
+        field = runtime.db.fields.get_by_name(session, field_name)
+    if field is None:
+        raise HTTPException(status_code=404, detail=f"No field with name '{field_name}' found")
+    return field
 
 
 @router.get("/api/fields/{field_id}/irrigation", response_model=list[IrrigationRead])
@@ -200,6 +209,42 @@ async def upsert_bulk_irrigation_events(
         skipped_field_ids=skipped_field_ids,
         errors_by_field_id=errors_by_field_id,
     )
+
+
+@router.post("/api/irrigation/upsert", response_model=IrrigationRead, status_code=status.HTTP_200_OK)
+async def upsert_irrigation_event_by_field_name(
+    background_tasks: BackgroundTasks,
+    irrigation_event: IrrigationFieldNameUpsert,
+):
+    try:
+        field = get_field_by_name(irrigation_event.field)
+        existing_event = get_irrigation_events_for_fields_and_date([field.id], irrigation_event.date).get(field.id)
+
+        if existing_event is None:
+            event = runtime.db.irrigation_service.create(
+                field_id=field.id,
+                date=irrigation_event.date,
+                method=irrigation_event.method,
+                duration=irrigation_event.duration,
+                amount=irrigation_event.amount,
+            )
+        else:
+            event = runtime.db.irrigation_service.update(
+                event_id=existing_event.id,
+                updates={
+                    "field_id": field.id,
+                    "date": irrigation_event.date,
+                    "method": irrigation_event.method,
+                    "duration": irrigation_event.duration,
+                    "amount": irrigation_event.amount,
+                },
+            )
+
+        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field.id)
+        return serialize_irrigation_event(event)
+    except Exception as exc:
+        logger.exception("Upserting irrigation event for field with name %s failed: %s", irrigation_event.field, exc)
+        raise_write_http_error(exc, not_found_prefixes=("No field with name", "Could not find any irrigation event with id"))
 
 
 @router.put("/api/irrigation/{event_id}", response_model=IrrigationRead)

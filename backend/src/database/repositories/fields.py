@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models
@@ -58,6 +59,24 @@ class FieldRepository:
 
     def get_by_id(self, session: Session, field_id: int) -> models.Field | None:
         return self._query(session).filter(models.Field.id == field_id).one_or_none()
+
+    def get_by_name(self, session: Session, name: str) -> models.Field | None:
+        normalized_name = self._normalize_required_text(name, field_name="name")
+        matches = (
+            self._query(session)
+            .filter(func.lower(models.Field.name) == normalized_name.lower())
+            .order_by(models.Field.group, models.Field.name, models.Field.id)
+            .all()
+        )
+        if not matches:
+            return None
+        if len(matches) > 1:
+            groups = ", ".join(sorted({str(field.group) for field in matches}))
+            raise ValueError(
+                f"Field name '{normalized_name}' is ambiguous. Matching groups: {groups}. "
+                "Use a unique field name."
+            )
+        return matches[0]
 
     def list_all(self, session: Session) -> list[models.Field]:
         return self._query(session).order_by(models.Field.group, models.Field.name).all()
