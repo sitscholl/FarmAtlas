@@ -29,12 +29,12 @@ type TooltipRow = {
   key: string
   label: string
   color: string
-  value: number
+  value: number | null
 }
 
 function formatNumber(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
-    return 'n/a'
+    return '-'
   }
 
   return new Intl.NumberFormat('de-DE', {
@@ -128,52 +128,35 @@ function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
 }
 
 function buildTooltipRows(point: ChartRow): TooltipRow[] {
-  const rows: TooltipRow[] = []
-
-  if (point.soil_water_content_observed !== null) {
-    rows.push({
-      key: 'soil_water_content_observed',
+  return [
+    {
+      key: 'soil_water_content',
       label: 'Bodenwassergehalt',
       color: '#0f172a',
-      value: point.soil_water_content_observed,
-    })
-  } else if (point.soil_water_content_forecast !== null) {
-    rows.push({
-      key: 'soil_water_content_forecast',
-      label: 'Bodenwassergehalt Prognose',
-      color: '#0f172a',
-      value: point.soil_water_content_forecast,
-    })
-  }
-
-  if (point.precipitation !== 0) {
-    rows.push({
+      value: point.soil_water_content_observed ?? point.soil_water_content_forecast,
+    },
+    {
       key: 'precipitation',
       label: 'Niederschlag',
       color: '#0682b77d',
-      value: point.precipitation,
-    })
-  }
-
-  if (point.irrigation !== 0) {
-    rows.push({
+      value: point.precipitation ?? null,
+    },
+    {
       key: 'irrigation',
       label: 'Bewaesserung',
       color: '#259a057a',
-      value: point.irrigation,
-    })
-  }
-
-  if (point.evapotranspiration_negative !== null && point.evapotranspiration_negative !== 0) {
-    rows.push({
+      value: point.irrigation ?? null,
+    },
+    {
       key: 'evapotranspiration_negative',
       label: 'Evapotranspiration',
       color: '#f59e0b99',
-      value: Math.abs(point.evapotranspiration_negative),
-    })
-  }
-
-  return rows
+      value:
+        point.evapotranspiration_negative === null
+          ? null
+          : Math.abs(point.evapotranspiration_negative),
+    },
+  ]
 }
 
 export default function WaterBalanceChart({
@@ -259,6 +242,12 @@ export default function WaterBalanceChart({
                 width={36}
               />
               <ReferenceLine y={0} stroke="#64748b" strokeWidth={.5} />
+              <ReferenceLine
+                x={activePoint.date}
+                stroke="#94a3b8"
+                strokeDasharray="3 3"
+                strokeWidth={1}
+              />
               {hasTodayMarker ? (
                 <ReferenceLine
                   x={today}
@@ -345,24 +334,20 @@ export default function WaterBalanceChart({
           {activePoint.date}
         </p>
         <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          {activeRows.length === 0 ? (
-            <p className="text-slate-500">Keine Werte fuer diesen Zeitpunkt vorhanden.</p>
-          ) : (
-            activeRows.map((row) => (
-              <div key={`${activePoint.date}-${row.key}`} className="flex items-center justify-between gap-3 border border-slate-100 bg-slate-50 px-3 py-2">
-                <span className="flex items-center gap-2 text-slate-600">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: row.color }}
-                  />
-                  {row.label}
-                </span>
-                <span className="font-medium text-slate-900">
-                  {formatNumber(row.value)} mm
-                </span>
-              </div>
-            ))
-          )}
+          {activeRows.map((row) => (
+            <div key={`${activePoint.date}-${row.key}`} className="flex items-center justify-between gap-3 border border-slate-100 bg-slate-50 px-3 py-2">
+              <span className="flex items-center gap-2 text-slate-600">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: row.color }}
+                />
+                {row.label}
+              </span>
+              <span className="font-medium text-slate-900">
+                {row.value === null ? '-' : `${formatNumber(row.value)} mm`}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
