@@ -26,10 +26,17 @@ def ensure_sqlite_directory(engine_url: str) -> None:
 
 
 class DatabaseCore:
-    def __init__(self, engine_url: str = "sqlite:///db/database.db", **engine_kwargs) -> None:
+    def __init__(
+        self,
+        engine_url: str = "sqlite:///db/database.db",
+        *,
+        initialize_schema: bool = False,
+        **engine_kwargs,
+    ) -> None:
         ensure_sqlite_directory(engine_url)
         self.engine: Engine = create_engine(engine_url, future=True, **engine_kwargs)
-        models.Base.metadata.create_all(self.engine)
+        if initialize_schema:
+            models.Base.metadata.create_all(self.engine)
         self._session_factory = sessionmaker(
             bind=self.engine,
             autocommit=False,

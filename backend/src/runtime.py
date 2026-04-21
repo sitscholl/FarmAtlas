@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from .database.db import Database
+from .database.settings import get_database_url
 from .et import ET0Calculator
 from .et.et_correction import ETCorrection
 from .field import FieldContext
@@ -90,7 +91,7 @@ class RuntimeContext:
         )
 
         ## Database
-        self.db = Database(config.get('database', {}).get('path', 'sqlite:///db/database.db'))
+        self.db = Database(get_database_url(config))
        
         ## Fields
         if len(self.fields) == 0:

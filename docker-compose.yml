@@ -3,6 +3,9 @@ services:
     image: ghcr.io/sitscholl/farmatlas:latest
     # ports:
     #   - "8080:8080"
+    environment:
+      FARMATLAS_CONFIG_PATH: /app/config/config.yaml
+      FARMATLAS_LOG_CONFIG_PATH: /app/config/config.logging.yaml
     volumes:
       - ./config:/app/config
       - ./db:/app/db

@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
+from ..app_config import get_app_config_path
 from ..runtime import RuntimeContext
 from ..scheduler import WorkflowScheduler
 from ..schemas import (
@@ -25,7 +26,7 @@ from ..field import FieldContext
 
 logger = logging.getLogger(__name__)
 
-runtime = RuntimeContext.from_config_file("config/config.yaml")
+runtime = RuntimeContext.from_config_file(get_app_config_path())
 scheduler = WorkflowScheduler(runtime=runtime)
 
 frontend_dist_dir = Path(__file__).resolve().parents[3] / "frontend" / "dist"

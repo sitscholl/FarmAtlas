@@ -26,6 +26,8 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV FARMATLAS_CONFIG_PATH=/app/config/config.yaml
+ENV FARMATLAS_LOG_CONFIG_PATH=/app/config/config.logging.yaml
 
 COPY --from=backend-builder /usr/local /usr/local
 COPY backend/ /app/backend/
@@ -34,4 +36,4 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 EXPOSE 8000
 
 WORKDIR /app/backend
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "python scripts/run_migrations.py && python main.py"]

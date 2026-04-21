@@ -2,6 +2,11 @@ general:
     timezone: Europe/Rome
     season_end: "01-10-2025"
 
+database:
+    path: sqlite:///db/database.db
+    # In Docker on the NAS, prefer an absolute path on the mounted volume:
+    # path: sqlite:////app/db/database.db
+
 meteo:
     api_host: https://meteoservice.oberlenghof.org
     query_template: api/{provider}/timeseries?station_id={station_id}&start_date={start_date:%Y-%m-%dT%H:%M:%SZ}&end_date={end_date:%Y-%m-%dT%H:%M:%SZ}

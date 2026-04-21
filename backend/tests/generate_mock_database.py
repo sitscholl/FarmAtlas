@@ -136,7 +136,7 @@ def seed_mock_database(database_path: Path) -> None:
     if database_path.exists():
         database_path.unlink()
 
-    db = Database(f"sqlite:///{database_path.as_posix()}")
+    db = Database(f"sqlite:///{database_path.as_posix()}", initialize_schema=True)
     end_date = pd.Timestamp.now().floor("D")
 
     try:

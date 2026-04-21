@@ -22,8 +22,18 @@ class Database:
         "reference_station",
     }
 
-    def __init__(self, engine_url: str = "sqlite:///db/database.db", **engine_kwargs) -> None:
-        self.core = DatabaseCore(engine_url=engine_url, **engine_kwargs)
+    def __init__(
+        self,
+        engine_url: str = "sqlite:///db/database.db",
+        *,
+        initialize_schema: bool = False,
+        **engine_kwargs,
+    ) -> None:
+        self.core = DatabaseCore(
+            engine_url=engine_url,
+            initialize_schema=initialize_schema,
+            **engine_kwargs,
+        )
         self.engine = self.core.engine
 
         self.fields = FieldRepository()

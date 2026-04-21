@@ -10,23 +10,28 @@ Supporting files:
 
 - `core.py`: engine and session management.
 - `db.py`: composition root that wires repositories and services into one `Database` object.
+- `settings.py`: resolves the effective database URL from config or `DATABASE_URL`.
+- `../../alembic/`: schema migration history and Alembic environment.
 
 ## Current Rule Of Thumb
 
 - Use repositories directly for reads.
 - Use repositories directly for simple writes that only affect one table.
 - Use services for writes that need side effects, validation across entities, or cache invalidation.
+- Use Alembic migrations for every schema change. `create_all()` is now opt-in and only intended for disposable test databases.
 
 ## Add A New Table
 
 1. Add the SQLAlchemy model in [`models.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/models.py).
-2. If the table needs direct persistence access, add a repository in [`repositories/`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/repositories).
-3. Export the repository in [`repositories/__init__.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/repositories/__init__.py).
-4. Wire the repository in [`db.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/db.py) as `db.<name>`.
-5. If writes to the new table need cross-table rules or side effects, add a service in [`services/`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/services).
-6. Export the service in [`services/__init__.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/services/__init__.py).
-7. Wire the service in [`db.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/db.py) as `db.<name>_service`.
-8. Update callers to use:
+2. Create an Alembic migration from [`backend`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend) with `alembic revision --autogenerate -m "add <table>"`.
+3. Review the generated migration and then apply it with `alembic upgrade head`.
+4. If the table needs direct persistence access, add a repository in [`repositories/`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/repositories).
+5. Export the repository in [`repositories/__init__.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/repositories/__init__.py).
+6. Wire the repository in [`db.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/db.py) as `db.<name>`.
+7. If writes to the new table need cross-table rules or side effects, add a service in [`services/`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/services).
+8. Export the service in [`services/__init__.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/services/__init__.py).
+9. Wire the service in [`db.py`](c:/Users/tscho/Documents/_Coding/FarmAtlas/backend/src/database/db.py) as `db.<name>_service`.
+10. Update callers to use:
    - `with db.session_scope() as session: db.<repository>.<method>(session, ...)` for repository access
    - `db.<service>.<method>(...)` for business operations
 
