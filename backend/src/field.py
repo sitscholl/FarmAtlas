@@ -1,9 +1,9 @@
+from datetime import date
 from dataclasses import dataclass
 
 import pandas as pd
-from datetime import date
 
-from .database.models import Field, PhenologyEvents
+from .database.models import Field
 from .water_content import SoilWaterEstimate
 
 
@@ -43,6 +43,15 @@ class PlantingContext:
 
 
 @dataclass(frozen=True)
+class PhenologyEventContext:
+    id: int
+    date: object
+    stage_id: int
+    stage_name: str
+    kc: float
+
+
+@dataclass(frozen=True)
 class SectionContext:
     id: int
     name: str
@@ -59,12 +68,15 @@ class SectionContext:
     valid_from: object
     valid_to: object
     active: bool
-    phenology: list[PhenologyEvents]
+    phenology: list[PhenologyEventContext]
 
     @property
     def current_phenology(self) -> str | None:
         phen_stages = [stage for stage in self.phenology if stage.date <= date.today()]
-        return None if len(phen_stages) == 0  else phen_stages[0].stage
+        if not phen_stages:
+            return None
+        current_stage = max(phen_stages, key=lambda stage: stage.date)
+        return current_stage.stage_name
 
 
 @dataclass
@@ -118,6 +130,16 @@ class FieldContext:
                 valid_from=section.valid_from,
                 valid_to=section.valid_to,
                 active=section.active,
+                phenology=[
+                    PhenologyEventContext(
+                        id=event.id,
+                        date=event.date,
+                        stage_id=event.stage_id,
+                        stage_name=event.stage.name,
+                        kc=float(event.stage.kc),
+                    )
+                    for event in section.phenology_events
+                ],
             )
             for planting in field_model.plantings
             for section in planting.sections
@@ -217,6 +239,6 @@ class FieldContext:
         return max(dates) if dates else None
 
     @property
-    def phenology(self):
+    def current_phenology(self) -> str | None:
         all_stages = [i.current_phenology for i in self.sections]
         return _single_or_none(all_stages)

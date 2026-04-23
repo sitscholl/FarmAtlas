@@ -17,6 +17,8 @@ from ..schemas import (
     FieldSummaryRead,
     IrrigationRead,
     NutrientRequirementRead,
+    PhenologicalStageRead,
+    PhenologyEventRead,
     PlantingRead,
     SectionRead,
     VarietyRead,
@@ -88,6 +90,7 @@ def serialize_field_summary(
         tree_count=field_context.tree_count,
         running_metre=field_context.running_metre,
         active=field_context.active,
+        current_phenology=field_context.current_phenology,
         herbicide_free=field_context.herbicide_free,
         planting_count=len(field.plantings),
         section_count=len(field_context.sections),
@@ -120,6 +123,14 @@ def serialize_nutrient_requirement(nutrient_requirement) -> NutrientRequirementR
     return NutrientRequirementRead.model_validate(nutrient_requirement)
 
 
+def serialize_phenological_stage(stage) -> PhenologicalStageRead:
+    return PhenologicalStageRead.model_validate(stage)
+
+
+def serialize_phenology_event(event) -> PhenologyEventRead:
+    return PhenologyEventRead.model_validate(event)
+
+
 _INTEGRITY_ERROR_MESSAGES = {
     "fields.group, fields.name": "A field with this group and name already exists.",
     "varieties.name": "A variety with this name already exists.",
@@ -136,6 +147,10 @@ _INTEGRITY_ERROR_MESSAGES = {
     ),
     "irrigation_events.field_id, irrigation_events.date": "An irrigation event for this field and date already exists.",
     "water_balance.field_id, water_balance.date": "A water balance entry for this field and date already exists.",
+    "phenological_stages.name": "A phenological stage with this name already exists.",
+    "section_phenology_events.section_id, section_phenology_events.date": (
+        "A phenology event for this section and date already exists."
+    ),
     "ck_plantings_valid_range": "valid_to must be greater than or equal to valid_from",
     "ck_sections_valid_range": "valid_to must be greater than or equal to valid_from",
     "ck_field_cadastral_parcels_area_non_negative": "area must be greater than or equal to 0",

@@ -2,7 +2,7 @@ import datetime
 import logging
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .. import models
 from .plantings import PlantingRepository
@@ -28,6 +28,13 @@ class SectionRepository:
     def __init__(self, planting_repository: PlantingRepository) -> None:
         self._plantings = planting_repository
 
+    def _query(self, session: Session):
+        return session.query(models.Section).options(
+            selectinload(models.Section.phenology_events).selectinload(
+                models.SectionPhenologyEvent.stage
+            ),
+        )
+
     def _normalize_required_text(self, value: Any, *, field_name: str) -> str:
         text = str(value).strip()
         if text == "":
@@ -45,14 +52,14 @@ class SectionRepository:
             raise ValueError(f"Expected ISO date for '{field_name}', got {value!r}") from exc
 
     def get_by_id(self, session: Session, section_id: int) -> models.Section | None:
-        return session.query(models.Section).filter(models.Section.id == section_id).one_or_none()
+        return self._query(session).filter(models.Section.id == section_id).one_or_none()
 
     def list_for_planting(self, session: Session, planting_id: int) -> list[models.Section]:
         planting = self._plantings.get_by_id(session, planting_id)
         if planting is None:
             raise ValueError(f"No planting with id {planting_id} found")
         return (
-            session.query(models.Section)
+            self._query(session)
             .filter(models.Section.planting_id == planting_id)
             .order_by(models.Section.valid_from, models.Section.name)
             .all()

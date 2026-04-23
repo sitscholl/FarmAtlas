@@ -30,7 +30,10 @@ class FieldRepository:
     def _query(self, session: Session):
         return session.query(models.Field).options(
             selectinload(models.Field.plantings).selectinload(models.Planting.variety),
-            selectinload(models.Field.plantings).selectinload(models.Planting.sections),
+            selectinload(models.Field.plantings)
+            .selectinload(models.Planting.sections)
+            .selectinload(models.Section.phenology_events)
+            .selectinload(models.SectionPhenologyEvent.stage),
             selectinload(models.Field.cadastral_parcels),
         )
 

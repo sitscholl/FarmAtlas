@@ -71,6 +71,7 @@ class FieldSummaryRead(FieldRead):
     tree_count: int | None = None
     running_metre: float | None = None
     active: bool
+    current_phenology: str | None = None
     herbicide_free: bool | None = None
     planting_count: int
     section_count: int

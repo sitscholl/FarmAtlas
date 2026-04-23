@@ -19,7 +19,9 @@ class PlantingRepository:
     def _query(self, session: Session):
         return session.query(models.Planting).options(
             selectinload(models.Planting.variety),
-            selectinload(models.Planting.sections),
+            selectinload(models.Planting.sections)
+            .selectinload(models.Section.phenology_events)
+            .selectinload(models.SectionPhenologyEvent.stage),
         )
 
     def _get_variety_by_name(self, session: Session, variety_name: str) -> models.Variety:

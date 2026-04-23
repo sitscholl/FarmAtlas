@@ -166,7 +166,12 @@ class Section(Base, ValidityRangeMixin):
     herbicide_free = Column(Boolean, nullable=True)
 
     planting = relationship("Planting", back_populates="sections")
-    phenology = relationship("PhenologyEvents", back_populates='section', cascade="all, delete-orphan", order_by="PhenologyEvents.date")
+    phenology_events = relationship(
+        "SectionPhenologyEvent",
+        back_populates="section",
+        cascade="all, delete-orphan",
+        order_by="SectionPhenologyEvent.date",
+    )
 
     @property
     def field(self) -> Field | None:
@@ -175,6 +180,21 @@ class Section(Base, ValidityRangeMixin):
     @property
     def variety(self) -> "Variety | None":
         return self.planting.variety if self.planting is not None else None
+
+    @property
+    def current_phenology_event(self) -> "SectionPhenologyEvent | None":
+        today = datetime.date.today()
+        active_events = [event for event in self.phenology_events if event.date <= today]
+        if not active_events:
+            return None
+        return max(active_events, key=lambda event: event.date)
+
+    @property
+    def current_phenology(self) -> str | None:
+        current_event = self.current_phenology_event
+        if current_event is None or current_event.stage is None:
+            return None
+        return str(current_event.stage.name)
 
 
 class CadastralParcel(Base):
@@ -289,22 +309,29 @@ class WaterBalance(Base):
     field = relationship("Field", back_populates="water_balance")
 
 
-class PhenologicalStages(Base):
-    __tablename__ = 'phenological_stages'
+class PhenologicalStage(Base):
+    __tablename__ = "phenological_stages"
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_phenological_stages_name"),
+    )
 
-    id = Column(int, primary_key=True)
+    id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     kc = Column(Float, nullable=False)
 
-    phenology_events = relationship("FieldPhenology", back_populates='stage', cascade="all, delete-orphan")
+    phenology_events = relationship("SectionPhenologyEvent", back_populates="stage")
 
-class PhenologyEvents(Base):
-    __tablename__ = 'field_phenology'
 
-    id = Column(int, primary_key=True)
-    date = Column(Date, nullable = False)
-    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
-    stage_id = Column(Integer, ForeignKey('phenological_stages.id'), nullable=False)
+class SectionPhenologyEvent(Base):
+    __tablename__ = "section_phenology_events"
+    __table_args__ = (
+        UniqueConstraint("section_id", "date", name="uq_section_phenology_events_section_date"),
+    )
 
-    section = relationship("Section", back_populates='phenology')
-    stage = relationship("PhenologicalStages", back_populates='phenology_events')
+    id = Column(Integer, primary_key=True)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
+    stage_id = Column(Integer, ForeignKey("phenological_stages.id"), nullable=False)
+    date = Column(Date, nullable=False)
+
+    section = relationship("Section", back_populates="phenology_events")
+    stage = relationship("PhenologicalStage", back_populates="phenology_events")
