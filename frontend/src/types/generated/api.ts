@@ -141,6 +141,14 @@ export type IrrigationCreate = {
   amount?: number | null
 }
 
+export type IrrigationFieldNameUpsert = {
+  field: string
+  date?: string
+  method: string
+  duration: number
+  amount?: number | null
+}
+
 export type IrrigationRead = {
   date: string
   method: string

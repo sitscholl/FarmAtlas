@@ -4,6 +4,7 @@ import { FiX } from 'react-icons/fi'
 import api from '../api'
 import GroupedFieldSelector from './GroupedFieldSelector'
 import { notifyDataChanged } from '../lib/dataEvents'
+import { getApiErrorMessage, getBulkMutationMessage } from '../lib/apiErrors'
 import type { FieldRead, VarietyRead } from '../types/generated/api'
 import {
   type CreateActionConfig,
@@ -376,16 +377,21 @@ export default function CreateEntityModal({
           ? `/fields/${(payload as { field_id: number }).field_id}/irrigation`
           : submission.endpoint
 
-      await api.request({
+      const response = await api.request({
         method: submission.method ?? 'post',
         url: endpoint,
         data: payload,
       })
+      const bulkMutationMessage = getBulkMutationMessage(response.data)
       notifyDataChanged()
+      if (bulkMutationMessage !== null) {
+        setErrorMessage(bulkMutationMessage)
+        return
+      }
       onClose()
     } catch (error) {
       console.error(`Error saving ${action.id}`, error)
-      setErrorMessage('Die Daten konnten nicht gespeichert werden.')
+      setErrorMessage(getApiErrorMessage(error, 'Die Daten konnten nicht gespeichert werden.'))
     } finally {
       setIsSubmitting(false)
     }

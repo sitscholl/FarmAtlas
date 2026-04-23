@@ -2,7 +2,6 @@ import logging
 from datetime import date, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
-from sqlalchemy.exc import IntegrityError
 
 from ..schemas import (
     IrrigationBulkCreate,
@@ -15,6 +14,7 @@ from ..schemas import (
 )
 from .utils import (
     get_irrigation_event,
+    get_write_error_detail,
     queue_water_balance_refresh,
     raise_write_http_error,
     runtime,
@@ -112,12 +112,7 @@ async def create_bulk_irrigation_events(
         except Exception as exc:
             logger.exception("Adding irrigation event for field with id %s failed: %s", field_id, exc)
             skipped_field_ids.append(field_id)
-            if isinstance(exc, HTTPException):
-                errors_by_field_id[field_id] = str(exc.detail)
-            elif isinstance(exc, IntegrityError):
-                errors_by_field_id[field_id] = "Resource already exists or violates a uniqueness constraint."
-            else:
-                errors_by_field_id[field_id] = str(exc)
+            errors_by_field_id[field_id] = get_write_error_detail(exc)
 
     queue_water_balance_refresh(background_tasks, created_field_ids)
 
@@ -190,12 +185,7 @@ async def upsert_bulk_irrigation_events(
         except Exception as exc:
             logger.exception("Upserting irrigation event for field with id %s failed: %s", field_id, exc)
             skipped_field_ids.append(field_id)
-            if isinstance(exc, HTTPException):
-                errors_by_field_id[field_id] = str(exc.detail)
-            elif isinstance(exc, IntegrityError):
-                errors_by_field_id[field_id] = "Resource already exists or violates a uniqueness constraint."
-            else:
-                errors_by_field_id[field_id] = str(exc)
+            errors_by_field_id[field_id] = get_write_error_detail(exc)
 
     queue_water_balance_refresh(background_tasks, changed_field_ids)
 
