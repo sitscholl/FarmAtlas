@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
 import pandas as pd
+from datetime import date
 
-from .database.models import Field
+from .database.models import Field, PhenologyEvents
 from .water_content import SoilWaterEstimate
 
 
@@ -58,6 +59,12 @@ class SectionContext:
     valid_from: object
     valid_to: object
     active: bool
+    phenology: list[PhenologyEvents]
+
+    @property
+    def current_phenology(self) -> str | None:
+        phen_stages = [stage for stage in self.phenology if stage.date <= date.today()]
+        return None if len(phen_stages) == 0  else phen_stages[0].stage
 
 
 @dataclass
@@ -208,3 +215,8 @@ class FieldContext:
         if not dates:
             dates = [planting.valid_to for planting in self.plantings if planting.valid_to is not None]
         return max(dates) if dates else None
+
+    @property
+    def phenology(self):
+        all_stages = [i.current_phenology for i in self.sections]
+        return _single_or_none(all_stages)

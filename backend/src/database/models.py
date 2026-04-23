@@ -166,6 +166,7 @@ class Section(Base, ValidityRangeMixin):
     herbicide_free = Column(Boolean, nullable=True)
 
     planting = relationship("Planting", back_populates="sections")
+    phenology = relationship("PhenologyEvents", back_populates='section', cascade="all, delete-orphan", order_by="PhenologyEvents.date")
 
     @property
     def field(self) -> Field | None:
@@ -286,3 +287,24 @@ class WaterBalance(Base):
     below_raw = Column(Boolean, nullable=True)
 
     field = relationship("Field", back_populates="water_balance")
+
+
+class PhenologicalStages(Base):
+    __tablename__ = 'phenological_stages'
+
+    id = Column(int, primary_key=True)
+    name = Column(String, nullable=False)
+    kc = Column(Float, nullable=False)
+
+    phenology_events = relationship("FieldPhenology", back_populates='stage', cascade="all, delete-orphan")
+
+class PhenologyEvents(Base):
+    __tablename__ = 'field_phenology'
+
+    id = Column(int, primary_key=True)
+    date = Column(Date, nullable = False)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=False)
+    stage_id = Column(Integer, ForeignKey('phenological_stages.id'), nullable=False)
+
+    section = relationship("Section", back_populates='phenology')
+    stage = relationship("PhenologicalStages", back_populates='phenology_events')
