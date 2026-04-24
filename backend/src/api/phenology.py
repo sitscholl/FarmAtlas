@@ -3,13 +3,11 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 
 from ..schemas import (
-    PhenologicalStageCreate,
-    PhenologicalStageRead,
-    PhenologicalStageUpdate,
     PhenologyEventCreate,
     PhenologyEventRead,
     PhenologyEventUpdate,
 )
+from ..domain.phenology import PhenologicalStageDefinition
 from .utils import (
     raise_write_http_error,
     runtime,
@@ -22,48 +20,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["phenology"])
 
 
-@router.get("/api/phenological-stages", response_model=list[PhenologicalStageRead])
+@router.get("/api/phenological-stages", response_model=list[PhenologicalStageDefinition])
 async def list_phenological_stages():
     with runtime.db.session_scope() as session:
         stages = runtime.db.phenological_stages.list_all(session)
     return [serialize_phenological_stage(stage) for stage in stages]
 
 
-@router.post("/api/phenological-stages", response_model=PhenologicalStageRead, status_code=status.HTTP_201_CREATED)
-async def create_phenological_stage(stage: PhenologicalStageCreate):
-    try:
-        created = runtime.db.phenological_stage_service.create(**stage.model_dump())
-        return serialize_phenological_stage(created)
-    except Exception as exc:
-        logger.exception("Creating phenological stage failed: %s", exc)
-        raise_write_http_error(exc)
-
-
-@router.get("/api/phenological-stages/{stage_id}", response_model=PhenologicalStageRead)
+@router.get("/api/phenological-stages/{stage_id}", response_model=PhenologicalStageDefinition)
 async def get_phenological_stage(stage_id: int):
     with runtime.db.session_scope() as session:
         stage = runtime.db.phenological_stages.get_by_id(session, stage_id)
     if stage is None:
         raise HTTPException(status_code=404, detail=f"Could not find any phenological stage with id {stage_id}")
     return serialize_phenological_stage(stage)
-
-
-@router.put("/api/phenological-stages/{stage_id}", response_model=PhenologicalStageRead)
-async def update_phenological_stage(stage_id: int, stage: PhenologicalStageUpdate):
-    try:
-        updated = runtime.db.phenological_stage_service.update(stage_id, stage.model_dump())
-        return serialize_phenological_stage(updated)
-    except Exception as exc:
-        logger.exception("Updating phenological stage %s failed: %s", stage_id, exc)
-        raise_write_http_error(exc, not_found_prefixes=("Could not find any phenological stage with id",))
-
-
-@router.delete("/api/phenological-stages/{stage_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_phenological_stage(stage_id: int):
-    deleted = runtime.db.phenological_stage_service.delete(stage_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail=f"Could not find any phenological stage with id {stage_id}")
-
 
 @router.get("/api/sections/{section_id}/phenology-events", response_model=list[PhenologyEventRead])
 async def list_section_phenology_events(section_id: int):

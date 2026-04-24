@@ -6,33 +6,6 @@ from ..database import models
 from .base import ORMModel
 
 
-class PhenologicalStageBase(BaseModel):
-    name: str
-    kc: float
-
-    @model_validator(mode="after")
-    def validate_stage(self):
-        if self.name.strip() == "":
-            raise ValueError("name must not be empty")
-        if self.kc < 0:
-            raise ValueError("kc must be greater than or equal to 0")
-        return self
-
-
-class PhenologicalStageCreate(PhenologicalStageBase):
-    pass
-
-
-class PhenologicalStageUpdate(PhenologicalStageBase):
-    pass
-
-
-class PhenologicalStageRead(ORMModel):
-    id: int
-    name: str
-    kc: float
-
-
 class PhenologyEventBase(BaseModel):
     section_id: int
     stage_id: int

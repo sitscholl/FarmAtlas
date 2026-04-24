@@ -24,11 +24,11 @@ evapotranspiration:
         # Agricultural Water Management 226:105756, South Tyrol orchard.
         season_end: "31-10"
         periods:
-            - {"name": "Kc_ini", "value": 0.657, "start": "15-03", "end": "10-04"}
-            - {"name": "Kc_dev", "kind": "linear", "start": "10-04", "end": "15-06", "start_value": 0.657, "end_value": 1.013}
-            - {"name": "Kc_mid", "value": 1.013, "start": "15-06", "end": "16-09"}
-            - {"name": "Kc_late", "kind": "linear", "start": "16-09", "end": "31-10", "start_value": 1.004, "end_value": 0.835}
-            - {"name": "Kc_end", "value": 0.835, "start": "31-10", "end": "01-11"}
+            - {"name": "Kc_ini", "value": 0.657, "start": "15-03", "end": "10-04"} #around budburst
+            - {"name": "Kc_dev", "kind": "linear", "start": "10-04", "end": "15-06", "start_value": 0.657, "end_value": 1.013} #starts after flowering, when first fruits are there
+            - {"name": "Kc_mid", "value": 1.013, "start": "15-06", "end": "16-09"} #starts when leaf area is fully developed
+            - {"name": "Kc_late", "kind": "linear", "start": "16-09", "end": "31-10", "start_value": 1.004, "end_value": 0.835} #starts when harvesting
+            - {"name": "Kc_end", "value": 0.835, "start": "31-10", "end": "01-11"} #starts when leaves are falling
 
 workflows:
   water_balance:

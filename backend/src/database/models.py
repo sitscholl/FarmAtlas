@@ -309,29 +309,15 @@ class WaterBalance(Base):
     field = relationship("Field", back_populates="water_balance")
 
 
-class PhenologicalStage(Base):
-    __tablename__ = "phenological_stages"
-    __table_args__ = (
-        UniqueConstraint("name", name="uq_phenological_stages_name"),
-    )
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    kc = Column(Float, nullable=False)
-
-    phenology_events = relationship("SectionPhenologyEvent", back_populates="stage")
-
-
 class SectionPhenologyEvent(Base):
     __tablename__ = "section_phenology_events"
     __table_args__ = (
-        UniqueConstraint("section_id", "date", name="uq_section_phenology_events_section_date"),
+        UniqueConstraint("section_id", "date", "year", name="uq_section_phenology_events_section_date"),
     )
 
     id = Column(Integer, primary_key=True)
     section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
-    stage_id = Column(Integer, ForeignKey("phenological_stages.id"), nullable=False)
+    stage_code = Column(Integer, ForeignKey("phenological_stages.id"), nullable=False)
     date = Column(Date, nullable=False)
 
     section = relationship("Section", back_populates="phenology_events")
-    stage = relationship("PhenologicalStage", back_populates="phenology_events")
