@@ -30,9 +30,7 @@ class SectionRepository:
 
     def _query(self, session: Session):
         return session.query(models.Section).options(
-            selectinload(models.Section.phenology_events).selectinload(
-                models.SectionPhenologyEvent.stage
-            ),
+            selectinload(models.Section.phenology_events),
         )
 
     def _normalize_required_text(self, value: Any, *, field_name: str) -> str:

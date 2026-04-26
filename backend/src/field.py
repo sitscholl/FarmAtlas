@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from .database.models import Field
+from .domain.phenology import get_phenological_stage
 from .water_content import SoilWaterEstimate
 
 
@@ -33,6 +34,11 @@ def _sum_optional_int(values: list[int | None]) -> int | None:
     return sum(numeric_values) if numeric_values else None
 
 
+def _phenology_stage_name(stage_code: str) -> str:
+    stage = get_phenological_stage(stage_code)
+    return stage_code if stage is None else stage.label
+
+
 @dataclass(frozen=True)
 class PlantingContext:
     id: int
@@ -46,9 +52,8 @@ class PlantingContext:
 class PhenologyEventContext:
     id: int
     date: object
-    stage_id: int
+    stage_code: str
     stage_name: str
-    kc: float
 
 
 @dataclass(frozen=True)
@@ -134,9 +139,8 @@ class FieldContext:
                     PhenologyEventContext(
                         id=event.id,
                         date=event.date,
-                        stage_id=event.stage_id,
-                        stage_name=event.stage.name,
-                        kc=float(event.stage.kc),
+                        stage_code=event.stage_code,
+                        stage_name=_phenology_stage_name(event.stage_code),
                     )
                     for event in section.phenology_events
                 ],

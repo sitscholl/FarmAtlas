@@ -1,7 +1,6 @@
 from .fields import FieldRepository
 from .irrigation import IrrigationRepository
 from .nutrients import NutrientRequirementRepository
-from .phenological_stages import PhenologicalStageRepository
 from .phenology_events import PhenologyEventRepository
 from .plantings import PlantingRepository
 from .sections import SectionRepository
@@ -12,7 +11,6 @@ __all__ = [
     "FieldRepository",
     "IrrigationRepository",
     "NutrientRequirementRepository",
-    "PhenologicalStageRepository",
     "PhenologyEventRepository",
     "PlantingRepository",
     "SectionRepository",

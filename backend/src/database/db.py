@@ -3,7 +3,6 @@ from .repositories import (
     FieldRepository,
     IrrigationRepository,
     NutrientRequirementRepository,
-    PhenologicalStageRepository,
     PhenologyEventRepository,
     PlantingRepository,
     SectionRepository,
@@ -14,7 +13,6 @@ from .services import (
     FieldService,
     IrrigationService,
     NutrientRequirementService,
-    PhenologicalStageService,
     PhenologyEventService,
     PlantingService,
     SectionService,
@@ -49,8 +47,7 @@ class Database:
         self.fields = FieldRepository()
         self.plantings = PlantingRepository(self.fields)
         self.sections = SectionRepository(self.plantings)
-        self.phenological_stages = PhenologicalStageRepository()
-        self.phenology_events = PhenologyEventRepository(self.sections, self.phenological_stages)
+        self.phenology_events = PhenologyEventRepository(self.sections)
         self.varieties = VarietyRepository()
         self.nutrients = NutrientRequirementRepository(self.varieties)
         self.water_balance = WaterBalanceRepository(self.fields)
@@ -76,13 +73,10 @@ class Database:
             self.core,
             self.nutrients,
         )
-        self.phenological_stage_service = PhenologicalStageService(
-            self.core,
-            self.phenological_stages,
-        )
         self.phenology_event_service = PhenologyEventService(
             self.core,
             self.phenology_events,
+            self.water_balance,
         )
         self.section_service = SectionService(
             self.core,

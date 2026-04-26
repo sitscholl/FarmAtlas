@@ -7,6 +7,7 @@ import pandas as pd
 
 from ..database.db import Database
 from ..et.base import ET0Calculator
+from ..et.et_correction import ETCorrection
 from ..field import FieldContext
 from ..irrigation import FieldIrrigation
 from ..meteo.load import MeteoLoader
@@ -37,6 +38,7 @@ class WaterBalanceWorkflow:
     meteo_loader: MeteoLoader
     meteo_validator: MeteoValidator
     et_calculator: ET0Calculator
+    et_corrector: ETCorrection
     timezone: ZoneInfo
     meteo_resampler: MeteoResampler | None = None
     min_sample_size: int = 1
@@ -315,6 +317,7 @@ class WaterBalanceWorkflow:
                 start=pd.Timestamp(f"{year}-1-1").date(),
             ) or []
         field_irrigation = FieldIrrigation.from_list(irrigation_events)
+        station.data = self.et_corrector.apply_to_field(station.data, "et0", field)
         water_balance = self.calculate_water_balance(
             field=field,
             station_data=station.data,
@@ -427,7 +430,7 @@ class WaterBalanceWorkflow:
 
                 station = self._prepare_station_data(station)
                 logger.debug("Station preparation completed for station %s", station_id)
-                et_data = self.et_calculator.calculate(station, correct=True)
+                et_data = self.et_calculator.calculate(station, correct=False)
                 logger.debug("ET calculation completed for station %s", station_id)
                 station.data = station.data.join(et_data)
 

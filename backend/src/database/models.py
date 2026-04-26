@@ -15,6 +15,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 
+from ..domain.phenology import get_phenological_stage
+
 Base = declarative_base()
 
 
@@ -192,9 +194,10 @@ class Section(Base, ValidityRangeMixin):
     @property
     def current_phenology(self) -> str | None:
         current_event = self.current_phenology_event
-        if current_event is None or current_event.stage is None:
+        if current_event is None:
             return None
-        return str(current_event.stage.name)
+        stage = get_phenological_stage(current_event.stage_code)
+        return current_event.stage_code if stage is None else stage.label
 
 
 class CadastralParcel(Base):
@@ -312,12 +315,19 @@ class WaterBalance(Base):
 class SectionPhenologyEvent(Base):
     __tablename__ = "section_phenology_events"
     __table_args__ = (
-        UniqueConstraint("section_id", "date", "year", name="uq_section_phenology_events_section_date"),
+        UniqueConstraint("section_id", "date", name="uq_section_phenology_events_section_date"),
+        UniqueConstraint(
+            "section_id",
+            "stage_code",
+            "year",
+            name="uq_section_phenology_events_section_stage_year",
+        ),
     )
 
     id = Column(Integer, primary_key=True)
     section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
-    stage_code = Column(Integer, ForeignKey("phenological_stages.id"), nullable=False)
+    stage_code = Column(String, nullable=False)
     date = Column(Date, nullable=False)
+    year = Column(Integer, nullable=False)
 
     section = relationship("Section", back_populates="phenology_events")

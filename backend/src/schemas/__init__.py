@@ -10,9 +10,6 @@ from .irrigation import (
 )
 from .nutrient import NutrientRequirementCreate, NutrientRequirementRead, NutrientRequirementUpdate
 from .phenology import (
-    PhenologicalStageCreate,
-    PhenologicalStageRead,
-    PhenologicalStageUpdate,
     PhenologyEventCreate,
     PhenologyEventRead,
     PhenologyEventUpdate,
@@ -39,9 +36,6 @@ __all__ = [
     "NutrientRequirementCreate",
     "NutrientRequirementRead",
     "NutrientRequirementUpdate",
-    "PhenologicalStageCreate",
-    "PhenologicalStageRead",
-    "PhenologicalStageUpdate",
     "PhenologyEventCreate",
     "PhenologyEventRead",
     "PhenologyEventUpdate",

@@ -5,27 +5,24 @@ from typing import Any
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models
-from .phenological_stages import PhenologicalStageRepository
+from ...domain.phenology import require_phenological_stage
 from .sections import SectionRepository
 
 logger = logging.getLogger(__name__)
 
 
 class PhenologyEventRepository:
-    UPDATE_ALLOWLIST = {"section_id", "stage_id", "date"}
+    UPDATE_ALLOWLIST = {"section_id", "stage_code", "date"}
 
     def __init__(
         self,
         section_repository: SectionRepository,
-        stage_repository: PhenologicalStageRepository,
     ) -> None:
         self._sections = section_repository
-        self._stages = stage_repository
 
     def _query(self, session: Session):
         return session.query(models.SectionPhenologyEvent).options(
             selectinload(models.SectionPhenologyEvent.section),
-            selectinload(models.SectionPhenologyEvent.stage),
         )
 
     def _normalize_date(self, value: Any, *, field_name: str) -> datetime.date:
@@ -43,12 +40,10 @@ class PhenologyEventRepository:
             raise ValueError(f"No section with id {section_id} found")
         return section_id
 
-    def _resolve_stage_id(self, session: Session, value: Any) -> int:
-        stage_id = int(value)
-        stage = self._stages.get_by_id(session, stage_id)
-        if stage is None:
-            raise ValueError(f"No phenological stage with id {stage_id} found")
-        return stage_id
+    def _resolve_stage_code(self, value: Any) -> str:
+        stage_code = str(value).strip().upper()
+        require_phenological_stage(stage_code)
+        return stage_code
 
     def get_by_id(self, session: Session, event_id: int) -> models.SectionPhenologyEvent | None:
         return self._query(session).filter(models.SectionPhenologyEvent.id == event_id).one_or_none()
@@ -69,13 +64,15 @@ class PhenologyEventRepository:
         session: Session,
         *,
         section_id: int,
-        stage_id: int,
+        stage_code: str,
         date: datetime.date,
     ) -> models.SectionPhenologyEvent:
+        normalized_date = self._normalize_date(date, field_name="date")
         event = models.SectionPhenologyEvent(
             section_id=self._resolve_section_id(session, section_id),
-            stage_id=self._resolve_stage_id(session, stage_id),
-            date=self._normalize_date(date, field_name="date"),
+            stage_code=self._resolve_stage_code(stage_code),
+            date=normalized_date,
+            year=normalized_date.year,
         )
         session.add(event)
         session.flush()
@@ -102,8 +99,8 @@ class PhenologyEventRepository:
 
             if field_key == "section_id":
                 new_value = self._resolve_section_id(session, raw_value)
-            elif field_key == "stage_id":
-                new_value = self._resolve_stage_id(session, raw_value)
+            elif field_key == "stage_code":
+                new_value = self._resolve_stage_code(raw_value)
             elif field_key == "date":
                 new_value = self._normalize_date(raw_value, field_name="date")
             else:
@@ -115,6 +112,9 @@ class PhenologyEventRepository:
             if getattr(event, field_key) != new_value:
                 setattr(event, field_key, new_value)
                 changed_keys.add(field_key)
+                if field_key == "date":
+                    event.year = new_value.year
+                    changed_keys.add("year")
 
         if not changed_keys:
             return event, changed_keys

@@ -7,11 +7,14 @@ from ..schemas import (
     PhenologyEventRead,
     PhenologyEventUpdate,
 )
-from ..domain.phenology import PhenologicalStageDefinition
+from ..domain.phenology import (
+    PhenologicalStageDefinition,
+    get_phenological_stage as get_stage_definition,
+    list_phenological_stages as list_stage_definitions,
+)
 from .utils import (
     raise_write_http_error,
     runtime,
-    serialize_phenological_stage,
     serialize_phenology_event,
 )
 
@@ -22,18 +25,16 @@ router = APIRouter(tags=["phenology"])
 
 @router.get("/api/phenological-stages", response_model=list[PhenologicalStageDefinition])
 async def list_phenological_stages():
-    with runtime.db.session_scope() as session:
-        stages = runtime.db.phenological_stages.list_all(session)
-    return [serialize_phenological_stage(stage) for stage in stages]
+    return list_stage_definitions()
 
 
-@router.get("/api/phenological-stages/{stage_id}", response_model=PhenologicalStageDefinition)
-async def get_phenological_stage(stage_id: int):
-    with runtime.db.session_scope() as session:
-        stage = runtime.db.phenological_stages.get_by_id(session, stage_id)
+@router.get("/api/phenological-stages/{stage_code}", response_model=PhenologicalStageDefinition)
+async def get_phenological_stage(stage_code: str):
+    stage = get_stage_definition(stage_code)
     if stage is None:
-        raise HTTPException(status_code=404, detail=f"Could not find any phenological stage with id {stage_id}")
-    return serialize_phenological_stage(stage)
+        raise HTTPException(status_code=404, detail=f"Could not find any phenological stage with code {stage_code}")
+    return stage
+
 
 @router.get("/api/sections/{section_id}/phenology-events", response_model=list[PhenologyEventRead])
 async def list_section_phenology_events(section_id: int):
@@ -54,7 +55,7 @@ async def create_phenology_event(event: PhenologyEventCreate):
         logger.exception("Creating phenology event failed: %s", exc)
         raise_write_http_error(
             exc,
-            not_found_prefixes=("No section with id", "No phenological stage with id"),
+            not_found_prefixes=("No section with id", "No phenological stage with code"),
         )
 
 
@@ -79,7 +80,7 @@ async def update_phenology_event(event_id: int, event: PhenologyEventUpdate):
             not_found_prefixes=(
                 "Could not find any phenology event with id",
                 "No section with id",
-                "No phenological stage with id",
+                "No phenological stage with code",
             ),
         )
 

@@ -1,9 +1,14 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Literal, Mapping, Sequence
+from typing import TYPE_CHECKING, Literal, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
+
+from ..domain.phenology import KC_PHASES_BY_NAME, PHENOLOGICAL_STAGES_BY_ANCHOR, get_phenological_stage
+
+if TYPE_CHECKING:
+    from ..field import FieldContext, SectionContext
 
 
 def _resolve_date_spec(value: datetime | date | str | None, anchor_year: int) -> pd.Timestamp | None:
@@ -236,12 +241,179 @@ class ETCorrection:
 
         raise TypeError("target_index must be a pandas DatetimeIndex or RangeIndex.")
 
+    def _observed_anchor_dates_for_section(
+        self,
+        section: "SectionContext",
+        year: int,
+        tzinfo=None,
+    ) -> dict[str, pd.Timestamp]:
+        observed: dict[str, pd.Timestamp] = {}
+        for event in section.phenology:
+            event_date = pd.Timestamp(event.date)
+            if event_date.year != year:
+                continue
+            stage = get_phenological_stage(event.stage_code)
+            if stage is None or stage.kc_anchor is None:
+                continue
+            observed[stage.kc_anchor] = _align_timestamp_timezone(event_date, tzinfo)
+        return observed
+
+    def _resolve_periods_for_section(
+        self,
+        section: "SectionContext",
+        year: int,
+        tzinfo=None,
+    ) -> list[dict[str, object]]:
+        fixed_periods = self._resolve_periods_for_year(year, tzinfo=tzinfo)
+        observed = self._observed_anchor_dates_for_section(section, year, tzinfo=tzinfo)
+
+        starts: dict[str, pd.Timestamp] = {}
+        shifted_anchor = False
+        previous_anchor: str | None = None
+
+        for period, fixed in zip(self._periods, fixed_periods, strict=True):
+            phase = KC_PHASES_BY_NAME.get(period.name)
+            anchor = None if phase is None else phase.anchor
+            fixed_start = pd.Timestamp(fixed["start"])
+
+            if anchor is None:
+                start = fixed_start
+                shifted_anchor = False
+            elif anchor in observed:
+                start = observed[anchor]
+                shifted_anchor = True
+            elif previous_anchor is not None and shifted_anchor:
+                previous_stage = PHENOLOGICAL_STAGES_BY_ANCHOR.get(previous_anchor)
+                previous_start = starts[previous_anchor]
+                if previous_stage is not None and previous_stage.default_duration is not None:
+                    start = previous_start + pd.Timedelta(days=previous_stage.default_duration)
+                else:
+                    start = fixed_start
+                    shifted_anchor = False
+            else:
+                start = fixed_start
+                shifted_anchor = False
+
+            if previous_anchor is not None and start <= starts[previous_anchor]:
+                start = starts[previous_anchor] + pd.Timedelta(days=1)
+
+            if anchor is not None:
+                starts[anchor] = start
+                previous_anchor = anchor
+
+        resolved: list[dict[str, object]] = []
+        for idx, (period, fixed) in enumerate(zip(self._periods, fixed_periods, strict=True)):
+            phase = KC_PHASES_BY_NAME.get(period.name)
+            anchor = None if phase is None else phase.anchor
+            next_phase = KC_PHASES_BY_NAME.get(self._periods[idx + 1].name) if idx + 1 < len(self._periods) else None
+            next_anchor = None if next_phase is None else next_phase.anchor
+
+            start = starts[anchor] if anchor is not None else pd.Timestamp(fixed["start"])
+            end = starts[next_anchor] if next_anchor is not None else pd.Timestamp(fixed["end"])
+            if end <= start:
+                end = start + pd.Timedelta(days=1)
+
+            resolved.append(
+                {
+                    "name": period.name,
+                    "kind": period.kind,
+                    "value": period.value,
+                    "start_value": period.start_value,
+                    "end_value": period.end_value,
+                    "start": start,
+                    "end": end,
+                }
+            )
+
+        return resolved
+
+    def _section_daily_series(
+        self,
+        section: "SectionContext",
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> pd.Series:
+        daily_index = pd.date_range(start, end, freq="D")
+        if start.tzinfo is not None and daily_index.tz is None:
+            daily_index = daily_index.tz_localize(start.tzinfo)
+        kc = pd.Series(index=daily_index, dtype=float, name="kc")
+
+        for year in range(start.year, end.year + 1):
+            for period in self._resolve_periods_for_section(section, year, tzinfo=daily_index.tz):
+                mask = (kc.index >= period["start"]) & (kc.index < period["end"])
+                period_index = kc.index[mask]
+                if period["kind"] == "linear":
+                    if len(period_index) == 1:
+                        kc.loc[mask] = float(period["start_value"])
+                    elif len(period_index) > 1:
+                        kc.loc[mask] = pd.Series(
+                            np.linspace(
+                                float(period["start_value"]),
+                                float(period["end_value"]),
+                                len(period_index),
+                            ),
+                            index=period_index,
+                            dtype=float,
+                        )
+                    continue
+
+                kc.loc[mask] = float(period["value"])
+
+        return kc
+
+    def to_field_series(
+        self,
+        target_index: pd.DatetimeIndex,
+        field: "FieldContext",
+    ) -> pd.Series:
+        if not isinstance(target_index, pd.DatetimeIndex):
+            raise TypeError("target_index must be a pandas DatetimeIndex for field-specific ET correction.")
+        if target_index.empty:
+            return pd.Series(index=target_index, dtype=float, name="kc")
+
+        start_ts = target_index.min().normalize()
+        end_ts = target_index.max().normalize()
+        sections = [section for section in field.sections if section.active] or list(field.sections)
+        if not sections:
+            return self.to_series(target_index)
+
+        weights = pd.Series(
+            [max(float(section.area), 0.0) for section in sections],
+            index=[section.id for section in sections],
+            dtype=float,
+        )
+        if weights.sum() <= 0:
+            weights = pd.Series(1.0, index=weights.index, dtype=float)
+        weights = weights / weights.sum()
+
+        weighted = pd.Series(0.0, index=pd.date_range(start_ts, end_ts, freq="D"), dtype=float, name="kc")
+        if start_ts.tzinfo is not None and weighted.index.tz is None:
+            weighted.index = weighted.index.tz_localize(start_ts.tzinfo)
+
+        for section in sections:
+            section_kc = self._section_daily_series(section, start_ts, end_ts)
+            weighted = weighted.add(section_kc * weights.loc[section.id], fill_value=0.0)
+
+        return weighted.reindex(target_index).rename("kc")
+
     def apply_to(
         self,
         frame: pd.DataFrame,
         column: str,
     ) -> pd.DataFrame:
         kc = self.to_series(frame.index)
+        corrected = frame.copy()
+        corrected["kc"] = kc
+        corrected[f"{column}_corrected"] = corrected[column] * kc
+        return corrected
+
+    def apply_to_field(
+        self,
+        frame: pd.DataFrame,
+        column: str,
+        field: "FieldContext",
+    ) -> pd.DataFrame:
+        kc = self.to_field_series(frame.index, field)
         corrected = frame.copy()
         corrected["kc"] = kc
         corrected[f"{column}_corrected"] = corrected[column] * kc

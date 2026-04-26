@@ -72,6 +72,7 @@ export type FieldSummaryRead = {
   tree_count?: number | null
   running_metre?: number | null
   active: boolean
+  current_phenology?: string | null
   herbicide_free?: boolean | null
   planting_count: number
   section_count: number
@@ -191,6 +192,40 @@ export type NutrientRequirementUpdate = {
   requirement_per_kg_max: number
 }
 
+export type PhenologicalStageDefinition = {
+  code: string
+  label: string
+  bbch_code: number | null
+  principal_stage: number | null
+  sort_order: number
+  description: string
+  kc_anchor?: string | null
+  default_duration?: number | null
+}
+
+export type PhenologyEventCreate = {
+  section_id: number
+  stage_code: string
+  date: string
+}
+
+export type PhenologyEventRead = {
+  id: number
+  section_id: number
+  stage_code: string
+  date: string
+  stage_name: string
+  bbch_code?: number | null
+  principal_stage?: number | null
+  kc_anchor?: string | null
+}
+
+export type PhenologyEventUpdate = {
+  section_id: number
+  stage_code: string
+  date: string
+}
+
 export type PlantingCreate = {
   field_id: number
   variety: string
@@ -253,6 +288,8 @@ export type SectionRead = {
   valid_from: string
   valid_to?: string | null
   active: boolean
+  current_phenology?: string | null
+  phenology_events?: Array<PhenologyEventRead>
 }
 
 export type SectionUpdate = {

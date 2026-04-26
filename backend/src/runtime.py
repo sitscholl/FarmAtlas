@@ -93,10 +93,6 @@ class RuntimeContext:
         ## Database
         self.db = Database(get_database_url(config))
        
-        ## Fields
-        if len(self.fields) == 0:
-            logger.warning('No fields found in database.')
-
         ## Evapotranspiration
         et_calculator_cls = ET0Calculator.get_calculator_by_name(config['evapotranspiration']['method'])
         if et_calculator_cls is None:
@@ -104,9 +100,8 @@ class RuntimeContext:
                 f"ET0 calculator {config['evapotranspiration']['method']} not found. "
                 f"Choose one of {ET0Calculator.registry.keys()}"
             )
-        self.et_calculator = et_calculator_cls(
-            corrector=ETCorrection(**config['evapotranspiration']['correction'])
-        )
+        self.et_corrector = ETCorrection(**config['evapotranspiration']['correction'])
+        self.et_calculator = et_calculator_cls()
 
         self.workflows = WorkflowCollection(
             water_balance=WaterBalanceWorkflow(
@@ -114,6 +109,7 @@ class RuntimeContext:
                 meteo_loader=self.meteo_loader,
                 meteo_validator=self.meteo_validator,
                 et_calculator=self.et_calculator,
+                et_corrector=self.et_corrector,
                 timezone=self.timezone,
                 meteo_resampler=self.meteo_resampler,
                 min_sample_size=int(self.min_sample_size),
