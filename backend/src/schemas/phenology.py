@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from ..database import models
 from ..domain.phenology import get_phenological_stage
@@ -15,6 +15,19 @@ class PhenologyEventBase(BaseModel):
 
 class PhenologyEventCreate(PhenologyEventBase):
     pass
+
+
+class PhenologyBulkCreate(BaseModel):
+    section_ids: list[int] = Field(min_length=1)
+    stage_code: str
+    date: date
+
+
+class PhenologyBulkResponse(BaseModel):
+    created_event_ids: list[int]
+    created_count: int
+    skipped_section_ids: list[int]
+    errors_by_section_id: dict[int, str] = Field(default_factory=dict)
 
 
 class PhenologyEventUpdate(PhenologyEventBase):

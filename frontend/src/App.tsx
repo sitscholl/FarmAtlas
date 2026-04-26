@@ -8,6 +8,7 @@ import FieldsTablePage from './pages/FieldsTablePage'
 import Home from './pages/Home'
 import IrrigationTablePage from './pages/IrrigationTablePage'
 import NutrientsTablePage from './pages/NutrientsTablePage'
+import VegetationTablePage from './pages/VegetationTablePage'
 import VarietyTablePage from './pages/VarietyTablePage'
 
 const getIsDesktopViewport = () => {
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/fields" element={<FieldsTablePage />} />
             <Route path="/irrigation" element={<IrrigationTablePage />} />
+            <Route path="/vegetation" element={<VegetationTablePage />} />
             <Route path="/nutrients" element={<NutrientsTablePage />} />
             <Route path="/variety" element={<VarietyTablePage />} />
             <Route path="/fields/:fieldId" element={<FieldDetail />} />

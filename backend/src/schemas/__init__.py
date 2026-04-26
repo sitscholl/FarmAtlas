@@ -10,6 +10,8 @@ from .irrigation import (
 )
 from .nutrient import NutrientRequirementCreate, NutrientRequirementRead, NutrientRequirementUpdate
 from .phenology import (
+    PhenologyBulkCreate,
+    PhenologyBulkResponse,
     PhenologyEventCreate,
     PhenologyEventRead,
     PhenologyEventUpdate,
@@ -36,6 +38,8 @@ __all__ = [
     "NutrientRequirementCreate",
     "NutrientRequirementRead",
     "NutrientRequirementUpdate",
+    "PhenologyBulkCreate",
+    "PhenologyBulkResponse",
     "PhenologyEventCreate",
     "PhenologyEventRead",
     "PhenologyEventUpdate",

@@ -7,7 +7,9 @@ type ValidationDetailItem = {
 
 type BulkMutationResult = {
   errors_by_field_id?: Record<string, string> | Record<number, string>
+  errors_by_section_id?: Record<string, string> | Record<number, string>
   skipped_field_ids?: number[]
+  skipped_section_ids?: number[]
   created_count?: number
   updated_count?: number
   unchanged_count?: number
@@ -66,11 +68,21 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
 }
 
 export function getBulkMutationMessage(data: unknown): string | null {
-  if (!isRecord(data) || !isRecord(data.errors_by_field_id)) {
+  if (!isRecord(data)) {
     return null
   }
 
-  const entries = Object.entries(data.errors_by_field_id)
+  const errorMap = isRecord(data.errors_by_field_id)
+    ? data.errors_by_field_id
+    : isRecord(data.errors_by_section_id)
+      ? data.errors_by_section_id
+      : null
+
+  if (errorMap === null) {
+    return null
+  }
+
+  const entries = Object.entries(errorMap)
   if (entries.length === 0) {
     return null
   }
@@ -81,8 +93,9 @@ export function getBulkMutationMessage(data: unknown): string | null {
     (summary.updated_count ?? 0) +
     (summary.unchanged_count ?? 0)
 
+  const subject = isRecord(data.errors_by_section_id) ? 'Abschnitt' : 'Anlage'
   const details = entries
-    .map(([fieldId, message]) => `Anlage ${fieldId}: ${message}`)
+    .map(([id, message]) => `${subject} ${id}: ${message}`)
     .join(' | ')
 
   return successCount > 0 ? `Teilweise gespeichert. ${details}` : details

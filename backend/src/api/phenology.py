@@ -3,6 +3,8 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 
 from ..schemas import (
+    PhenologyBulkCreate,
+    PhenologyBulkResponse,
     PhenologyEventCreate,
     PhenologyEventRead,
     PhenologyEventUpdate,
@@ -13,6 +15,7 @@ from ..domain.phenology import (
     list_phenological_stages as list_stage_definitions,
 )
 from .utils import (
+    get_write_error_detail,
     raise_write_http_error,
     runtime,
     serialize_phenology_event,
@@ -57,6 +60,33 @@ async def create_phenology_event(event: PhenologyEventCreate):
             exc,
             not_found_prefixes=("No section with id", "No phenological stage with code"),
         )
+
+
+@router.post("/api/phenology-events/bulk", response_model=PhenologyBulkResponse, status_code=status.HTTP_201_CREATED)
+async def create_phenology_events_bulk(payload: PhenologyBulkCreate):
+    created_event_ids: list[int] = []
+    skipped_section_ids: list[int] = []
+    errors_by_section_id: dict[int, str] = {}
+
+    for section_id in sorted(set(payload.section_ids)):
+        try:
+            created = runtime.db.phenology_event_service.create(
+                section_id=section_id,
+                stage_code=payload.stage_code,
+                date=payload.date,
+            )
+            created_event_ids.append(created.id)
+        except Exception as exc:
+            logger.exception("Creating phenology event for section %s failed: %s", section_id, exc)
+            skipped_section_ids.append(section_id)
+            errors_by_section_id[section_id] = get_write_error_detail(exc)
+
+    return PhenologyBulkResponse(
+        created_event_ids=created_event_ids,
+        created_count=len(created_event_ids),
+        skipped_section_ids=skipped_section_ids,
+        errors_by_section_id=errors_by_section_id,
+    )
 
 
 @router.get("/api/phenology-events/{event_id}", response_model=PhenologyEventRead)

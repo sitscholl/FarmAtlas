@@ -47,6 +47,10 @@ function toSelectedFieldIds(value: string) {
   }
 }
 
+function toSelectedSectionIds(value: string) {
+  return toSelectedFieldIds(value)
+}
+
 export const irrigationEditFields = [
   { id: 'field_id', label: 'Anlage', type: 'select', optionsSource: 'fields', required: true },
   { id: 'date', label: 'Datum', type: 'date', required: true },
@@ -65,7 +69,7 @@ export const irrigationEditFields = [
 ] as const
 
 export const irrigationCreateFields = [
-  { id: 'field_ids', label: '', type: 'custom', renderer: 'groupedFieldSelector', required: true },
+  { id: 'field_ids', label: 'Anlagen', type: 'custom', renderer: 'groupedFieldSelector', required: true },
   { id: 'date', label: 'Datum', type: 'date', required: true },
   {
     id: 'method',
@@ -284,6 +288,44 @@ export const irrigationCreateAction: CreateActionConfig = {
   }),
 }
 
-export const createActions: CreateActionConfig[] = [fieldCreateAction, varietyCreateAction, nutrientCreateAction, irrigationCreateAction]
+export const phenologyCreateAction: CreateActionConfig = {
+  id: 'phenology',
+  label: 'Phänologie eingeben',
+  title: 'Phänologie eingeben',
+  submitLabel: 'Phänologie speichern',
+  endpoint: '/phenology-events/bulk',
+  method: 'post',
+  fields: [
+    {
+      id: 'section_ids',
+      label: 'Abschnitte',
+      type: 'custom',
+      renderer: 'groupedFieldSelector',
+      selectionMode: 'sections',
+      required: true,
+    },
+    {
+      id: 'stage_code',
+      label: 'Stadium',
+      type: 'select',
+      optionsSource: 'phenologicalStages',
+      required: true,
+    },
+    { id: 'date', label: 'Datum', type: 'date', required: true },
+  ],
+  buildPayload: (values) => ({
+    section_ids: toSelectedSectionIds(values.section_ids ?? ''),
+    stage_code: values.stage_code.trim(),
+    date: values.date,
+  }),
+}
+
+export const createActions: CreateActionConfig[] = [
+  fieldCreateAction,
+  varietyCreateAction,
+  nutrientCreateAction,
+  irrigationCreateAction,
+  phenologyCreateAction,
+]
 
 export { squareMetresToHectares }

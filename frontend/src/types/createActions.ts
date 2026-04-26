@@ -3,6 +3,7 @@ import type {
   FieldUpdate,
   NutrientRequirementCreate,
   NutrientRequirementUpdate,
+  PhenologyEventCreate,
   PlantingCreate,
   PlantingUpdate,
   SectionCreate,
@@ -15,6 +16,7 @@ export type FieldCreatePayload = FieldCreate
 export type FieldUpdatePayload = FieldUpdate
 export type NutrientRequirementCreatePayload = NutrientRequirementCreate
 export type NutrientRequirementUpdatePayload = NutrientRequirementUpdate
+export type PhenologyEventCreatePayload = PhenologyEventCreate
 export type PlantingCreatePayload = PlantingCreate
 export type PlantingUpdatePayload = PlantingUpdate
 export type SectionCreatePayload = SectionCreate
@@ -38,11 +40,19 @@ export type IrrigationBulkCreatePayload = {
   amount?: number | null
 }
 
+export type PhenologyBulkCreatePayload = {
+  section_ids: number[]
+  stage_code: string
+  date: string
+}
+
 type ActionPayload =
   | FieldCreatePayload
   | FieldUpdatePayload
   | NutrientRequirementCreatePayload
   | NutrientRequirementUpdatePayload
+  | PhenologyEventCreatePayload
+  | PhenologyBulkCreatePayload
   | PlantingCreatePayload
   | PlantingUpdatePayload
   | SectionCreatePayload
@@ -73,7 +83,7 @@ export type CreateActionField =
       id: string
       label: string
       type: 'select'
-      optionsSource?: 'fields' | 'varieties' | 'varietiesOptional'
+      optionsSource?: 'fields' | 'varieties' | 'varietiesOptional' | 'phenologicalStages'
       options?: readonly FieldOption[]
       defaultValue?: string | number
       required?: boolean
@@ -83,11 +93,12 @@ export type CreateActionField =
       label: string
       type: 'custom'
       renderer: 'groupedFieldSelector'
+      selectionMode?: 'fields' | 'sections'
       required?: boolean
     }
 
 export type CreateActionConfig = {
-  id: 'field' | 'planting' | 'section' | 'irrigation' | 'variety' | 'nutrient'
+  id: 'field' | 'planting' | 'section' | 'irrigation' | 'phenology' | 'variety' | 'nutrient'
   label: string
   title: string
   submitLabel: string

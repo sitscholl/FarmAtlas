@@ -203,6 +203,21 @@ export type PhenologicalStageDefinition = {
   default_duration?: number | null
 }
 
+export type PhenologyBulkCreate = {
+  section_ids: Array<number>
+  stage_code: string
+  date: string
+}
+
+export type PhenologyBulkResponse = {
+  created_event_ids: Array<number>
+  created_count: number
+  skipped_section_ids: Array<number>
+  errors_by_section_id?: {
+  [key: string]: string
+}
+}
+
 export type PhenologyEventCreate = {
   section_id: number
   stage_code: string

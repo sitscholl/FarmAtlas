@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { CiApple } from 'react-icons/ci'
 import { GiPlantWatering } from 'react-icons/gi'
 import { IoHomeOutline } from 'react-icons/io5'
-import { LuLeaf, LuTableProperties } from 'react-icons/lu'
+import { LuLeaf, LuTableProperties, LuTrees } from 'react-icons/lu'
 
 import styles from '../styles/Home.module.css'
 
@@ -17,6 +17,7 @@ const navigationItems = [
   { to: '/', label: 'Home', icon: IoHomeOutline, end: true },
   { to: '/fields', label: 'Anlagen', icon: LuTableProperties },
   { to: '/irrigation', label: 'Bewaesserung', icon: GiPlantWatering },
+  { to: '/vegetation', label: 'Vegetation', icon: LuTrees },
   { to: '/nutrients', label: 'Naehrstoffe', icon: LuLeaf },
   { to: '/variety', label: 'Sorten', icon: CiApple },
 ]

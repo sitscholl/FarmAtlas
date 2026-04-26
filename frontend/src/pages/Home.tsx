@@ -417,6 +417,8 @@ export default function Home() {
                 key={field.id}
                 title={field.name}
                 subtitle={buildSubtitle(field)}
+                stageIcon={LuTrees}
+                stageLabel={field.current_phenology ?? '-'}
                 metrics={buildFieldMetrics(field)}
                 titleAdornment={
                   field.herbicide_free === true ? (

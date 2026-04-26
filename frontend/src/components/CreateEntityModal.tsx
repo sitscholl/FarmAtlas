@@ -5,7 +5,7 @@ import api from '../api'
 import GroupedFieldSelector from './GroupedFieldSelector'
 import { notifyDataChanged } from '../lib/dataEvents'
 import { getApiErrorMessage, getBulkMutationMessage } from '../lib/apiErrors'
-import type { FieldRead, VarietyRead } from '../types/generated/api'
+import type { FieldRead, PhenologicalStageDefinition, VarietyRead } from '../types/generated/api'
 import {
   type CreateActionConfig,
   type CreateActionField,
@@ -97,11 +97,24 @@ function buildVarietyOptions(
     : options
 }
 
+function buildPhenologicalStageOptions(stages: PhenologicalStageDefinition[]): FieldOption[] {
+  return stages
+    .slice()
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((stage) => ({
+      value: stage.code,
+      label: stage.bbch_code === null || stage.bbch_code === undefined
+        ? stage.label
+        : `${stage.label} (BBCH ${stage.bbch_code})`,
+    }))
+}
+
 function getSelectOptions(
   field: CreateActionField,
   fieldOptions: readonly FieldOption[],
   varietyOptions: readonly FieldOption[],
   optionalVarietyOptions: readonly FieldOption[],
+  phenologicalStageOptions: readonly FieldOption[],
 ): readonly FieldOption[] {
   if (field.type !== 'select') {
     return []
@@ -116,10 +129,13 @@ function getSelectOptions(
   if (field.optionsSource === 'varietiesOptional') {
     return optionalVarietyOptions
   }
+  if (field.optionsSource === 'phenologicalStages') {
+    return phenologicalStageOptions
+  }
   return field.options ?? []
 }
 
-function parseSelectedFieldIds(value: string) {
+function parseSelectedIds(value: string) {
   if (value.trim() === '') {
     return []
   }
@@ -150,6 +166,7 @@ export default function CreateEntityModal({
   const [fieldOptions, setFieldOptions] = useState<FieldOption[]>([])
   const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
   const [optionalVarietyOptions, setOptionalVarietyOptions] = useState<FieldOption[]>([])
+  const [phenologicalStageOptions, setPhenologicalStageOptions] = useState<FieldOption[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const needsFieldCatalog = useMemo(
@@ -187,6 +204,7 @@ export default function CreateEntityModal({
     setFieldOptions([])
     setVarietyOptions([])
     setOptionalVarietyOptions([])
+    setPhenologicalStageOptions([])
     setErrorMessage(null)
   }, [action, initialValues, isOpen])
 
@@ -209,7 +227,13 @@ export default function CreateEntityModal({
           continue
         }
 
-        const options = getSelectOptions(field, fieldOptions, varietyOptions, optionalVarietyOptions)
+        const options = getSelectOptions(
+          field,
+          fieldOptions,
+          varietyOptions,
+          optionalVarietyOptions,
+          phenologicalStageOptions,
+        )
         if (options.length === 0) {
           continue
         }
@@ -220,7 +244,7 @@ export default function CreateEntityModal({
 
       return changed ? nextValues : currentValues
     })
-  }, [action, fieldOptions, isOpen, optionalVarietyOptions, varietyOptions])
+  }, [action, fieldOptions, isOpen, optionalVarietyOptions, phenologicalStageOptions, varietyOptions])
 
   useEffect(() => {
     if (!isOpen) {
@@ -237,6 +261,9 @@ export default function CreateEntityModal({
           dynamicOptionSources.has('varieties') || dynamicOptionSources.has('varietiesOptional')
             ? (await api.get<VarietyRead[]>('/varieties')).data
             : []
+        const phenologicalStagesData = dynamicOptionSources.has('phenologicalStages')
+          ? (await api.get<PhenologicalStageDefinition[]>('/phenological-stages')).data
+          : []
         const nextFields = needsFieldCatalog || dynamicOptionSources.has('fields')
           ? (await api.get<FieldRead[]>('/fields')).data
           : []
@@ -251,6 +278,7 @@ export default function CreateEntityModal({
         setFieldOptions(buildFieldOptions(nextFields))
         setVarietyOptions(nextVarietyOptions)
         setOptionalVarietyOptions(nextOptionalVarietyOptions)
+        setPhenologicalStageOptions(buildPhenologicalStageOptions(phenologicalStagesData))
       } catch (error) {
         console.error('Error loading select options', error)
         setErrorMessage('Die verfuegbaren Optionen konnten nicht geladen werden.')
@@ -261,7 +289,7 @@ export default function CreateEntityModal({
   }, [dynamicOptionSources, isOpen, needsFieldCatalog])
 
   const selectedFieldIds = useMemo(
-    () => parseSelectedFieldIds(values.field_ids ?? ''),
+    () => parseSelectedIds(values.field_ids ?? ''),
     [values.field_ids],
   )
 
@@ -300,7 +328,7 @@ export default function CreateEntityModal({
     }
 
     setValues((currentValues) => {
-      const currentSelectedFieldIds = parseSelectedFieldIds(currentValues.field_ids ?? '')
+      const currentSelectedFieldIds = parseSelectedIds(currentValues.field_ids ?? '')
       const fieldForCalculation = currentValues.field_id
         ? fields.find((field) => String(field.id) === currentValues.field_id)
         : currentSelectedFieldIds.length === 1
@@ -360,7 +388,12 @@ export default function CreateEntityModal({
           return false
         }
 
-        return (values[String(field.id)] ?? '').trim() === ''
+        const currentValue = values[String(field.id)] ?? ''
+        if (currentValue.trim() === '') {
+          return true
+        }
+
+        return parseSelectedIds(currentValue).length === 0
       })
 
       if (missingRequiredField) {
@@ -408,6 +441,7 @@ export default function CreateEntityModal({
             value={values[String(field.id)] ?? ''}
             onChange={(nextValue) => handleChange(String(field.id), nextValue)}
             disabled={isSubmitting}
+            selectionMode={field.selectionMode ?? 'fields'}
           />
         )
       }
@@ -423,7 +457,9 @@ export default function CreateEntityModal({
             ? varietyOptions
             : field.optionsSource === 'varietiesOptional'
               ? optionalVarietyOptions
-            : (field.options ?? [])
+              : field.optionsSource === 'phenologicalStages'
+                ? phenologicalStageOptions
+                : (field.options ?? [])
 
       return (
         <select

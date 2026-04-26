@@ -15,6 +15,8 @@ export type FieldBoxMetric = {
 type FieldBoxProps = {
   title: string
   subtitle?: string
+  stageLabel?: string
+  stageIcon?: IconType
   metrics?: FieldBoxMetric[]
   to?: string
   actions?: ReactNode
@@ -26,6 +28,8 @@ type FieldBoxProps = {
 function FieldBoxContent({
   title,
   subtitle,
+  stageLabel,
+  stageIcon: StageIcon,
   metrics,
   to,
   actions,
@@ -104,6 +108,13 @@ function FieldBoxContent({
 
       {subtitle ? (
         <p className={`${contentClasses} whitespace-pre-line text-sm text-slate-500`}>{subtitle}</p>
+      ) : null}
+
+      {stageLabel ? (
+        <div className={`${contentClasses} mt-2 flex items-center gap-1.5 text-sm font-medium text-slate-700`}>
+          {StageIcon ? <StageIcon className="h-4 w-4 text-emerald-600" aria-hidden="true" /> : null}
+          <span>{stageLabel}</span>
+        </div>
       ) : null}
 
       {metrics && metrics.length > 0 ? (
