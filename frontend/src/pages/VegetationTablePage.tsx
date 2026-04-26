@@ -9,19 +9,33 @@ import DataTable, {
 } from '../components/DataTable'
 import { phenologyCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
-import type { FieldDetailRead, FieldRead } from '../types/generated/api'
+import type { FieldDetailRead, FieldRead, PhenologicalStageDefinition } from '../types/generated/api'
+
+type SectionReadFromDetail = FieldDetailRead['plantings'][number]['sections'][number]
 
 type VegetationRow = {
   id: number
   fieldId: number
   fieldName: string
   fieldGroup: string
-  plantingId: number
   variety: string
   sectionName: string
-  plantingYear: number
   active: boolean
   currentPhenology: string | null | undefined
+  phenologyDatesByStageCode: Record<string, string>
+}
+
+function buildPhenologyDatesByStageCode(events: SectionReadFromDetail['phenology_events']) {
+  const datesByStageCode: Record<string, string> = {}
+
+  for (const event of events ?? []) {
+    const existingDate = datesByStageCode[event.stage_code]
+    if (existingDate === undefined || event.date > existingDate) {
+      datesByStageCode[event.stage_code] = event.date
+    }
+  }
+
+  return datesByStageCode
 }
 
 function buildVegetationRows(fieldDetails: FieldDetailRead[]): VegetationRow[] {
@@ -32,12 +46,11 @@ function buildVegetationRows(fieldDetails: FieldDetailRead[]): VegetationRow[] {
         fieldId: fieldDetail.field.id,
         fieldName: fieldDetail.field.name,
         fieldGroup: fieldDetail.field.group,
-        plantingId: planting.id,
         variety: planting.variety,
         sectionName: section.name,
-        plantingYear: section.planting_year,
         active: section.active,
         currentPhenology: section.current_phenology,
+        phenologyDatesByStageCode: buildPhenologyDatesByStageCode(section.phenology_events),
       })),
     ),
   )
@@ -63,9 +76,18 @@ function sortRows(rows: VegetationRow[]) {
     })
 }
 
+function formatDate(value: string | null | undefined) {
+  if (!value) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat('de-DE').format(new Date(value))
+}
+
 export default function VegetationTablePage() {
   const [rows, setRows] = useState<VegetationRow[]>([])
   const [fields, setFields] = useState<FieldRead[]>([])
+  const [phenologicalStages, setPhenologicalStages] = useState<PhenologicalStageDefinition[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -78,17 +100,24 @@ export default function VegetationTablePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const fieldsResponse = await api.get<FieldRead[]>('/fields')
+        const [fieldsResponse, stagesResponse] = await Promise.all([
+          api.get<FieldRead[]>('/fields'),
+          api.get<PhenologicalStageDefinition[]>('/phenological-stages'),
+        ])
         const detailResponses = await Promise.all(
           fieldsResponse.data.map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
         )
 
         setFields(fieldsResponse.data)
+        setPhenologicalStages(
+          stagesResponse.data.slice().sort((left, right) => left.sort_order - right.sort_order),
+        )
         setRows(buildVegetationRows(detailResponses.map((response) => response.data)))
         setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching vegetation table data', error)
         setFields([])
+        setPhenologicalStages([])
         setRows([])
         setErrorMessage('Die Vegetationsdaten konnten nicht geladen werden.')
       } finally {
@@ -134,18 +163,13 @@ export default function VegetationTablePage() {
         header: 'Phänologie',
         cell: (row) => row.currentPhenology ?? '-',
       },
-      {
-        id: 'planting_year',
-        header: 'Pflanzjahr',
-        cell: (row) => row.plantingYear,
-      },
-      {
-        id: 'active',
-        header: 'Status',
-        cell: (row) => (row.active ? 'Aktiv' : 'Inaktiv'),
-      },
+      ...phenologicalStages.map((stage): DataTableColumn<VegetationRow> => ({
+        id: `stage_${stage.code}`,
+        header: stage.label,
+        cell: (row) => formatDate(row.phenologyDatesByStageCode[stage.code]),
+      })),
     ],
-    [],
+    [phenologicalStages],
   )
 
   const tableFilters = useMemo<DataTableFilter[]>(
@@ -197,6 +221,7 @@ export default function VegetationTablePage() {
       const matchesQuery =
         normalizedQuery === '' ||
         [row.fieldName, row.fieldGroup, row.variety, row.sectionName, row.currentPhenology ?? '']
+          .concat(Object.values(row.phenologyDatesByStageCode))
           .join(' ')
           .toLowerCase()
           .includes(normalizedQuery)

@@ -14,7 +14,11 @@ import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
 import WaterBalanceChart from '../components/WaterBalanceChart'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
-import { type FieldSummaryRead, type WaterBalanceSeriesPoint } from '../types/generated/api'
+import {
+  type FieldDetailRead,
+  type FieldSummaryRead,
+  type WaterBalanceSeriesPoint,
+} from '../types/generated/api'
 
 const FORECAST_DAYS = 5
 
@@ -36,6 +40,14 @@ type WaterBalanceModalState = {
   errorMessage: string | null
 }
 
+type FieldPhenologyEvent = {
+  id: number
+  sectionName: string
+  variety: string
+  stageName: string
+  date: string
+}
+
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
   {
     key: 'effective_root_depth_display',
@@ -52,13 +64,6 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     icon: LuRadioTower,
     kind: 'text',
     getValue: (field) => field.reference_station,
-  },
-  {
-    key: 'tree_count',
-    label: 'Baumzahl',
-    icon: LuTrees,
-    kind: 'number',
-    getValue: (field) => field.tree_count,
   },
   {
     key: 'safe_ratio',
@@ -114,6 +119,60 @@ function buildSubtitle(field: FieldSummaryRead) {
   ]
     .filter((value): value is string => value !== null)
     .join('\n')
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('de-DE').format(new Date(value))
+}
+
+function buildPhenologyEventsByFieldId(fieldDetails: FieldDetailRead[]) {
+  return Object.fromEntries(
+    fieldDetails.map((fieldDetail) => [
+      fieldDetail.field.id,
+      fieldDetail.plantings
+        .flatMap((planting) =>
+          planting.sections.flatMap((section) =>
+            (section.phenology_events ?? []).map((event) => ({
+              id: event.id,
+              sectionName: section.name,
+              variety: planting.variety,
+              stageName: event.stage_name,
+              date: event.date,
+            })),
+          ),
+        )
+        .sort((left, right) => right.date.localeCompare(left.date)),
+    ]),
+  ) as Record<number, FieldPhenologyEvent[]>
+}
+
+function FieldPhenologyTooltip({ events }: { events: FieldPhenologyEvent[] | undefined }) {
+  const visibleEvents = events ?? []
+
+  if (visibleEvents.length === 0) {
+    return <div className="text-slate-500">Keine Phänologieereignisse erfasst.</div>
+  }
+
+  return (
+    <div>
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Phänologie
+      </div>
+      <div className="max-h-64 overflow-y-auto pr-1">
+        {visibleEvents.map((event) => (
+          <div key={event.id} className="grid grid-cols-[5.5rem_1fr] gap-1 border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
+            <div className="font-semibold text-slate-900">{formatDate(event.date)}</div>
+            <div className="min-w-0">
+              <div className="font-medium text-slate-800">{event.stageName}</div>
+              <div className="truncate text-slate-500">
+                {event.variety} | {event.sectionName}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function FieldActionsMenu({
@@ -252,6 +311,7 @@ function WaterBalanceModal({
 
 export default function Home() {
   const [fields, setFields] = useState<FieldSummaryRead[]>([])
+  const [phenologyEventsByFieldId, setPhenologyEventsByFieldId] = useState<Record<number, FieldPhenologyEvent[]>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
@@ -265,12 +325,19 @@ export default function Home() {
         if (!Array.isArray(response.data)) {
           throw new TypeError('Expected /fields/summary to return an array.')
         }
+        const detailResponses = await Promise.all(
+          response.data.map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
+        )
         setFields(response.data)
+        setPhenologyEventsByFieldId(
+          buildPhenologyEventsByFieldId(detailResponses.map((detailResponse) => detailResponse.data)),
+        )
         setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching field summaries', error)
         setErrorMessage('Fields could not be loaded.')
         setFields([])
+        setPhenologyEventsByFieldId({})
       } finally {
         setIsLoading(false)
       }
@@ -419,6 +486,7 @@ export default function Home() {
                 subtitle={buildSubtitle(field)}
                 stageIcon={LuTrees}
                 stageLabel={field.current_phenology ?? '-'}
+                stageTooltipContent={<FieldPhenologyTooltip events={phenologyEventsByFieldId[field.id]} />}
                 metrics={buildFieldMetrics(field)}
                 titleAdornment={
                   field.herbicide_free === true ? (

@@ -17,6 +17,7 @@ type FieldBoxProps = {
   subtitle?: string
   stageLabel?: string
   stageIcon?: IconType
+  stageTooltipContent?: ReactNode
   metrics?: FieldBoxMetric[]
   to?: string
   actions?: ReactNode
@@ -30,6 +31,7 @@ function FieldBoxContent({
   subtitle,
   stageLabel,
   stageIcon: StageIcon,
+  stageTooltipContent,
   metrics,
   to,
   actions,
@@ -111,9 +113,17 @@ function FieldBoxContent({
       ) : null}
 
       {stageLabel ? (
-        <div className={`${contentClasses} mt-2 flex items-center gap-1.5 text-sm font-medium text-slate-700`}>
+        <div className={`${contentClasses} group/stage mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 pointer-events-auto`}>
           {StageIcon ? <StageIcon className="h-4 w-4 text-emerald-600" aria-hidden="true" /> : null}
           <span>{stageLabel}</span>
+          {stageTooltipContent ? (
+            <>
+              <div className="absolute left-0 top-full z-30 hidden h-2 w-80 max-w-[calc(100vw-3rem)] group-hover/stage:block" />
+              <div className="pointer-events-auto absolute left-0 top-full z-30 mt-2 hidden w-80 max-w-[calc(100vw-3rem)] border border-slate-200 bg-white p-3 text-left text-xs font-normal text-slate-700 opacity-0 shadow-xl transition duration-150 group-hover/stage:block group-hover/stage:opacity-100">
+                {stageTooltipContent}
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
 
