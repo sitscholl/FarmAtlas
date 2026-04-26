@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { FiChevronDown } from 'react-icons/fi'
 
 import api from '../api'
 import type { FieldDetailRead, FieldRead, PlantingDetailRead, SectionRead } from '../types/generated/api'
@@ -17,6 +18,7 @@ type IndeterminateCheckboxProps = {
   indeterminate?: boolean
   disabled?: boolean
   onChange: () => void
+  onClick?: (event: MouseEvent<HTMLInputElement>) => void
   className?: string
 }
 
@@ -25,6 +27,7 @@ function IndeterminateCheckbox({
   indeterminate = false,
   disabled = false,
   onChange,
+  onClick,
   className,
 }: IndeterminateCheckboxProps) {
   const ref = useRef<HTMLInputElement | null>(null)
@@ -42,6 +45,7 @@ function IndeterminateCheckbox({
       checked={checked}
       disabled={disabled}
       onChange={onChange}
+      onClick={onClick}
       className={className}
     />
   )
@@ -242,6 +246,22 @@ export default function GroupedFieldSelector({
     })
   }
 
+  const handleSelectableRowKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    onSelect: () => void,
+  ) => {
+    if (event.target !== event.currentTarget) {
+      return
+    }
+
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return
+    }
+
+    event.preventDefault()
+    onSelect()
+  }
+
   if (isLoading) {
     return (
       <div className="mt-2 border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
@@ -259,6 +279,8 @@ export default function GroupedFieldSelector({
   }
 
   const checkboxClasses = 'mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400'
+  const chevronClasses = (isExpanded: boolean) =>
+    `h-5 w-5 shrink-0 text-slate-700 transition-transform ${isExpanded ? 'rotate-180' : ''}`
 
   return (
     <div className="mt-2 border border-slate-200 bg-white">
@@ -283,12 +305,12 @@ export default function GroupedFieldSelector({
         </button>
       </div>
 
-      <div className="max-h-80 overflow-y-auto">
+      <div>
         {selectionMode === 'fields' ? (
           fields.map((field) => (
             <label
               key={field.id}
-              className="flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3 transition last:border-b-0 hover:bg-slate-50"
+              className="flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-1 transition last:border-b-0 hover:bg-slate-50"
             >
               <IndeterminateCheckbox
                 checked={selectedIds.has(field.id)}
@@ -298,9 +320,6 @@ export default function GroupedFieldSelector({
               />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-slate-900">{field.name}</div>
-                <div className="text-xs text-slate-500">
-                  {field.group} | {field.reference_station}
-                </div>
               </div>
             </label>
           ))
@@ -312,34 +331,48 @@ export default function GroupedFieldSelector({
 
             return (
               <div key={fieldDetail.field.id} className="border-b border-slate-100 last:border-b-0">
-                <div className="flex items-start gap-2 px-4 py-3 transition hover:bg-slate-50">
-                  <button
-                    type="button"
-                    onClick={() => toggleFieldExpansion(fieldDetail.field.id)}
-                    className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
-                    aria-label={`${fieldDetail.field.name} ${isExpanded ? 'einklappen' : 'ausklappen'}`}
-                  >
-                    {isExpanded ? '-' : '+'}
-                  </button>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleIds(fieldSectionIds)}
+                  onKeyDown={(event) => handleSelectableRowKeyDown(event, () => toggleIds(fieldSectionIds))}
+                  className="flex w-full cursor-pointer items-center gap-3 px-4 py-1 text-left transition hover:bg-slate-50"
+                >
                   <IndeterminateCheckbox
                     checked={fieldSectionIds.length > 0 && selectedFieldSectionCount === fieldSectionIds.length}
                     indeterminate={selectedFieldSectionCount > 0 && selectedFieldSectionCount < fieldSectionIds.length}
                     disabled={disabled || fieldSectionIds.length === 0}
                     onChange={() => toggleIds(fieldSectionIds)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                    }}
                     className={checkboxClasses}
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-slate-900">{fieldDetail.field.name}</div>
-                    <div className="text-xs text-slate-500">
-                      {fieldDetail.field.group} | {fieldDetail.field.reference_station} | {fieldSectionIds.length} Abschnitte
-                    </div>
                   </div>
+                  <span className="shrink-0 text-sm font-medium tabular-nums text-slate-400">
+                    {selectedFieldSectionCount} / {fieldSectionIds.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleFieldExpansion(fieldDetail.field.id)
+                    }}
+                    disabled={fieldDetail.plantings.length === 0}
+                    className="shrink-0 p-1 text-slate-700 transition hover:text-slate-950 disabled:cursor-not-allowed disabled:text-slate-300"
+                    aria-label={`${fieldDetail.field.name} ${isExpanded ? 'einklappen' : 'ausklappen'}`}
+                    aria-expanded={isExpanded}
+                  >
+                    <FiChevronDown className={chevronClasses(isExpanded)} aria-hidden="true" />
+                  </button>
                 </div>
 
                 {isExpanded ? (
                   <div className="border-t border-slate-100 bg-slate-50/60">
                     {fieldDetail.plantings.length === 0 ? (
-                      <div className="px-12 py-3 text-xs text-slate-500">
+                      <div className="px-12 py-1 text-xs text-slate-500">
                         Keine Pflanzungen vorhanden.
                       </div>
                     ) : (
@@ -350,41 +383,55 @@ export default function GroupedFieldSelector({
 
                         return (
                           <div key={planting.id} className="border-t border-slate-100 first:border-t-0">
-                            <div className="flex items-start gap-2 py-3 pl-10 pr-4 transition hover:bg-slate-100/70">
-                              <button
-                                type="button"
-                                onClick={() => togglePlantingExpansion(planting.id)}
-                                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
-                                aria-label={`${planting.variety} ${isPlantingExpanded ? 'einklappen' : 'ausklappen'}`}
-                              >
-                                {isPlantingExpanded ? '-' : '+'}
-                              </button>
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => toggleIds(plantingSectionIds)}
+                              onKeyDown={(event) => handleSelectableRowKeyDown(event, () => toggleIds(plantingSectionIds))}
+                              className="flex w-full cursor-pointer items-center gap-3 py-1 pl-10 pr-4 text-left transition hover:bg-slate-100/70"
+                            >
                               <IndeterminateCheckbox
                                 checked={plantingSectionIds.length > 0 && selectedPlantingSectionCount === plantingSectionIds.length}
                                 indeterminate={selectedPlantingSectionCount > 0 && selectedPlantingSectionCount < plantingSectionIds.length}
                                 disabled={disabled || plantingSectionIds.length === 0}
                                 onChange={() => toggleIds(plantingSectionIds)}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                }}
                                 className={checkboxClasses}
                               />
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-slate-800">{planting.variety}</div>
-                                <div className="text-xs text-slate-500">
-                                  {planting.sections.length} Abschnitte | {planting.active ? 'Aktiv' : 'Inaktiv'}
-                                </div>
                               </div>
+                              <span className="shrink-0 text-sm font-medium tabular-nums text-slate-400">
+                                {selectedPlantingSectionCount} / {plantingSectionIds.length}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  togglePlantingExpansion(planting.id)
+                                }}
+                                disabled={planting.sections.length === 0}
+                                className="shrink-0 p-1 text-slate-700 transition hover:text-slate-950 disabled:cursor-not-allowed disabled:text-slate-300"
+                                aria-label={`${planting.variety} ${isPlantingExpanded ? 'einklappen' : 'ausklappen'}`}
+                                aria-expanded={isPlantingExpanded}
+                              >
+                                <FiChevronDown className={chevronClasses(isPlantingExpanded)} aria-hidden="true" />
+                              </button>
                             </div>
 
                             {isPlantingExpanded ? (
                               <div className="bg-white">
                                 {planting.sections.length === 0 ? (
-                                  <div className="py-3 pl-20 pr-4 text-xs text-slate-500">
+                                  <div className="py-1 pl-20 pr-4 text-xs text-slate-500">
                                     Keine Abschnitte vorhanden.
                                   </div>
                                 ) : (
                                   planting.sections.map((section: SectionRead) => (
                                     <label
                                       key={section.id}
-                                      className="flex cursor-pointer items-start gap-3 border-t border-slate-100 py-3 pl-20 pr-4 transition hover:bg-slate-50"
+                                      className="flex cursor-pointer items-start gap-3 border-t border-slate-100 py-1 pl-20 pr-4 transition hover:bg-slate-50"
                                     >
                                       <IndeterminateCheckbox
                                         checked={selectedIds.has(section.id)}
@@ -394,9 +441,6 @@ export default function GroupedFieldSelector({
                                       />
                                       <div className="min-w-0">
                                         <div className="text-sm font-medium text-slate-800">{section.name}</div>
-                                        <div className="text-xs text-slate-500">
-                                          Pflanzjahr {section.planting_year} | {section.active ? 'Aktiv' : 'Inaktiv'}
-                                        </div>
                                       </div>
                                     </label>
                                   ))
