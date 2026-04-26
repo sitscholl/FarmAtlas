@@ -48,6 +48,24 @@ class PhenologyEventRepository:
     def get_by_id(self, session: Session, event_id: int) -> models.SectionPhenologyEvent | None:
         return self._query(session).filter(models.SectionPhenologyEvent.id == event_id).one_or_none()
 
+    def get_by_section_stage_year(
+        self,
+        session: Session,
+        *,
+        section_id: int,
+        stage_code: str,
+        year: int,
+    ) -> models.SectionPhenologyEvent | None:
+        return (
+            self._query(session)
+            .filter(
+                models.SectionPhenologyEvent.section_id == section_id,
+                models.SectionPhenologyEvent.stage_code == stage_code,
+                models.SectionPhenologyEvent.year == year,
+            )
+            .one_or_none()
+        )
+
     def list_for_section(self, session: Session, section_id: int) -> list[models.SectionPhenologyEvent]:
         section = self._sections.get_by_id(session, section_id)
         if section is None:
@@ -68,9 +86,26 @@ class PhenologyEventRepository:
         date: datetime.date,
     ) -> models.SectionPhenologyEvent:
         normalized_date = self._normalize_date(date, field_name="date")
+        resolved_section_id = self._resolve_section_id(session, section_id)
+        resolved_stage_code = self._resolve_stage_code(stage_code)
+        existing_event = self.get_by_section_stage_year(
+            session,
+            section_id=resolved_section_id,
+            stage_code=resolved_stage_code,
+            year=normalized_date.year,
+        )
+
+        if existing_event is not None:
+            if existing_event.date != normalized_date:
+                existing_event.date = normalized_date
+                existing_event.year = normalized_date.year
+                session.flush()
+                logger.debug("Replaced phenology event %s", existing_event)
+            return self.get_by_id(session, existing_event.id) or existing_event
+
         event = models.SectionPhenologyEvent(
-            section_id=self._resolve_section_id(session, section_id),
-            stage_code=self._resolve_stage_code(stage_code),
+            section_id=resolved_section_id,
+            stage_code=resolved_stage_code,
             date=normalized_date,
             year=normalized_date.year,
         )

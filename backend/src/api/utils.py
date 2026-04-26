@@ -270,3 +270,19 @@ def get_water_balance_summary_for_field(field_id: int) -> WaterBalanceSummary:
             safe_ratio=None,
         )
     return WaterBalanceSummary(**summaries[0])
+
+
+def get_field_id_for_section_id(section_id: int) -> int | None:
+    with runtime.db.session_scope() as session:
+        section = runtime.db.sections.get_by_id(session, section_id)
+        if section is None or section.field is None:
+            return None
+        return section.field.id
+
+
+def get_field_id_for_phenology_event_id(event_id: int) -> int | None:
+    with runtime.db.session_scope() as session:
+        event = runtime.db.phenology_events.get_by_id(session, event_id)
+        if event is None or event.section is None or event.section.field is None:
+            return None
+        return event.section.field.id
