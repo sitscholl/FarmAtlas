@@ -18,7 +18,34 @@ type WaterBalanceChartProps = {
   reservedForecastDays?: number
 }
 
-type ChartRow = WaterBalanceSeriesPoint & {
+type NullableSeriesPoint = Omit<
+  WaterBalanceSeriesPoint,
+  | 'precipitation'
+  | 'irrigation'
+  | 'evapotranspiration'
+  | 'kc'
+  | 'incoming'
+  | 'net'
+  | 'soil_water_content'
+  | 'available_water_storage'
+  | 'water_deficit'
+  | 'readily_available_water'
+  | 'safe_ratio'
+> & {
+  precipitation: number | null
+  irrigation: number | null
+  evapotranspiration: number | null
+  kc?: number | null
+  incoming: number | null
+  net: number | null
+  soil_water_content: number | null
+  available_water_storage: number | null
+  water_deficit: number | null
+  readily_available_water: number | null
+  safe_ratio: number | null
+}
+
+type ChartRow = NullableSeriesPoint & {
   raw_threshold: number | null
   evapotranspiration_negative: number | null
   soil_water_content_observed: number | null
@@ -65,7 +92,7 @@ function addDaysToIsoDate(isoDate: string, days: number) {
 function extendChartRange(
   data: WaterBalanceSeriesPoint[],
   reservedForecastDays: number,
-): WaterBalanceSeriesPoint[] {
+): NullableSeriesPoint[] {
   if (data.length === 0 || reservedForecastDays <= 0) {
     return data
   }
@@ -78,22 +105,21 @@ function extendChartRange(
     return data
   }
 
-  const paddedData = [...data]
-  const lastPoint = data[data.length - 1]
+  const paddedData: NullableSeriesPoint[] = [...data]
   let nextDate = addDaysToIsoDate(lastDate, 1)
   while (nextDate <= reservedEndDate) {
     paddedData.push({
       date: nextDate,
-      precipitation: 0,
-      irrigation: 0,
-      evapotranspiration: 0,
-      kc: lastPoint.kc ?? null,
-      incoming: 0,
-      net: 0,
-      soil_water_content: lastPoint.soil_water_content,
-      available_water_storage: lastPoint.available_water_storage,
-      water_deficit: lastPoint.water_deficit,
-      readily_available_water: lastPoint.readily_available_water,
+      precipitation: null,
+      irrigation: null,
+      evapotranspiration: null,
+      kc: null,
+      incoming: null,
+      net: null,
+      soil_water_content: null,
+      available_water_storage: null,
+      water_deficit: null,
+      readily_available_water: null,
       safe_ratio: null,
       below_raw: null,
       value_type: null,
@@ -105,7 +131,7 @@ function extendChartRange(
   return paddedData
 }
 
-function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
+function buildChartData(data: NullableSeriesPoint[]): ChartRow[] {
   return data.map((point, index) => {
     const nextPoint = data[index + 1]
     const forecastStartsNext = nextPoint?.value_type === 'forecast'
@@ -113,7 +139,7 @@ function buildChartData(data: WaterBalanceSeriesPoint[]): ChartRow[] {
     return {
       ...point,
       raw_threshold:
-        point.readily_available_water === null
+        point.readily_available_water === null || point.available_water_storage === null
           ? null
           : point.available_water_storage - point.readily_available_water,
       evapotranspiration_negative:
@@ -210,16 +236,9 @@ export default function WaterBalanceChart({
   }
 
   return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm sm:rounded-3xl sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Wasserbilanz
-          </p>
-        </div>
-      </div>
+    <div className="overflow-hidden rounded-[1.5rem] p-3 focus:outline-none sm:p-6 [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none">
 
-      <div className="mt-4 overflow-x-auto sm:mt-6">
+      <div className="overflow-x-auto">
         <div className="h-[320px] w-full min-w-[40rem] sm:h-[420px] sm:min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -282,7 +301,6 @@ export default function WaterBalanceChart({
                   label={{ value: 'Heute', position: 'top', fill: '#475569', fontSize: 11 }}
                 />
               ) : null}
-              <Legend wrapperStyle={{ paddingTop: 8, fontSize: '12px' }} />
               {hasKc ? (
                 <Line
                   yAxisId="kc"
