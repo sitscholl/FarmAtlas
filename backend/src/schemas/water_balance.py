@@ -19,6 +19,7 @@ class WaterBalanceSeriesPoint(BaseModel):
     precipitation: float
     irrigation: float
     evapotranspiration: float
+    kc: float | None = None
     incoming: float
     net: float
     soil_water_content: float

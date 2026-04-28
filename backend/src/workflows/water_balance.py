@@ -143,7 +143,9 @@ class WaterBalanceWorkflow:
         )
         dataframe["date"] = pd.to_datetime(dataframe["date"]).dt.tz_localize(self.timezone)
         dataframe["value_type"] = "observed"
-        return dataframe.set_index("date").sort_index()
+        dataframe = dataframe.set_index("date").sort_index()
+        dataframe["kc"] = self.et_corrector.to_field_series(dataframe.index, field)
+        return dataframe
 
     def calculate_water_balance(
         self,
@@ -210,6 +212,8 @@ class WaterBalanceWorkflow:
         water_balance["available_water_storage"] = available_water_storage
         water_balance["water_deficit"] = available_water_storage - water_balance["soil_water_content"]
         water_balance["field_id"] = field.id
+        if "kc" in data.columns:
+            water_balance["kc"] = data["kc"]
 
         readily_available_water = field.p_allowable * available_water_storage
         water_balance["readily_available_water"] = readily_available_water

@@ -8,7 +8,6 @@ from .utils import (
     raise_write_http_error,
     runtime,
     serialize_forecast_water_balance,
-    serialize_water_balance_series,
     validate_field_id,
 )
 
@@ -35,7 +34,7 @@ async def get_field_water_balance_series(
     field_id: int,
     forecast_days: int = Query(default=0, ge=0, le=14),
 ):
-    validate_field_id(field_id)
+    field_context = validate_field_id(field_id)
 
     if forecast_days > 0:
         field_context = runtime.run_workflow_for_field(
@@ -49,9 +48,10 @@ async def get_field_water_balance_series(
             return []
         return serialize_forecast_water_balance(water_balance)
 
-    with runtime.db.session_scope() as session:
-        records = runtime.db.water_balance.list_for_field(session, field_id=field_id)
-    return serialize_water_balance_series(records)
+    water_balance = runtime.workflows.water_balance.get_cached_water_balance(field_context)
+    if water_balance is None or water_balance.empty:
+        return []
+    return serialize_forecast_water_balance(water_balance)
 
 
 @router.post("/api/fields/{field_id}/water-balance", response_model=WaterBalanceSummary, status_code=status.HTTP_200_OK)

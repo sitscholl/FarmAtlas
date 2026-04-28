@@ -30,6 +30,8 @@ type TooltipRow = {
   label: string
   color: string
   value: number | null
+  unit?: string
+  digits?: number
 }
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -85,6 +87,7 @@ function extendChartRange(
       precipitation: 0,
       irrigation: 0,
       evapotranspiration: 0,
+      kc: lastPoint.kc ?? null,
       incoming: 0,
       net: 0,
       soil_water_content: lastPoint.soil_water_content,
@@ -134,18 +137,21 @@ function buildTooltipRows(point: ChartRow): TooltipRow[] {
       label: 'Bodenwassergehalt',
       color: '#0f172a',
       value: point.soil_water_content_observed ?? point.soil_water_content_forecast,
+      unit: 'mm',
     },
     {
       key: 'precipitation',
       label: 'Niederschlag',
       color: '#0682b77d',
       value: point.precipitation ?? null,
+      unit: 'mm',
     },
     {
       key: 'irrigation',
       label: 'Bewaesserung',
       color: '#259a057a',
       value: point.irrigation ?? null,
+      unit: 'mm',
     },
     {
       key: 'evapotranspiration_negative',
@@ -155,6 +161,14 @@ function buildTooltipRows(point: ChartRow): TooltipRow[] {
         point.evapotranspiration_negative === null
           ? null
           : Math.abs(point.evapotranspiration_negative),
+      unit: 'mm',
+    },
+    {
+      key: 'kc',
+      label: 'Kc',
+      color: '#94a3b8',
+      value: point.kc ?? null,
+      digits: 2,
     },
   ]
 }
@@ -168,6 +182,7 @@ export default function WaterBalanceChart({
   const hasEvapotranspiration = chartData.some(
     (point) => point.evapotranspiration_negative !== null,
   )
+  const hasKc = chartData.some((point) => point.kc !== null && point.kc !== undefined)
   const hasForecast = chartData.some((point) => point.value_type === 'forecast')
   const today = getLocalIsoDate()
   const hasTodayMarker = chartData.some((point) => point.date === today)
@@ -241,6 +256,17 @@ export default function WaterBalanceChart({
                 axisLine={{ stroke: '#cbd5e1' }}
                 width={36}
               />
+              {hasKc ? (
+                <YAxis
+                  yAxisId="kc"
+                  orientation="right"
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  tickLine={{ fill: '#94a3b8' }}
+                  axisLine={{ stroke: '#cbd5e1' }}
+                  width={36}
+                  domain={[0, 'auto']}
+                />
+              ) : null}
               <ReferenceLine y={0} stroke="#64748b" strokeWidth={.5} />
               <ReferenceLine
                 x={activePoint.date}
@@ -257,6 +283,20 @@ export default function WaterBalanceChart({
                 />
               ) : null}
               <Legend wrapperStyle={{ paddingTop: 8, fontSize: '12px' }} />
+              {hasKc ? (
+                <Line
+                  yAxisId="kc"
+                  type="monotone"
+                  dataKey="kc"
+                  stroke="#94a3b8"
+                  strokeWidth={1.5}
+                  strokeOpacity={0.65}
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  name="Kc"
+                />
+              ) : null}
               <Line
                 type="monotone"
                 dataKey="soil_water_content_observed"
@@ -344,7 +384,7 @@ export default function WaterBalanceChart({
                 {row.label}
               </span>
               <span className="font-medium text-slate-900">
-                {row.value === null ? '-' : `${formatNumber(row.value)} mm`}
+                {row.value === null ? '-' : `${formatNumber(row.value, row.digits ?? 1)}${row.unit ? ` ${row.unit}` : ''}`}
               </span>
             </div>
           ))}

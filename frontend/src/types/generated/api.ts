@@ -366,6 +366,7 @@ export type WaterBalanceSeriesPoint = {
   precipitation: number
   irrigation: number
   evapotranspiration: number
+  kc?: number | null
   incoming: number
   net: number
   soil_water_content: number
