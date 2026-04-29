@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { GoPencil } from 'react-icons/go'
 import { IoMdAdd } from 'react-icons/io'
+import { PiTrashBold } from 'react-icons/pi'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
@@ -8,50 +10,41 @@ import DataTable, {
   type DataTableFilter,
 } from '../components/DataTable'
 import { phenologyCreateAction } from '../config/createActions'
-import { DATA_CHANGED_EVENT } from '../lib/dataEvents'
-import type { FieldDetailRead, FieldRead, PhenologicalStageDefinition } from '../types/generated/api'
+import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
+import {
+  buildPhenologyEditAction,
+  buildPhenologyEditInitialValues,
+} from '../lib/phenologyForm'
+import type {
+  FieldDetailRead,
+  FieldRead,
+  PhenologicalStageDefinition,
+  PhenologyEventRead,
+} from '../types/generated/api'
 
-type SectionReadFromDetail = FieldDetailRead['plantings'][number]['sections'][number]
-
-type VegetationRow = {
-  id: number
+type VegetationRow = PhenologyEventRead & {
   fieldId: number
   fieldName: string
   fieldGroup: string
   variety: string
   sectionName: string
-  active: boolean
-  currentPhenology: string | null | undefined
-  phenologyDatesByStageCode: Record<string, string>
-}
-
-function buildPhenologyDatesByStageCode(events: SectionReadFromDetail['phenology_events']) {
-  const datesByStageCode: Record<string, string> = {}
-
-  for (const event of events ?? []) {
-    const existingDate = datesByStageCode[event.stage_code]
-    if (existingDate === undefined || event.date > existingDate) {
-      datesByStageCode[event.stage_code] = event.date
-    }
-  }
-
-  return datesByStageCode
+  sectionActive: boolean
 }
 
 function buildVegetationRows(fieldDetails: FieldDetailRead[]): VegetationRow[] {
   return fieldDetails.flatMap((fieldDetail) =>
     fieldDetail.plantings.flatMap((planting) =>
-      planting.sections.map((section) => ({
-        id: section.id,
-        fieldId: fieldDetail.field.id,
-        fieldName: fieldDetail.field.name,
-        fieldGroup: fieldDetail.field.group,
-        variety: planting.variety,
-        sectionName: section.name,
-        active: section.active,
-        currentPhenology: section.current_phenology,
-        phenologyDatesByStageCode: buildPhenologyDatesByStageCode(section.phenology_events),
-      })),
+      planting.sections.flatMap((section) =>
+        (section.phenology_events ?? []).map((event) => ({
+          ...event,
+          fieldId: fieldDetail.field.id,
+          fieldName: fieldDetail.field.name,
+          fieldGroup: fieldDetail.field.group,
+          variety: planting.variety,
+          sectionName: section.name,
+          sectionActive: section.active,
+        })),
+      ),
     ),
   )
 }
@@ -60,6 +53,10 @@ function sortRows(rows: VegetationRow[]) {
   return rows
     .slice()
     .sort((left, right) => {
+      const dateCompare = right.date.localeCompare(left.date)
+      if (dateCompare !== 0) {
+        return dateCompare
+      }
       const groupCompare = left.fieldGroup.localeCompare(right.fieldGroup, 'de-DE')
       if (groupCompare !== 0) {
         return groupCompare
@@ -72,28 +69,38 @@ function sortRows(rows: VegetationRow[]) {
       if (varietyCompare !== 0) {
         return varietyCompare
       }
-      return left.sectionName.localeCompare(right.sectionName, 'de-DE')
+      const sectionCompare = left.sectionName.localeCompare(right.sectionName, 'de-DE')
+      if (sectionCompare !== 0) {
+        return sectionCompare
+      }
+      return left.stage_name.localeCompare(right.stage_name, 'de-DE')
     })
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return '-'
-  }
-
+function formatDate(value: string) {
   return new Intl.DateTimeFormat('de-DE').format(new Date(value))
 }
 
+function formatStage(event: PhenologyEventRead) {
+  return event.bbch_code === null || event.bbch_code === undefined
+    ? event.stage_name
+    : `${event.stage_name} (BBCH ${event.bbch_code})`
+}
+
 export default function VegetationTablePage() {
+  const interactiveAreaRef = useRef<HTMLDivElement | null>(null)
   const [rows, setRows] = useState<VegetationRow[]>([])
   const [fields, setFields] = useState<FieldRead[]>([])
   const [phenologicalStages, setPhenologicalStages] = useState<PhenologicalStageDefinition[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [editingEvent, setEditingEvent] = useState<PhenologyEventRead | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [filters, setFilters] = useState({
     query: '',
     fieldId: '',
+    stageCode: '',
     status: 'active',
   })
 
@@ -136,8 +143,28 @@ export default function VegetationTablePage() {
     return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [])
 
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (interactiveAreaRef.current === null) {
+        return
+      }
+
+      if (!interactiveAreaRef.current.contains(event.target as Node)) {
+        setSelectedEventId(null)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [])
+
   const columns = useMemo<DataTableColumn<VegetationRow>[]>(
     () => [
+      {
+        id: 'date',
+        header: 'Datum',
+        cell: (row) => formatDate(row.date),
+      },
       {
         id: 'field',
         header: 'Anlage',
@@ -159,17 +186,12 @@ export default function VegetationTablePage() {
         cell: (row) => row.sectionName,
       },
       {
-        id: 'phenology',
-        header: 'Phänologie',
-        cell: (row) => row.currentPhenology ?? '-',
+        id: 'stage',
+        header: 'Stadium',
+        cell: (row) => formatStage(row),
       },
-      ...phenologicalStages.map((stage): DataTableColumn<VegetationRow> => ({
-        id: `stage_${stage.code}`,
-        header: stage.label,
-        cell: (row) => formatDate(row.phenologyDatesByStageCode[stage.code]),
-      })),
     ],
-    [phenologicalStages],
+    [],
   )
 
   const tableFilters = useMemo<DataTableFilter[]>(
@@ -179,7 +201,7 @@ export default function VegetationTablePage() {
         label: 'Suche',
         type: 'text',
         value: filters.query,
-        placeholder: 'Anlage, Gruppe, Pflanzung oder Abschnitt',
+        placeholder: 'Anlage, Gruppe, Pflanzung, Abschnitt oder Stadium',
       },
       {
         id: 'fieldId',
@@ -200,6 +222,21 @@ export default function VegetationTablePage() {
         ],
       },
       {
+        id: 'stageCode',
+        label: 'Stadium',
+        type: 'select',
+        value: filters.stageCode,
+        options: [
+          { label: 'Alle', value: '' },
+          ...phenologicalStages.map((stage) => ({
+            label: stage.bbch_code === null || stage.bbch_code === undefined
+              ? stage.label
+              : `${stage.label} (BBCH ${stage.bbch_code})`,
+            value: stage.code,
+          })),
+        ],
+      },
+      {
         id: 'status',
         label: 'Status',
         type: 'select',
@@ -211,7 +248,7 @@ export default function VegetationTablePage() {
         ],
       },
     ],
-    [fields, filters],
+    [fields, filters, phenologicalStages],
   )
 
   const filteredRows = useMemo(() => {
@@ -220,20 +257,44 @@ export default function VegetationTablePage() {
     return sortRows(rows).filter((row) => {
       const matchesQuery =
         normalizedQuery === '' ||
-        [row.fieldName, row.fieldGroup, row.variety, row.sectionName, row.currentPhenology ?? '']
-          .concat(Object.values(row.phenologyDatesByStageCode))
+        [
+          row.fieldName,
+          row.fieldGroup,
+          row.variety,
+          row.sectionName,
+          row.stage_name,
+          row.stage_code,
+          row.date,
+        ]
           .join(' ')
           .toLowerCase()
           .includes(normalizedQuery)
 
       const matchesField = filters.fieldId === '' || row.fieldId === Number(filters.fieldId)
+      const matchesStage = filters.stageCode === '' || row.stage_code === filters.stageCode
       const matchesStatus =
         filters.status === '' ||
-        (filters.status === 'active' ? row.active : !row.active)
+        (filters.status === 'active' ? row.sectionActive : !row.sectionActive)
 
-      return matchesQuery && matchesField && matchesStatus
+      return matchesQuery && matchesField && matchesStage && matchesStatus
     })
   }, [filters, rows])
+
+  const selectedEvent = useMemo(
+    () => filteredRows.find((row) => row.id === selectedEventId) ?? null,
+    [filteredRows, selectedEventId],
+  )
+
+  useEffect(() => {
+    if (selectedEventId === null) {
+      return
+    }
+
+    const stillExists = filteredRows.some((row) => row.id === selectedEventId)
+    if (!stillExists) {
+      setSelectedEventId(null)
+    }
+  }, [filteredRows, selectedEventId])
 
   const handleFilterChange = (filterId: string, value: string) => {
     setFilters((current) => ({ ...current, [filterId]: value }))
@@ -243,9 +304,37 @@ export default function VegetationTablePage() {
     setFilters({
       query: '',
       fieldId: '',
+      stageCode: '',
       status: 'active',
     })
   }
+
+  const handleDeleteEvent = async (event: VegetationRow) => {
+    const confirmed = window.confirm(
+      `Soll der Phaenologieeintrag "${formatStage(event)}" fuer "${event.fieldName}" am ${formatDate(event.date)} wirklich geloescht werden?`,
+    )
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await api.delete(`/phenology-events/${event.id}`)
+      setSelectedEventId(null)
+      notifyDataChanged()
+    } catch (error) {
+      console.error(`Error deleting phenology event ${event.id}`, error)
+      setErrorMessage('Der Phaenologieeintrag konnte nicht geloescht werden.')
+    }
+  }
+
+  const editAction = useMemo(
+    () => buildPhenologyEditAction(editingEvent),
+    [editingEvent],
+  )
+  const editInitialValues = useMemo(
+    () => buildPhenologyEditInitialValues(editingEvent),
+    [editingEvent],
+  )
 
   return (
     <section className="w-full max-w-7xl">
@@ -266,7 +355,7 @@ export default function VegetationTablePage() {
               className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
             >
               <IoMdAdd />
-              Phänologie
+              Phaenologie
             </button>
             <div className="border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
               {filteredRows.length} / {rows.length} Eintraege
@@ -274,7 +363,41 @@ export default function VegetationTablePage() {
           </div>
         </div>
 
-        <div className="mt-8">
+        <div ref={interactiveAreaRef} className="mt-8">
+          {selectedEvent ? (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border border-slate-200 bg-slate-50 px-4 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Ausgewaehlter Eintrag
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {selectedEvent.fieldName} am {formatDate(selectedEvent.date)}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {selectedEvent.sectionName} | {formatStage(selectedEvent)}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingEvent(selectedEvent)}
+                  className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-500"
+                >
+                  <GoPencil />
+                  Bearbeiten
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteEvent(selectedEvent)}
+                  className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
+                >
+                  <PiTrashBold />
+                  Loeschen
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {isLoading ? (
             <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
               Lade Vegetationsdaten...
@@ -288,10 +411,12 @@ export default function VegetationTablePage() {
               columns={columns}
               rows={filteredRows}
               getRowKey={(row) => row.id}
-              emptyMessage="Keine Abschnitte gefunden."
+              emptyMessage="Keine Phaenologieeintraege gefunden."
               filters={tableFilters}
               onFilterChange={handleFilterChange}
               onResetFilters={handleResetFilters}
+              selectedRowKey={selectedEventId}
+              onRowSelect={(row) => setSelectedEventId(row?.id ?? null)}
             />
           )}
         </div>
@@ -301,6 +426,12 @@ export default function VegetationTablePage() {
         action={phenologyCreateAction}
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
+      />
+      <CreateEntityModal
+        action={editAction}
+        isOpen={editingEvent !== null}
+        initialValues={editInitialValues}
+        onClose={() => setEditingEvent(null)}
       />
     </section>
   )

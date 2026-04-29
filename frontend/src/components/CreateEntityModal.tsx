@@ -5,7 +5,7 @@ import api from '../api'
 import GroupedFieldSelector from './GroupedFieldSelector'
 import { notifyDataChanged } from '../lib/dataEvents'
 import { getApiErrorMessage, getBulkMutationMessage } from '../lib/apiErrors'
-import type { FieldRead, PhenologicalStageDefinition, VarietyRead } from '../types/generated/api'
+import type { FieldDetailRead, FieldRead, PhenologicalStageDefinition, VarietyRead } from '../types/generated/api'
 import {
   type CreateActionConfig,
   type CreateActionField,
@@ -83,6 +83,19 @@ function buildFieldOptions(fields: FieldRead[]): FieldOption[] {
   }))
 }
 
+function buildSectionOptions(fieldDetails: FieldDetailRead[]): FieldOption[] {
+  return fieldDetails.flatMap((fieldDetail) =>
+    fieldDetail.plantings.flatMap((planting) =>
+      planting.sections.map((section) => ({
+        value: String(section.id),
+        label: [fieldDetail.field.group, fieldDetail.field.name, planting.variety, section.name]
+          .filter((part) => String(part).trim() !== '')
+          .join(' | '),
+      })),
+    ),
+  )
+}
+
 function buildVarietyOptions(
   varieties: VarietyRead[],
   { includeEmpty = false }: { includeEmpty?: boolean } = {},
@@ -112,6 +125,7 @@ function buildPhenologicalStageOptions(stages: PhenologicalStageDefinition[]): F
 function getSelectOptions(
   field: CreateActionField,
   fieldOptions: readonly FieldOption[],
+  sectionOptions: readonly FieldOption[],
   varietyOptions: readonly FieldOption[],
   optionalVarietyOptions: readonly FieldOption[],
   phenologicalStageOptions: readonly FieldOption[],
@@ -122,6 +136,9 @@ function getSelectOptions(
 
   if (field.optionsSource === 'fields') {
     return fieldOptions
+  }
+  if (field.optionsSource === 'sections') {
+    return sectionOptions
   }
   if (field.optionsSource === 'varieties') {
     return varietyOptions
@@ -164,6 +181,7 @@ export default function CreateEntityModal({
   const hasManualIrrigationAmountRef = useRef(false)
   const [fields, setFields] = useState<FieldRead[]>([])
   const [fieldOptions, setFieldOptions] = useState<FieldOption[]>([])
+  const [sectionOptions, setSectionOptions] = useState<FieldOption[]>([])
   const [varietyOptions, setVarietyOptions] = useState<FieldOption[]>([])
   const [optionalVarietyOptions, setOptionalVarietyOptions] = useState<FieldOption[]>([])
   const [phenologicalStageOptions, setPhenologicalStageOptions] = useState<FieldOption[]>([])
@@ -202,6 +220,7 @@ export default function CreateEntityModal({
     hasManualIrrigationAmountRef.current = false
     setFields([])
     setFieldOptions([])
+    setSectionOptions([])
     setVarietyOptions([])
     setOptionalVarietyOptions([])
     setPhenologicalStageOptions([])
@@ -230,6 +249,7 @@ export default function CreateEntityModal({
         const options = getSelectOptions(
           field,
           fieldOptions,
+          sectionOptions,
           varietyOptions,
           optionalVarietyOptions,
           phenologicalStageOptions,
@@ -244,7 +264,7 @@ export default function CreateEntityModal({
 
       return changed ? nextValues : currentValues
     })
-  }, [action, fieldOptions, isOpen, optionalVarietyOptions, phenologicalStageOptions, varietyOptions])
+  }, [action, fieldOptions, isOpen, optionalVarietyOptions, phenologicalStageOptions, sectionOptions, varietyOptions])
 
   useEffect(() => {
     if (!isOpen) {
@@ -267,6 +287,12 @@ export default function CreateEntityModal({
         const nextFields = needsFieldCatalog || dynamicOptionSources.has('fields')
           ? (await api.get<FieldRead[]>('/fields')).data
           : []
+        const sectionFieldDetails = dynamicOptionSources.has('sections')
+          ? await Promise.all(
+              (nextFields.length > 0 ? nextFields : (await api.get<FieldRead[]>('/fields')).data)
+                .map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
+            )
+          : []
         const nextVarietyOptions = dynamicOptionSources.has('varieties')
           ? buildVarietyOptions(varietiesData)
           : []
@@ -276,6 +302,7 @@ export default function CreateEntityModal({
 
         setFields(nextFields)
         setFieldOptions(buildFieldOptions(nextFields))
+        setSectionOptions(buildSectionOptions(sectionFieldDetails.map((response) => response.data)))
         setVarietyOptions(nextVarietyOptions)
         setOptionalVarietyOptions(nextOptionalVarietyOptions)
         setPhenologicalStageOptions(buildPhenologicalStageOptions(phenologicalStagesData))
@@ -453,6 +480,8 @@ export default function CreateEntityModal({
       const options =
         field.optionsSource === 'fields'
           ? fieldOptions
+          : field.optionsSource === 'sections'
+            ? sectionOptions
           : field.optionsSource === 'varieties'
             ? varietyOptions
             : field.optionsSource === 'varietiesOptional'

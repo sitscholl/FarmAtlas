@@ -83,7 +83,7 @@ export type CreateActionField =
       id: string
       label: string
       type: 'select'
-      optionsSource?: 'fields' | 'varieties' | 'varietiesOptional' | 'phenologicalStages'
+      optionsSource?: 'fields' | 'sections' | 'varieties' | 'varietiesOptional' | 'phenologicalStages'
       options?: readonly FieldOption[]
       defaultValue?: string | number
       required?: boolean

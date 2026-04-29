@@ -2,7 +2,7 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
+  // Legend,
   Line,
   ReferenceLine,
   ResponsiveContainer,
