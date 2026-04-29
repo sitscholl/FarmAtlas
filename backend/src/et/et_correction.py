@@ -374,24 +374,12 @@ class ETCorrection:
         if not sections:
             return self.to_series(target_index)
 
-        weights = pd.Series(
-            [max(float(section.area), 0.0) for section in sections],
-            index=[section.id for section in sections],
-            dtype=float,
-        )
-        if weights.sum() <= 0:
-            weights = pd.Series(1.0, index=weights.index, dtype=float)
-        weights = weights / weights.sum()
-
-        weighted = pd.Series(0.0, index=pd.date_range(start_ts, end_ts, freq="D"), dtype=float, name="kc")
-        if start_ts.tzinfo is not None and weighted.index.tz is None:
-            weighted.index = weighted.index.tz_localize(start_ts.tzinfo)
-
+        section_series: list[pd.Series] = []
         for section in sections:
-            section_kc = self._section_daily_series(section, start_ts, end_ts)
-            weighted = weighted.add(section_kc * weights.loc[section.id], fill_value=0.0)
+            section_series.append(self._section_daily_series(section, start_ts, end_ts))
 
-        return weighted.reindex(target_index).rename("kc")
+        max_kc = pd.concat(section_series, axis=1).max(axis=1).rename("kc")
+        return max_kc.reindex(target_index).rename("kc")
 
     def apply_to(
         self,

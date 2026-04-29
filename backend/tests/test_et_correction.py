@@ -97,6 +97,40 @@ class ETCorrectionTests(unittest.TestCase):
         )
         self.assertGreater(float(sliced_forecast.iloc[0]), 0.657)
 
+    def test_field_kc_uses_maximum_section_kc(self) -> None:
+        early_section = SimpleNamespace(
+            id=1,
+            active=True,
+            area=1.0,
+            phenology=[
+                SimpleNamespace(date=pd.Timestamp("2026-04-01").date(), stage_code="FRUIT_SET"),
+            ],
+        )
+        late_section = SimpleNamespace(
+            id=2,
+            active=True,
+            area=1.0,
+            phenology=[
+                SimpleNamespace(date=pd.Timestamp("2026-05-20").date(), stage_code="FRUIT_SET"),
+            ],
+        )
+        index = pd.date_range("2026-06-20", "2026-06-22", freq="D")
+
+        field_kc = self.corrector.to_field_series(
+            index,
+            SimpleNamespace(sections=[early_section, late_section]),
+        )
+        section_kc = pd.concat(
+            [
+                self.corrector.to_field_series(index, SimpleNamespace(sections=[early_section])),
+                self.corrector.to_field_series(index, SimpleNamespace(sections=[late_section])),
+            ],
+            axis=1,
+        ).max(axis=1).rename("kc")
+
+        pd.testing.assert_series_equal(field_kc, section_kc)
+        self.assertEqual(float(field_kc.iloc[0]), 1.013)
+
 
 if __name__ == "__main__":
     unittest.main()
