@@ -40,6 +40,37 @@ def _align_timestamp_timezone(ts: pd.Timestamp | None, tzinfo) -> pd.Timestamp |
     return ts.tz_convert(tzinfo)
 
 
+def _apply_kc_period(kc: pd.Series, period: Mapping[str, object]) -> None:
+    mask = (kc.index >= period["start"]) & (kc.index < period["end"])
+    period_index = kc.index[mask]
+    if len(period_index) == 0:
+        return
+
+    if period["kind"] == "linear":
+        full_period_index = pd.date_range(
+            pd.Timestamp(period["start"]),
+            pd.Timestamp(period["end"]) - pd.Timedelta(days=1),
+            freq="D",
+        )
+        if len(full_period_index) == 1:
+            kc.loc[mask] = float(period["start_value"])
+            return
+
+        full_period_values = pd.Series(
+            np.linspace(
+                float(period["start_value"]),
+                float(period["end_value"]),
+                len(full_period_index),
+            ),
+            index=full_period_index,
+            dtype=float,
+        )
+        kc.loc[mask] = full_period_values.reindex(period_index)
+        return
+
+    kc.loc[mask] = float(period["value"])
+
+
 @dataclass(frozen=True)
 class KcPeriod:
     name: str
@@ -187,24 +218,7 @@ class ETCorrection:
 
         for year in range(start_ts.year, end_ts.year + 1):
             for period in self._resolve_periods_for_year(year, tzinfo=daily_index.tz):
-                mask = (kc.index >= period["start"]) & (kc.index < period["end"])
-                period_index = kc.index[mask]
-                if period["kind"] == "linear":
-                    if len(period_index) == 1:
-                        kc.loc[mask] = float(period["start_value"])
-                    elif len(period_index) > 1:
-                        kc.loc[mask] = pd.Series(
-                            np.linspace(
-                                float(period["start_value"]),
-                                float(period["end_value"]),
-                                len(period_index),
-                            ),
-                            index=period_index,
-                            dtype=float,
-                        )
-                    continue
-
-                kc.loc[mask] = float(period["value"])
+                _apply_kc_period(kc, period)
 
         return kc
 
@@ -340,24 +354,7 @@ class ETCorrection:
 
         for year in range(start.year, end.year + 1):
             for period in self._resolve_periods_for_section(section, year, tzinfo=daily_index.tz):
-                mask = (kc.index >= period["start"]) & (kc.index < period["end"])
-                period_index = kc.index[mask]
-                if period["kind"] == "linear":
-                    if len(period_index) == 1:
-                        kc.loc[mask] = float(period["start_value"])
-                    elif len(period_index) > 1:
-                        kc.loc[mask] = pd.Series(
-                            np.linspace(
-                                float(period["start_value"]),
-                                float(period["end_value"]),
-                                len(period_index),
-                            ),
-                            index=period_index,
-                            dtype=float,
-                        )
-                    continue
-
-                kc.loc[mask] = float(period["value"])
+                _apply_kc_period(kc, period)
 
         return kc
 
