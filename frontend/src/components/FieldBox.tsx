@@ -84,7 +84,7 @@ function FieldBoxContent({
     metric.value < metric.criticalBelow
 
   return (
-    <div className="group relative overflow-visible border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 sm:p-6">
+    <div className="group relative z-0 overflow-visible border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 hover:z-50 focus-within:z-50 sm:p-6">
       {to ? (
         <Link
           to={to}
@@ -118,8 +118,8 @@ function FieldBoxContent({
           <span>{stageLabel}</span>
           {stageTooltipContent ? (
             <>
-              <div className="absolute left-0 top-full z-30 hidden h-2 w-80 max-w-[calc(100vw-3rem)] group-hover/stage:block" />
-              <div className="pointer-events-auto absolute left-0 top-full z-30 mt-2 hidden w-80 max-w-[calc(100vw-3rem)] border border-slate-200 bg-white p-3 text-left text-xs font-normal text-slate-700 opacity-0 shadow-xl transition duration-150 group-hover/stage:block group-hover/stage:opacity-100">
+              <div className="absolute left-0 top-full z-40 hidden h-2 w-80 max-w-[calc(100vw-3rem)] group-hover/stage:block" />
+              <div className="pointer-events-auto absolute left-0 top-full z-50 mt-2 hidden w-80 max-w-[calc(100vw-3rem)] border border-slate-200 bg-white p-3 text-left text-xs font-normal text-slate-700 opacity-0 shadow-xl transition duration-150 group-hover/stage:block group-hover/stage:opacity-100">
                 {stageTooltipContent}
               </div>
             </>
