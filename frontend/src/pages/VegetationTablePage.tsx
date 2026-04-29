@@ -214,9 +214,7 @@ export default function VegetationTablePage() {
             .slice()
             .sort((left, right) => left.name.localeCompare(right.name, 'de-DE'))
             .map((field) => ({
-              label: [field.group, field.name]
-                .filter((part) => String(part).trim() !== '')
-                .join(' | '),
+              label: field.name,
               value: String(field.id),
             })),
         ],
