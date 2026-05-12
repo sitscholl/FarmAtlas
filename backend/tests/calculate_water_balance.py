@@ -13,6 +13,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from src.field import FieldContext
+from src.database import models
 from src.runtime import RuntimeContext, load_config_file
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,9 @@ logger = logging.getLogger(__name__)
 def build_runtime(temp_db_path: Path) -> RuntimeContext:
     config = load_config_file(BACKEND_ROOT / "config.example.yaml")
     config["database"] = {"path": f"sqlite:///{temp_db_path.as_posix()}"}
-    return RuntimeContext(config=config)
+    runtime = RuntimeContext(config=config)
+    models.Base.metadata.create_all(runtime.db.engine)
+    return runtime
 
 
 def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: int) -> list[FieldContext]:
@@ -37,6 +40,7 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "planting_year": 1900,
             "reference_provider": provider,
             "reference_station": station_id,
+            "elevation": 0.0,
             "soil_type": "sandiger lehm",
             "soil_weight": "leicht",
             "humus_pct": 2.2,
@@ -51,6 +55,7 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
             "planting_year": 1900,
             "reference_provider": provider,
             "reference_station": station_id,
+            "elevation": 0.0,
             "soil_type": "lehm",
             "soil_weight": "mittel",
             "humus_pct": 1.8,
@@ -64,18 +69,49 @@ def seed_fields(runtime: RuntimeContext, provider: str, station_id: str, year: i
     follow_up_date = start_date + timedelta(days=4)
 
     for spec in field_specs:
+        field_values = {
+            key: spec[key]
+            for key in (
+                "group",
+                "name",
+                "reference_provider",
+                "reference_station",
+                "elevation",
+                "soil_type",
+                "soil_weight",
+                "humus_pct",
+                "effective_root_depth_cm",
+                "p_allowable",
+            )
+        }
         with runtime.db.session_scope() as session:
-            field_model = runtime.db.fields.create(session, **spec)
+            field_model = runtime.db.fields.create(session, **field_values)
+            planting = runtime.db.plantings.create(
+                session,
+                field_id=field_model.id,
+                variety=spec["variety"],
+                valid_from=pd.Timestamp(f"{spec['planting_year']}-01-01").date(),
+            )
+            runtime.db.sections.create(
+                session,
+                planting_id=planting.id,
+                name=field_model.name,
+                planting_year=spec["planting_year"],
+                area=spec["area"],
+                valid_from=pd.Timestamp(f"{spec['planting_year']}-01-01").date(),
+            )
         runtime.db.irrigation_service.create(
             field_id=field_model.id,
             date=start_date,
             method="drip",
+            duration=1.0,
             amount=18.0,
         )
         runtime.db.irrigation_service.create(
             field_id=field_model.id,
             date=follow_up_date,
             method="drip",
+            duration=1.0,
             amount=10.0,
         )
 
@@ -103,7 +139,7 @@ def main() -> None:
                 station_id,
                 year,
             )
-            populated_fields = runtime.run_workflow_for_fields(
+            workflow_results = runtime.run_workflow_for_fields(
                 workflow_name="water_balance",
                 field_ids=[field.id for field in fields],
                 year=year,
@@ -111,13 +147,16 @@ def main() -> None:
                 forecast_days=forecast_days
             )
 
-            for field in populated_fields:
-                print(f"\n=== {field.name} ===")
-                print("Soil water estimate:", field.soil_water_estimate)
-                if field.water_balance is None or field.water_balance.empty:
+            for result in workflow_results:
+                print(f"\n=== {result.field_name} ===")
+                if result.warnings:
+                    print("Warnings:", [warning.message for warning in result.warnings])
+                if result.errors:
+                    print("Errors:", [error.message for error in result.errors])
+                if result.result is None or result.result.empty:
                     print("No water-balance output produced.")
                     continue
-                print(field.water_balance.tail())
+                print(result.result.tail())
         finally:
             runtime.db.close()
 

@@ -379,6 +379,20 @@ export type WaterBalanceSeriesPoint = {
   model: string | null
 }
 
+export type WaterBalanceSeriesResponse = {
+  workflow_name: string
+  field_id: number
+  field_name?: string | null
+  status: string
+  ok: boolean
+  warnings?: Array<WorkflowWarningRead>
+  errors?: Array<WorkflowErrorRead>
+  metadata?: {
+  [key: string]: unknown
+}
+  data?: Array<WaterBalanceSeriesPoint>
+}
+
 export type WaterBalanceSummary = {
   field_id: number
   as_of: string | null
@@ -388,4 +402,22 @@ export type WaterBalanceSummary = {
   readily_available_water: number | null
   below_raw: boolean | null
   safe_ratio: number | null
+}
+
+export type WorkflowErrorRead = {
+  message: string
+  code?: string | null
+  exception_type?: string | null
+  details?: {
+  [key: string]: unknown
+}
+  fatal?: boolean
+}
+
+export type WorkflowWarningRead = {
+  message: string
+  code?: string | null
+  details?: {
+  [key: string]: unknown
+}
 }

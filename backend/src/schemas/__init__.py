@@ -19,7 +19,8 @@ from .phenology import (
 from .planting import PlantingCreate, PlantingDetailRead, PlantingRead, PlantingUpdate
 from .section import SectionCreate, SectionRead, SectionUpdate
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
-from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSummary
+from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSeriesResponse, WaterBalanceSummary
+from .workflow import WorkflowErrorRead, WorkflowFieldResponseBase, WorkflowWarningRead
 
 __all__ = [
     "CadastralParcelRead",
@@ -54,5 +55,9 @@ __all__ = [
     "VarietyRead",
     "VarietyUpdate",
     "WaterBalanceSeriesPoint",
+    "WaterBalanceSeriesResponse",
     "WaterBalanceSummary",
+    "WorkflowErrorRead",
+    "WorkflowFieldResponseBase",
+    "WorkflowWarningRead",
 ]

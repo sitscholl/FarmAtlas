@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -13,6 +14,7 @@ from .field import FieldContext
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
+from .workflows.base import WorkflowFieldResult
 from .workflows.water_balance import WaterBalanceWorkflow
 
 logger = logging.getLogger(__name__)
@@ -148,7 +150,7 @@ class RuntimeContext:
         workflow_name: str,
         field_ids: list[int] | None = None,
         **kwargs,
-    ) -> list[FieldContext]:
+    ) -> list[WorkflowFieldResult[Any]]:
         fields = self.get_fields_by_ids(field_ids)
         workflow = self.workflows.get(workflow_name)
         return workflow.run(fields=fields, **kwargs)
@@ -158,7 +160,7 @@ class RuntimeContext:
         workflow_name: str,
         field_id: int,
         **kwargs,
-    ) -> FieldContext | None:
+    ) -> WorkflowFieldResult[Any] | None:
         results = self.run_workflow_for_fields(
             workflow_name=workflow_name,
             field_ids=[field_id],

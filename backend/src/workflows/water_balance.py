@@ -181,14 +181,6 @@ class WaterBalanceWorkflow(BaseWorkflow):
                 f"Field {field.name} is missing required soil parameters: {', '.join(missing_soil_parameters)}"
             )
 
-        if field.soil_water_estimate is None:
-            field.soil_water_estimate = estimate_available_water_storage_capacity(
-                soil_type=field.soil_type,
-                soil_weight=field.soil_weight,
-                humus_pct=field.humus_pct,
-                effective_root_depth_cm=field.effective_root_depth_cm,
-            )
-
         data = station_data.sort_index().copy()
         if "precipitation" not in data.columns:
             raise KeyError("Station data must contain a 'precipitation' column.")
@@ -207,7 +199,13 @@ class WaterBalanceWorkflow(BaseWorkflow):
 
         incoming = precip + irrigation
         net = incoming - evap
-        available_water_storage = field.soil_water_estimate.nfk_total_mm
+        soil_water_estimate = estimate_available_water_storage_capacity(
+            soil_type=field.soil_type,
+            soil_weight=field.soil_weight,
+            humus_pct=field.humus_pct,
+            effective_root_depth_cm=field.effective_root_depth_cm,
+        )
+        available_water_storage = soil_water_estimate.nfk_total_mm
 
         soil_water_content: list[float] = []
         current_water_content = available_water_storage if initial_storage is None else max(0.0, min(available_water_storage, initial_storage))
@@ -347,12 +345,6 @@ class WaterBalanceWorkflow(BaseWorkflow):
                     status="skipped",
                 )
 
-            field.soil_water_estimate = estimate_available_water_storage_capacity(
-                soil_type=field.soil_type,
-                soil_weight=field.soil_weight,
-                humus_pct=field.humus_pct,
-                effective_root_depth_cm=field.effective_root_depth_cm,
-            )
             with self.db.session_scope() as session:
                 irrigation_events = self.db.irrigation.list(
                     session,

@@ -22,9 +22,13 @@ from ..schemas import (
     SectionRead,
     VarietyRead,
     WaterBalanceSeriesPoint,
+    WaterBalanceSeriesResponse,
     WaterBalanceSummary,
+    WorkflowErrorRead,
+    WorkflowWarningRead,
 )
 from ..field import FieldContext
+from ..workflows.base import WorkflowFieldResult
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +259,49 @@ def serialize_forecast_water_balance(dataframe: pd.DataFrame) -> list[WaterBalan
         )
         for _, row in series.iterrows()
     ]
+
+
+def serialize_workflow_result_messages(
+    result: WorkflowFieldResult,
+) -> tuple[list[WorkflowWarningRead], list[WorkflowErrorRead]]:
+    warnings = [
+        WorkflowWarningRead(
+            message=warning.message,
+            code=warning.code,
+            details=warning.details,
+        )
+        for warning in result.warnings
+    ]
+    errors = [
+        WorkflowErrorRead(
+            message=error.message,
+            code=error.code,
+            exception_type=error.exception_type,
+            details=error.details,
+            fatal=error.fatal,
+        )
+        for error in result.errors
+    ]
+    return warnings, errors
+
+
+def serialize_water_balance_workflow_result(
+    result: WorkflowFieldResult[pd.DataFrame],
+) -> WaterBalanceSeriesResponse:
+    warnings, errors = serialize_workflow_result_messages(result)
+    dataframe = result.result
+    data = [] if dataframe is None or dataframe.empty else serialize_forecast_water_balance(dataframe)
+    return WaterBalanceSeriesResponse(
+        workflow_name=result.workflow_name,
+        field_id=result.field_id,
+        field_name=result.field_name,
+        status=result.status or "skipped",
+        ok=result.ok,
+        warnings=warnings,
+        errors=errors,
+        metadata=result.metadata,
+        data=data,
+    )
 
 
 def get_water_balance_summary_for_field(field_id: int) -> WaterBalanceSummary:

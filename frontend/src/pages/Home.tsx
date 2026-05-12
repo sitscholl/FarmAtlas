@@ -18,6 +18,7 @@ import {
   type FieldDetailRead,
   type FieldSummaryRead,
   type WaterBalanceSeriesPoint,
+  type WaterBalanceSeriesResponse,
 } from '../types/generated/api'
 
 const FORECAST_DAYS = 5
@@ -36,6 +37,7 @@ type FieldMetricDefinition = {
 type WaterBalanceModalState = {
   field: FieldSummaryRead
   data: WaterBalanceSeriesPoint[]
+  workflowMessages: string[]
   isLoading: boolean
   errorMessage: string | null
 }
@@ -301,7 +303,16 @@ function WaterBalanceModal({
               {state.errorMessage}
             </div>
           ) : (
-            <WaterBalanceChart data={state.data} reservedForecastDays={FORECAST_DAYS} />
+            <div className="space-y-3">
+              {state.workflowMessages.length > 0 ? (
+                <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {state.workflowMessages.map((message) => (
+                    <div key={message}>{message}</div>
+                  ))}
+                </div>
+              ) : null}
+              <WaterBalanceChart data={state.data} reservedForecastDays={FORECAST_DAYS} />
+            </div>
           )}
         </div>
       </div>
@@ -406,28 +417,36 @@ export default function Home() {
     setWaterBalanceModal({
       field,
       data: [],
+      workflowMessages: [],
       isLoading: true,
       errorMessage: null,
     })
 
     try {
-      const response = await api.get<WaterBalanceSeriesPoint[]>(
+      const response = await api.get<WaterBalanceSeriesResponse>(
         `/fields/${field.id}/water-balance/series`,
         {
           params: { forecast_days: FORECAST_DAYS },
         },
       )
+      const workflowMessages = [
+        ...(response.data.warnings ?? []).map((warning) => warning.message),
+        ...(response.data.errors ?? []).map((error) => error.message),
+      ]
+      const data = response.data.data ?? []
       setWaterBalanceModal({
         field,
-        data: response.data,
+        data,
+        workflowMessages,
         isLoading: false,
-        errorMessage: response.data.length === 0 ? 'Keine Wasserbilanzdaten vorhanden.' : null,
+        errorMessage: data.length === 0 && workflowMessages.length === 0 ? 'Keine Wasserbilanzdaten vorhanden.' : null,
       })
     } catch (error) {
       console.error(`Error fetching water balance for field ${field.id}`, error)
       setWaterBalanceModal({
         field,
         data: [],
+        workflowMessages: [],
         isLoading: false,
         errorMessage: 'Die Wasserbilanz konnte nicht geladen werden.',
       })

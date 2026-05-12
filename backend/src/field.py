@@ -1,11 +1,8 @@
 from datetime import date
 from dataclasses import dataclass
 
-import pandas as pd
-
 from .database.models import Field
 from .domain.phenology import get_phenological_stage
-from .water_content import SoilWaterEstimate
 
 
 def _unique_non_null(values: list[object]) -> list[object]:
@@ -103,8 +100,6 @@ class FieldContext:
     valve_open: bool
     plantings: list[PlantingContext]
     sections: list[SectionContext]
-    soil_water_estimate: SoilWaterEstimate | None = None
-    water_balance: pd.DataFrame | None = None
 
     @classmethod
     def from_model(cls, field_model: Field) -> "FieldContext":

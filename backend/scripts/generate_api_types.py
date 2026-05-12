@@ -22,7 +22,12 @@ def _ref_name(schema: dict[str, Any]) -> str:
     return ref.rsplit("/", 1)[-1]
 
 
-def _schema_to_ts(schema: dict[str, Any]) -> str:
+def _schema_to_ts(schema: dict[str, Any] | bool) -> str:
+    if schema is True:
+        return "unknown"
+    if schema is False:
+        return "never"
+
     if "$ref" in schema:
         return _ref_name(schema)
 

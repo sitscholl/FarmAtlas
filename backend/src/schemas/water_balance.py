@@ -1,6 +1,8 @@
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from .workflow import WorkflowFieldResponseBase
 
 
 class WaterBalanceSummary(BaseModel):
@@ -30,3 +32,7 @@ class WaterBalanceSeriesPoint(BaseModel):
     below_raw: bool | None
     value_type: str | None
     model: str | None
+
+
+class WaterBalanceSeriesResponse(WorkflowFieldResponseBase):
+    data: list[WaterBalanceSeriesPoint] = Field(default_factory=list)
