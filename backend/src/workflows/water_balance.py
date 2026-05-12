@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from .base import WorkflowFieldResult, WorkflowWarning, WorkflowError, BaseWorkflow
 from ..database.db import Database
 from ..et.base import ET0Calculator
 from ..et.et_correction import ETCorrection
@@ -33,7 +34,7 @@ def _missing_soil_parameters(field: FieldContext) -> list[str]:
 
 
 @dataclass
-class WaterBalanceWorkflow:
+class WaterBalanceWorkflow(BaseWorkflow):
     db: Database
     meteo_loader: MeteoLoader
     meteo_validator: MeteoValidator
@@ -262,20 +263,7 @@ class WaterBalanceWorkflow:
             data=resampled,
         )
 
-    def _set_cached_water_balance(
-        self,
-        field: FieldContext,
-        context: dict[str, object],
-    ) -> pd.DataFrame | None:
-        cached = self.get_cached_water_balance(
-            field,
-            start=context["season_start_ts"],
-            end=context["cache_end"],
-        )
-        field.water_balance = cached if not cached.empty else None
-        return field.water_balance
-
-    def _run_field(
+    def run_field(
         self,
         field: FieldContext,
         year: int,
@@ -283,72 +271,93 @@ class WaterBalanceWorkflow:
         persist: bool = True,
         station: Station | None = None,
         context: dict[str, object] | None = None,
-    ) -> pd.DataFrame | None:
-        context = context or self._get_field_run_context(field, year, period_end, None)
-        if context is None:
-            return None
+    ) -> WorkflowFieldResult:
 
-        season_start_ts = context["season_start_ts"]
-        start_ts = context["start_ts"]
-        initial_storage = context["initial_storage"]
-        observe_end = context["observe_end"]
-        cache_end = context["cache_end"]
-        if start_ts >= period_end:
-            return self._set_cached_water_balance(field, context)
+        try:
+            context = context or self._get_field_run_context(field, year, period_end, None)
+            if context is None:
+                return None
 
-        if station is None:
-            logger.warning("No meteo station data available for field %s", field.name)
-            return None
-        missing_soil_parameters = _missing_soil_parameters(field)
-        if missing_soil_parameters:
-            logger.warning(
-                "Missing soil parameters for field %s (%s). Skipping water balance",
-                field.name,
-                ", ".join(missing_soil_parameters),
+            season_start_ts = context["season_start_ts"]
+            start_ts = context["start_ts"]
+            initial_storage = context["initial_storage"]
+            observe_end = context["observe_end"]
+            cache_end = context["cache_end"]
+            if start_ts >= period_end:
+                return WorkflowFieldResult(
+                    workflow_name=self.__name__,
+                    field_id = field.id,
+                    result = self.get_cached_water_balance(field, start = season_start_ts, end = cache_end)
+                )
+
+            if station is None:
+                return WorkflowFieldResult(
+                    workflow_name=self.__name__,
+                    field_id = field.id,
+                    warnings=WorkflowWarning(f"No meteo station data available for field {field.name}")
+                )
+
+            missing_soil_parameters = _missing_soil_parameters(field)
+            if missing_soil_parameters:
+                missing_params = ', '.join(missing_soil_parameters)
+                return WorkflowFieldResult(
+                    workflow_name=self.__name__,
+                    field_id = field.id,
+                    warnings=WorkflowWarning(f"Missing soil parameters for field {field.name} ({missing_params}). Skipping water balance")
+                )
+
+            field.soil_water_estimate = estimate_available_water_storage_capacity(
+                soil_type=field.soil_type,
+                soil_weight=field.soil_weight,
+                humus_pct=field.humus_pct,
+                effective_root_depth_cm=field.effective_root_depth_cm,
             )
-            return None
+            with self.db.session_scope() as session:
+                irrigation_events = self.db.irrigation.list(
+                    session,
+                    field_id=field.id,
+                    start=pd.Timestamp(f"{year}-1-1").date(),
+                ) or []
+            field_irrigation = FieldIrrigation.from_list(irrigation_events)
+            station.data = self.et_corrector.apply_to_field(station.data, "et0", field)
+            water_balance = self.calculate_water_balance(
+                field=field,
+                station_data=station.data,
+                field_irrigation=field_irrigation,
+                initial_storage=initial_storage,
+            )
 
-        field.soil_water_estimate = estimate_available_water_storage_capacity(
-            soil_type=field.soil_type,
-            soil_weight=field.soil_weight,
-            humus_pct=field.humus_pct,
-            effective_root_depth_cm=field.effective_root_depth_cm,
-        )
-        with self.db.session_scope() as session:
-            irrigation_events = self.db.irrigation.list(
-                session,
-                field_id=field.id,
-                start=pd.Timestamp(f"{year}-1-1").date(),
-            ) or []
-        field_irrigation = FieldIrrigation.from_list(irrigation_events)
-        station.data = self.et_corrector.apply_to_field(station.data, "et0", field)
-        water_balance = self.calculate_water_balance(
-            field=field,
-            station_data=station.data,
-            field_irrigation=field_irrigation,
-            initial_storage=initial_storage,
-        )
+            if persist:
+                observed_water_balance = water_balance.loc[water_balance.index < observe_end]
+                if not observed_water_balance.empty:
+                    with self.db.session_scope() as session:
+                        self.db.water_balance.add(
+                            session,
+                            self.db.engine,
+                            observed_water_balance,
+                            field_id=field.id,
+                        )
+                cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
+                forecast_water_balance = water_balance.loc[water_balance.index >= observe_end]
+                if cached.empty:
+                    field.water_balance = water_balance
+                elif forecast_water_balance.empty:
+                    field.water_balance = cached
+                else:
+                    field.water_balance = pd.concat([cached, forecast_water_balance]).sort_index()
 
-        if persist:
-            observed_water_balance = water_balance.loc[water_balance.index < observe_end]
-            if not observed_water_balance.empty:
-                with self.db.session_scope() as session:
-                    self.db.water_balance.add(
-                        session,
-                        self.db.engine,
-                        observed_water_balance,
-                        field_id=field.id,
-                    )
-            cached = self.get_cached_water_balance(field, start=season_start_ts, end=cache_end)
-            forecast_water_balance = water_balance.loc[water_balance.index >= observe_end]
-            if cached.empty:
-                field.water_balance = water_balance
-            elif forecast_water_balance.empty:
-                field.water_balance = cached
-            else:
-                field.water_balance = pd.concat([cached, forecast_water_balance]).sort_index()
-
-        return field.water_balance
+            return WorkflowFieldResult(
+                workflow_name = self.__name__,
+                field_id = field.id,
+                result = field.water_balance
+            )
+        except Exception as e:
+            logger.exception("Water balance calculation failed for field: %s)", field.name)
+            return WorkflowFieldResult(
+                workflow_name=self.__name__,
+                field_id = field.id,
+                errors = WorkflowError(message = str(e), traceback = e)
+            )
 
     def run(
         self,
@@ -356,7 +365,7 @@ class WaterBalanceWorkflow:
         year: int | None = None,
         persist: bool = True,
         forecast_days: int = 0,
-    ) -> list[FieldContext]:
+    ) -> list[WorkflowFieldResult]:
         if year is None:
             year = pd.Timestamp.now(tz=self.timezone).year
 
@@ -364,96 +373,106 @@ class WaterBalanceWorkflow:
 
         field_contexts: dict[int, dict[str, object]] = {}
         fields_by_station: dict[str, list[FieldContext]] = {}
+        field_results = []
 
         for field in fields:
-            try:
-                context = self._get_field_run_context(field, year, observe_end, forecast_end)
-                if context is None:
-                    continue
-                field_contexts[field.id] = context
-                if forecast_end is None and context["start_ts"] >= observe_end:
-                    self._run_field(
-                        field=field,
-                        year=year,
-                        period_end=observe_end,
-                        persist=persist,
-                        context=context,
-                    )
-                    continue
+            context = self._get_field_run_context(field, year, observe_end, forecast_end)
+            if context is None:
+                continue
+            field_contexts[field.id] = context
+            if forecast_end is None and context["start_ts"] >= observe_end:
+                field_result = self.run_field(
+                    field=field,
+                    year=year,
+                    period_end=observe_end,
+                    persist=persist,
+                    context=context,
+                )
+                field_results.append(field_result)
+                continue
 
-                fields_by_station.setdefault((field.reference_provider, field.reference_station), []).append(field)
-            except Exception:
-                logger.exception("Water balance calculation failed for field %s", field.name)
+            fields_by_station.setdefault((field.reference_provider, field.reference_station), []).append(field)
 
         for (provider, station_id), station_fields in fields_by_station.items():
+            station_start = min(field_contexts[field.id]["start_ts"] for field in station_fields)
+            
+            meteo_data = None
             try:
-                station_start = min(field_contexts[field.id]["start_ts"] for field in station_fields)
-                meteo_data = None
-                try:
-                    if station_start < observe_end:
-                        meteo_data = self.meteo_loader.query(
-                            provider=provider,
-                            station_ids=[station_id],
-                            start=station_start,
-                            end=observe_end,
-                        )
-                except Exception:
-                    logger.exception("Error getting observed meteo data for station %s", station_id)
-                    meteo_data = None
-
-                if forecast_end is not None:
-                    try:
-                        forecast_meteo_data = self.meteo_loader.query(
-                            provider=self.forecast_provider,
-                            station_ids=[station_id],
-                            start=max(station_start, observe_end),
-                            end=forecast_end,
-                        )
-                        if meteo_data is None:
-                            meteo_data = forecast_meteo_data
-                        else:
-                            meteo_data = meteo_data.combine(forecast_meteo_data)
-                    except Exception:
-                        logger.exception("Error getting forecast meteo data for station %s", station_id)
-
-                if meteo_data is None:
-                    logger.warning("No meteo data available for station %s", station_id)
-                    for field in station_fields:
-                        self._set_cached_water_balance(field, field_contexts[field.id])
-                    continue
-
-                logger.debug("Meteo query completed for station %s", station_id)
-                meteo_data = self.meteo_validator.validate(meteo_data)
-                logger.debug("Meteo validation completed for station %s", station_id)
-                station = meteo_data.get_station_data(station_id)
-                if station is None:
-                    logger.warning("No meteo station data available for station %s", station_id)
-                    for field in station_fields:
-                        self._set_cached_water_balance(field, field_contexts[field.id])
-                    continue
-
-                station = self._prepare_station_data(station)
-                logger.debug("Station preparation completed for station %s", station_id)
-                et_data = self.et_calculator.calculate(station, correct=False)
-                logger.debug("ET calculation completed for station %s", station_id)
-                station.data = station.data.join(et_data)
-
-                for field in station_fields:
-                    context = field_contexts[field.id]
-                    field_station = self._build_station(
-                        station,
-                        start=context["start_ts"],
-                        end=forecast_end or observe_end,
-                    )
-                    self._run_field(
-                        field=field,
-                        year=year,
-                        period_end=forecast_end or observe_end,
-                        persist=persist,
-                        station=field_station,
-                        context=context,
+                if station_start < observe_end:
+                    meteo_data = self.meteo_loader.query(
+                        provider=provider,
+                        station_ids=[station_id],
+                        start=station_start,
+                        end=observe_end,
                     )
             except Exception:
-                field_names = ", ".join(field.name for field in station_fields)
-                logger.exception("Water balance calculation failed for station %s (fields: %s)", station_id, field_names)
-        return fields
+                logger.exception("Error getting observed meteo data for station %s", station_id)
+                meteo_data = None
+
+            if forecast_end is not None:
+                try:
+                    forecast_meteo_data = self.meteo_loader.query(
+                        provider=self.forecast_provider,
+                        station_ids=[station_id],
+                        start=max(station_start, observe_end),
+                        end=forecast_end,
+                    )
+                    if meteo_data is None:
+                        meteo_data = forecast_meteo_data
+                    else:
+                        meteo_data = meteo_data.combine(forecast_meteo_data)
+                except Exception:
+                    logger.exception("Error getting forecast meteo data for station %s", station_id)
+
+            if meteo_data is None:
+                logger.warning("No meteo data available for station %s", station_id)
+                for field in station_fields:
+                    field_result = WorkflowFieldResult(
+                        workflow_name = self.__name__,
+                        field_id = field.id,
+                        result = self.get_cached_water_balance(field),
+                        warnings = WorkflowWarning(message = f"No meteo data available for station {station_id}")
+                    )
+                    field_results.append(field_result)
+                continue
+
+            logger.debug("Meteo query completed for station %s", station_id)
+            meteo_data = self.meteo_validator.validate(meteo_data)
+            logger.debug("Meteo validation completed for station %s", station_id)
+            station = meteo_data.get_station_data(station_id)
+            if station is None:
+                logger.warning("No meteo station data available for station %s", station_id)
+                for field in station_fields:
+                    field_result = WorkflowFieldResult(
+                        workflow_name = self.__name__,
+                        field_id = field.id,
+                        result = self.get_cached_water_balance(field),
+                        warnings = WorkflowWarning(message = f"No meteo station data available for station {station_id}")
+                    )
+                    field_results.append(field_result)
+                continue
+
+            station = self._prepare_station_data(station)
+            logger.debug("Station preparation completed for station %s", station_id)
+            et_data = self.et_calculator.calculate(station, correct=False)
+            logger.debug("ET calculation completed for station %s", station_id)
+            station.data = station.data.join(et_data)
+
+            for field in station_fields:
+                context = field_contexts[field.id]
+                field_station = self._build_station(
+                    station,
+                    start=context["start_ts"],
+                    end=forecast_end or observe_end,
+                )
+                field_result = self.run_field(
+                    field=field,
+                    year=year,
+                    period_end=forecast_end or observe_end,
+                    persist=persist,
+                    station=field_station,
+                    context=context,
+                )
+                field_results.append(field_result)
+        
+        return field_results

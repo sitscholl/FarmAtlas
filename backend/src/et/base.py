@@ -18,7 +18,7 @@ class ET0Calculator(ABC):
         pass    
 
     @abstractmethod
-    def calculate(self, data):
+    def calculate(self, data, **kwargs):
         pass
 
     def get_calculator_by_name(name):
