@@ -11,12 +11,12 @@ const statusRank: Record<CropProtectionStatus, number> = {
   ok: 1,
 }
 
-const statusLabels: Record<CropProtectionStatus, string> = {
-  due: 'Faellig',
-  soon: 'Bald',
-  ok: 'OK',
-  missing: 'Offen',
-}
+// const statusLabels: Record<CropProtectionStatus, string> = {
+//   due: 'Faellig',
+//   soon: 'Bald',
+//   ok: 'OK',
+//   missing: 'Offen',
+// }
 
 const statusClasses: Record<CropProtectionStatus, string> = {
   due: 'border-rose-200 bg-rose-50 text-rose-800',
@@ -117,7 +117,6 @@ export default function CropProtectionStatusLayer({
             >
               <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="truncate">{evaluation.rule_name}</span>
-              <span className="shrink-0">{statusLabels[status]}</span>
               <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-72 max-w-[calc(100vw-3rem)] whitespace-pre-line border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 opacity-0 shadow-xl transition group-hover/protection:block group-hover/protection:opacity-100">
                 {buildTooltip(evaluation)}
               </div>
