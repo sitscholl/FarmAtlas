@@ -12,10 +12,12 @@ from .et import ET0Calculator
 from .et.et_correction import ETCorrection
 from .field import FieldContext
 from .field_weather import FieldWeatherCacheService
+from .integrations.smartfarmer import SmartFarmerSettings
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
 from .workflows.base import WorkflowFieldResult
+from .workflows.fetch_treatment_data import FetchTreatmentDataWorkflow
 from .workflows.water_balance import WaterBalanceWorkflow
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,7 @@ def load_config_file(config_file: str | Path) -> dict:
 @dataclass
 class WorkflowCollection:
     water_balance: WaterBalanceWorkflow
+    fetch_treatment_data: FetchTreatmentDataWorkflow
 
     def get(self, workflow_name: str):
         workflow = getattr(self, workflow_name, None)
@@ -106,6 +109,13 @@ class RuntimeContext:
         self.et_corrector = ETCorrection(**config['evapotranspiration']['correction'])
         self.et_calculator = et_calculator_cls()
 
+        config_base_dir = None if self.config_file is None else Path(self.config_file).parent
+        smartfarmer_config = config.get("integrations", {}).get("smartfarmer", {})
+        smartfarmer_settings = SmartFarmerSettings.from_config(
+            smartfarmer_config,
+            base_dir=config_base_dir,
+        )
+
         self.workflows = WorkflowCollection(
             water_balance=WaterBalanceWorkflow(
                 db=self.db,
@@ -116,6 +126,11 @@ class RuntimeContext:
                 timezone=self.timezone,
                 meteo_resampler=self.meteo_resampler,
                 min_sample_size=int(self.min_sample_size),
+            ),
+            fetch_treatment_data=FetchTreatmentDataWorkflow(
+                db=self.db,
+                settings=smartfarmer_settings,
+                timezone=self.timezone,
             ),
         )
         self.field_weather_service = FieldWeatherCacheService(
@@ -154,15 +169,25 @@ class RuntimeContext:
             raise ValueError(f"Unknown field ids: {missing_ids}")
         return [fields_by_id[field_id] for field_id in field_ids]
 
+    def run_workflow(
+        self,
+        workflow_name: str,
+        field_ids: list[int] | None = None,
+        **kwargs,
+    ):
+        workflow = self.workflows.get(workflow_name)
+        if getattr(workflow, "requires_fields", False):
+            fields = self.get_fields_by_ids(field_ids)
+            return workflow.run(fields=fields, **kwargs)
+        return workflow.run(**kwargs)
+
     def run_workflow_for_fields(
         self,
         workflow_name: str,
         field_ids: list[int] | None = None,
         **kwargs,
     ) -> list[WorkflowFieldResult[Any]]:
-        fields = self.get_fields_by_ids(field_ids)
-        workflow = self.workflows.get(workflow_name)
-        return workflow.run(fields=fields, **kwargs)
+        return self.run_workflow(workflow_name, field_ids=field_ids, **kwargs)
 
     def run_workflow_for_field(
         self,

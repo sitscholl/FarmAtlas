@@ -135,7 +135,7 @@ class WorkflowScheduler:
 
         try:
             await asyncio.to_thread(
-                self.runtime.run_workflow_for_fields,
+                self.runtime.run_workflow,
                 workflow_name=job.workflow_name,
                 **job.run_kwargs,
             )

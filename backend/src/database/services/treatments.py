@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import math
 from io import StringIO
+from collections.abc import Iterable
 from typing import Any
 
 import pandas as pd
@@ -61,11 +62,10 @@ class TreatmentImportService:
         self._core = core
         self._treatments = treatments
 
-    def _parse_csv(self, csv_text: str, *, source: str, season_year: int) -> list[dict[str, Any]]:
-        frame = pd.read_csv(StringIO(csv_text))
+    def _parse_frame(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
         missing_columns = [column for column in CSV_COLUMNS.values() if column not in frame.columns]
         if missing_columns:
-            raise ValueError(f"Treatment CSV is missing required columns: {', '.join(missing_columns)}")
+            raise ValueError(f"Treatment export is missing required columns: {', '.join(missing_columns)}")
 
         parsed_rows: list[dict[str, Any]] = []
         for _, row in frame.iterrows():
@@ -78,8 +78,6 @@ class TreatmentImportService:
                 raise ValueError("Treatment CSV contains an empty Mittel value")
 
             values = {
-                "source": source,
-                "season_year": int(season_year),
                 "date": date_value,
                 "external_section_name": external_section_name,
                 "product_name": product_name,
@@ -88,23 +86,49 @@ class TreatmentImportService:
                 "hl": _parse_optional_float(row[CSV_COLUMNS["hl"]]),
                 "cost": _parse_optional_float(row[CSV_COLUMNS["cost"]]),
             }
-            values["row_hash"] = _row_hash(values)
             parsed_rows.append(values)
         return parsed_rows
 
-    def import_full_season_csv(
+    def _parse_csv(self, csv_text: str) -> list[dict[str, Any]]:
+        return self._parse_frame(pd.read_csv(StringIO(csv_text)))
+
+    def _prepare_records(
+        self,
+        records: Iterable[dict[str, Any]],
+        *,
+        source: str,
+        season_year: int,
+    ) -> list[dict[str, Any]]:
+        prepared_rows: list[dict[str, Any]] = []
+        for record in records:
+            values = dict(record)
+            values["source"] = source
+            values["season_year"] = int(season_year)
+            if not values.get("external_section_name"):
+                raise ValueError("Treatment export contains an empty Anlage value")
+            if not values.get("product_name"):
+                raise ValueError("Treatment export contains an empty Mittel value")
+            values["row_hash"] = values.get("row_hash") or _row_hash(values)
+            prepared_rows.append(values)
+        return prepared_rows
+
+    def import_full_season_records(
         self,
         *,
-        csv_text: str,
+        records: Iterable[dict[str, Any]],
         season_year: int,
         source: str = "legal_export",
     ):
         normalized_source = source.strip() or "legal_export"
-        records = self._parse_csv(csv_text, source=normalized_source, season_year=season_year)
+        prepared_records = self._prepare_records(
+            records,
+            source=normalized_source,
+            season_year=season_year,
+        )
 
         with self._core.session_scope() as session:
             alias_map = self._treatments.get_alias_map(session, source=normalized_source)
-            for record in records:
+            for record in prepared_records:
                 section_id = alias_map.get(record["external_section_name"])
                 record["section_id"] = section_id
                 record["resolution_status"] = "resolved" if section_id is not None else "unresolved"
@@ -113,10 +137,12 @@ class TreatmentImportService:
                 session,
                 source=normalized_source,
                 season_year=season_year,
-                records=records,
+                records=prepared_records,
             )
-            unresolved_count = sum(1 for record in records if record["resolution_status"] == "unresolved")
-            summary = self._treatments.upsert_import_summary(
+            unresolved_count = sum(
+                1 for record in prepared_records if record["resolution_status"] == "unresolved"
+            )
+            return self._treatments.upsert_import_summary(
                 session,
                 source=normalized_source,
                 season_year=season_year,
@@ -124,7 +150,32 @@ class TreatmentImportService:
                 row_count=inserted_count,
                 unresolved_count=unresolved_count,
             )
-            return summary
+
+    def import_full_season_dataframe(
+        self,
+        *,
+        dataframe: pd.DataFrame,
+        season_year: int,
+        source: str = "legal_export",
+    ):
+        return self.import_full_season_records(
+            records=self._parse_frame(dataframe),
+            season_year=season_year,
+            source=source,
+        )
+
+    def import_full_season_csv(
+        self,
+        *,
+        csv_text: str,
+        season_year: int,
+        source: str = "legal_export",
+    ):
+        return self.import_full_season_records(
+            records=self._parse_csv(csv_text),
+            season_year=season_year,
+            source=source,
+        )
 
     def create_alias(self, *, source: str, external_section_name: str, section_id: int):
         normalized_source = source.strip() or "legal_export"

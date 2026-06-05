@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+
+DEFAULT_BASE_URL = "https://app.smartfarmer.it/#/auth/welcome/"
+DEFAULT_USER_DATA_DIR = Path("var/smartfarmer/browser-profile")
+DEFAULT_KEEP_DOWNLOADS = False
+DEFAULT_HEADLESS = True
+DEFAULT_TIMEOUT_SECONDS = 30
+DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 90
+DEFAULT_TIMEZONE_ID = "Europe/Rome"
+DEFAULT_LOCALE = "de-DE"
+DEFAULT_VIEWPORT_WIDTH = 1920
+DEFAULT_VIEWPORT_HEIGHT = 1080
+
+
+def _path_or_none(value: str | Path | None, *, base_dir: Path | None = None) -> Path | None:
+    if value is None or str(value).strip() == "":
+        return None
+    path = Path(value)
+    if not path.is_absolute() and base_dir is not None:
+        path = base_dir / path
+    return path
+
+
+@dataclass(slots=True)
+class SmartFarmerSettings:
+    base_url: str = DEFAULT_BASE_URL
+    username: str | None = None
+    password: str | None = None
+    user_data_dir: Path = DEFAULT_USER_DATA_DIR
+    downloads_dir: Path | None = None
+    keep_downloads: bool = DEFAULT_KEEP_DOWNLOADS
+    headless: bool = DEFAULT_HEADLESS
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    download_timeout_seconds: int = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS
+    timezone_id: str = DEFAULT_TIMEZONE_ID
+    locale: str = DEFAULT_LOCALE
+    viewport_width: int = DEFAULT_VIEWPORT_WIDTH
+    viewport_height: int = DEFAULT_VIEWPORT_HEIGHT
+    record_har_path: Path | None = None
+    selectors: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: dict[str, Any] | None,
+        *,
+        base_dir: Path | None = None,
+    ) -> "SmartFarmerSettings":
+        config = config or {}
+        base_dir = base_dir.resolve() if base_dir is not None else None
+
+        return cls(
+            base_url=str(config.get("base_url", DEFAULT_BASE_URL)),
+            username=config.get("username"),
+            password=config.get("password"),
+            user_data_dir=_path_or_none(
+                config.get("user_data_dir", DEFAULT_USER_DATA_DIR),
+                base_dir=base_dir,
+            )
+            or DEFAULT_USER_DATA_DIR,
+            downloads_dir=_path_or_none(config.get("downloads_dir"), base_dir=base_dir),
+            keep_downloads=bool(config.get("keep_downloads", DEFAULT_KEEP_DOWNLOADS)),
+            headless=bool(config.get("headless", DEFAULT_HEADLESS)),
+            timeout_seconds=int(config.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)),
+            download_timeout_seconds=int(
+                config.get("download_timeout_seconds", DEFAULT_DOWNLOAD_TIMEOUT_SECONDS)
+            ),
+            timezone_id=str(config.get("timezone_id", DEFAULT_TIMEZONE_ID)),
+            locale=str(config.get("locale", DEFAULT_LOCALE)),
+            viewport_width=int(config.get("viewport_width", DEFAULT_VIEWPORT_WIDTH)),
+            viewport_height=int(config.get("viewport_height", DEFAULT_VIEWPORT_HEIGHT)),
+            record_har_path=_path_or_none(config.get("record_har_path"), base_dir=base_dir),
+            selectors=dict(config.get("selectors") or {}),
+        )
+
+    def resolve_username(self) -> str | None:
+        return self.username
+
+    def resolve_password(self) -> str | None:
+        return self.password

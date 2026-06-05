@@ -96,6 +96,7 @@ def _normalize_messages(
 class BaseWorkflow(ABC):
     workflow_name: ClassVar[str | None] = None
     result_class: ClassVar[type[WorkflowFieldResult[Any]]] = WorkflowFieldResult
+    requires_fields: ClassVar[bool] = True
 
     @property
     def name(self) -> str:
