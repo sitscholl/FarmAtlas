@@ -4,6 +4,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, status
 
 from ..schemas import (
+    CropProtectionFieldSummaryRead,
     CropProtectionRuleCreate,
     CropProtectionRuleEvaluationRead,
     CropProtectionRuleRead,
@@ -14,6 +15,13 @@ from .utils import raise_write_http_error, runtime
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/crop-protection", tags=["crop-protection"])
+
+_STATUS_RANK = {
+    "due": 4,
+    "soon": 3,
+    "missing": 2,
+    "ok": 1,
+}
 
 
 def _rule_payload(rule: CropProtectionRuleCreate | CropProtectionRuleUpdate) -> dict:
@@ -92,6 +100,59 @@ async def evaluate_crop_protection_rules(
     except Exception as exc:
         logger.exception("Evaluating crop protection rules failed: %s", exc)
         raise_write_http_error(exc, not_found_prefixes=("Could not find any crop protection rule with id",))
+
+
+@router.get("/field-summaries", response_model=list[CropProtectionFieldSummaryRead])
+async def summarize_crop_protection_by_field(
+    season_year: int | None = None,
+    as_of: date | None = None,
+    include_disabled: bool = False,
+):
+    try:
+        evaluations = runtime.db.crop_protection_service.evaluate_rules(
+            season_year=season_year,
+            as_of=as_of,
+            include_disabled=include_disabled,
+        )
+    except Exception as exc:
+        logger.exception("Summarizing crop protection by field failed: %s", exc)
+        raise_write_http_error(exc)
+
+    groups: dict[int, list] = {}
+    for evaluation in evaluations:
+        groups.setdefault(evaluation.field_id, []).append(evaluation)
+
+    summaries: list[CropProtectionFieldSummaryRead] = []
+    for field_id, field_evaluations in groups.items():
+        sorted_evaluations = sorted(
+            field_evaluations,
+            key=lambda evaluation: _STATUS_RANK.get(evaluation.status, 0),
+            reverse=True,
+        )
+        status_counts: dict[str, int] = {}
+        for evaluation in sorted_evaluations:
+            status_counts[evaluation.status] = status_counts.get(evaluation.status, 0) + 1
+        worst_status = sorted_evaluations[0].status if sorted_evaluations else "missing"
+
+        summaries.append(
+            CropProtectionFieldSummaryRead(
+                field_id=field_id,
+                field_name=sorted_evaluations[0].field_name,
+                status=worst_status,
+                evaluation_count=len(sorted_evaluations),
+                status_counts=status_counts,
+                evaluations=[
+                    CropProtectionRuleEvaluationRead.model_validate(evaluation)
+                    for evaluation in sorted_evaluations
+                ],
+            )
+        )
+
+    return sorted(
+        summaries,
+        key=lambda summary: (_STATUS_RANK.get(summary.status, 0), summary.field_name.lower()),
+        reverse=True,
+    )
 
 
 @router.get("/rules/{rule_id}/evaluations", response_model=list[CropProtectionRuleEvaluationRead])

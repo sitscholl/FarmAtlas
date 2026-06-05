@@ -53,6 +53,9 @@ def _schema_to_ts(schema: dict[str, Any] | bool) -> str:
         required = set(schema.get("required", []))
         additional_properties = schema.get("additionalProperties")
 
+        if not properties and additional_properties is None:
+            return "Record<string, never>"
+
         lines: list[str] = ["{"]
         for property_name, property_schema in properties.items():
             optional = "?" if property_name not in required else ""

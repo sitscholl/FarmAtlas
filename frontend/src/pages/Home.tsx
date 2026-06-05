@@ -10,11 +10,13 @@ import { Link } from 'react-router-dom'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
+import CropProtectionStatusLayer from '../components/CropProtectionStatusLayer'
 import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
 import WaterBalanceChart from '../components/WaterBalanceChart'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
+  type CropProtectionFieldSummaryRead,
   type FieldDetailRead,
   type FieldSummaryRead,
   type WaterBalanceSeriesPoint,
@@ -323,11 +325,13 @@ function WaterBalanceModal({
 export default function Home() {
   const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [phenologyEventsByFieldId, setPhenologyEventsByFieldId] = useState<Record<number, FieldPhenologyEvent[]>>({})
+  const [cropProtectionByFieldId, setCropProtectionByFieldId] = useState<Record<number, CropProtectionFieldSummaryRead>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
   const [waterBalanceModal, setWaterBalanceModal] = useState<WaterBalanceModalState | null>(null)
   const [showOnlyFieldsWithStatus, setShowOnlyFieldsWithStatus] = useState(true)
+  const [cropProtectionFilter, setCropProtectionFilter] = useState<'all' | 'attention'>('all')
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -336,19 +340,31 @@ export default function Home() {
         if (!Array.isArray(response.data)) {
           throw new TypeError('Expected /fields/summary to return an array.')
         }
-        const detailResponses = await Promise.all(
-          response.data.map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
+        const [detailResponses, cropProtectionResponse] = await Promise.all([
+          Promise.all(
+            response.data.map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
+          ),
+          api.get<CropProtectionFieldSummaryRead[]>('/crop-protection/field-summaries'),
+        ])
+        const cropProtectionGroups = cropProtectionResponse.data.reduce<Record<number, CropProtectionFieldSummaryRead>>(
+          (groups, summary) => {
+            groups[summary.field_id] = summary
+            return groups
+          },
+          {},
         )
         setFields(response.data)
         setPhenologyEventsByFieldId(
           buildPhenologyEventsByFieldId(detailResponses.map((detailResponse) => detailResponse.data)),
         )
+        setCropProtectionByFieldId(cropProtectionGroups)
         setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching field summaries', error)
         setErrorMessage('Fields could not be loaded.')
         setFields([])
         setPhenologyEventsByFieldId({})
+        setCropProtectionByFieldId({})
       } finally {
         setIsLoading(false)
       }
@@ -380,12 +396,21 @@ export default function Home() {
         }
 
         if (!showOnlyFieldsWithStatus) {
+          if (cropProtectionFilter === 'all') {
+            return true
+          }
+        } else if (field.water_balance_summary.safe_ratio === null || field.water_balance_summary.safe_ratio === undefined) {
+          return false
+        }
+
+        if (cropProtectionFilter === 'all') {
           return true
         }
 
-        return field.water_balance_summary.safe_ratio !== null && field.water_balance_summary.safe_ratio !== undefined
+        const summary = cropProtectionByFieldId[field.id]
+        return summary?.status === 'due' || summary?.status === 'soon'
       }),
-    [fields, showOnlyFieldsWithStatus],
+    [cropProtectionByFieldId, cropProtectionFilter, fields, showOnlyFieldsWithStatus],
   )
 
   const handleRefreshField = async (field: FieldSummaryRead) => {
@@ -480,7 +505,7 @@ export default function Home() {
 
     return (
       <>
-        <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between border border-slate-200 bg-white">
+        <div className="mt-6 flex flex-col gap-3 border border-slate-200 bg-white p-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
           <label className="flex w-full items-start gap-3 px-4 py-4 text-sm text-slate-700 shadow-sm sm:inline-flex sm:w-auto sm:items-center sm:px-5 sm:py-3">
             <input
               type="checkbox"
@@ -490,6 +515,25 @@ export default function Home() {
             />
             <span className="block font-medium text-slate-900">Nur Anlagen mit Status anzeigen</span>
           </label>
+          <div className="inline-flex border border-slate-200 bg-slate-50 p-1">
+            {[
+              { value: 'all', label: 'Alle' },
+              { value: 'attention', label: 'Faellig/Bald' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setCropProtectionFilter(option.value as 'all' | 'attention')}
+                className={`px-3 py-2 text-sm font-semibold transition ${
+                  cropProtectionFilter === option.value
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {visibleFields.length === 0 ? (
@@ -507,6 +551,9 @@ export default function Home() {
                 stageLabel={field.current_phenology ?? '-'}
                 stageTooltipContent={<FieldPhenologyTooltip events={phenologyEventsByFieldId[field.id]} />}
                 metrics={buildFieldMetrics(field)}
+                detailContent={
+                  <CropProtectionStatusLayer evaluations={cropProtectionByFieldId[field.id]?.evaluations ?? []} />
+                }
                 titleAdornment={
                   field.herbicide_free === true ? (
                     <span

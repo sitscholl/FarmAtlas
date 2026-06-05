@@ -1,4 +1,5 @@
 from .crop_protection import (
+    CropProtectionFieldSummaryRead,
     CropProtectionMetricEvaluationRead,
     CropProtectionRuleCreate,
     CropProtectionRuleEvaluationRead,
@@ -43,6 +44,7 @@ from .workflow import WorkflowErrorRead, WorkflowFieldResponseBase, WorkflowWarn
 
 __all__ = [
     "CadastralParcelRead",
+    "CropProtectionFieldSummaryRead",
     "CropProtectionMetricEvaluationRead",
     "CropProtectionRuleCreate",
     "CropProtectionRuleEvaluationRead",

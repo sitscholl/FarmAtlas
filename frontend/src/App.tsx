@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom'
 
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
+import CropProtectionPage from './pages/CropProtectionPage'
 import FieldDetail from './pages/FieldDetail'
 import FieldsTablePage from './pages/FieldsTablePage'
 import Home from './pages/Home'
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/fields" element={<FieldsTablePage />} />
             <Route path="/irrigation" element={<IrrigationTablePage />} />
+            <Route path="/crop-protection" element={<CropProtectionPage />} />
             <Route path="/vegetation" element={<VegetationTablePage />} />
             <Route path="/nutrients" element={<NutrientsTablePage />} />
             <Route path="/variety" element={<VarietyTablePage />} />

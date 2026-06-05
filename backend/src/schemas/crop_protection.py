@@ -172,3 +172,12 @@ class CropProtectionRuleEvaluationRead(BaseModel):
     metrics: list[CropProtectionMetricEvaluationRead]
 
     model_config = {"from_attributes": True}
+
+
+class CropProtectionFieldSummaryRead(BaseModel):
+    field_id: int
+    field_name: str
+    status: str
+    evaluation_count: int
+    status_counts: dict[str, int]
+    evaluations: list[CropProtectionRuleEvaluationRead]

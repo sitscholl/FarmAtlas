@@ -22,6 +22,7 @@ type FieldBoxProps = {
   to?: string
   actions?: ReactNode
   footerActions?: ReactNode
+  detailContent?: ReactNode
   borderClassName?: string
   titleAdornment?: ReactNode
 }
@@ -36,6 +37,7 @@ function FieldBoxContent({
   to,
   actions,
   footerActions,
+  detailContent,
   titleAdornment,
 }: FieldBoxProps) {
   const contentClasses = to ? 'relative z-10 pointer-events-none' : 'relative'
@@ -153,6 +155,12 @@ function FieldBoxContent({
               </div>
             )
           })}
+        </div>
+      ) : null}
+
+      {detailContent ? (
+        <div className={`${contentClasses} mt-3 border-t border-slate-100 pt-3 pointer-events-auto`}>
+          {detailContent}
         </div>
       ) : null}
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 export type DataTableColumn<Row> = {
   id: string
@@ -56,24 +56,14 @@ export default function DataTable<Row>({
   const [uncontrolledSelectedRowKey, setUncontrolledSelectedRowKey] = useState<
     string | number | null
   >(null)
-  const selectedRowKey =
+  const candidateSelectedRowKey =
     controlledSelectedRowKey !== undefined
       ? controlledSelectedRowKey
       : uncontrolledSelectedRowKey
-
-  useEffect(() => {
-    if (selectedRowKey === null) {
-      return
-    }
-
-    const stillExists = rows.some((row) => getRowKey(row) === selectedRowKey)
-    if (!stillExists) {
-      if (controlledSelectedRowKey === undefined) {
-        setUncontrolledSelectedRowKey(null)
-      }
-      onRowSelect?.(null)
-    }
-  }, [controlledSelectedRowKey, getRowKey, onRowSelect, rows, selectedRowKey])
+  const selectedRowKey =
+    candidateSelectedRowKey !== null && rows.some((row) => getRowKey(row) === candidateSelectedRowKey)
+      ? candidateSelectedRowKey
+      : null
 
   const handleRowSelect = (row: Row) => {
     if (controlledSelectedRowKey === undefined) {

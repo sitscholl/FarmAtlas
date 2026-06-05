@@ -11,6 +11,116 @@ export type CadastralParcelRead = {
   area: number
 }
 
+export type CropProtectionFieldSummaryRead = {
+  field_id: number
+  field_name: string
+  status: string
+  evaluation_count: number
+  status_counts: {
+  [key: string]: number
+}
+  evaluations: Array<CropProtectionRuleEvaluationRead>
+}
+
+export type CropProtectionMetricEvaluationRead = {
+  metric_type: string
+  value: number | number | null
+  threshold: number
+  warning_threshold?: number | null
+  status: string
+}
+
+export type CropProtectionRuleCreate = {
+  name: string
+  target: string
+  enabled?: boolean
+  season_start?: string | null
+  season_end?: string | null
+  logic?: "any" | "all"
+  notes?: string | null
+  product_names: Array<string>
+  scopes: Array<CropProtectionRuleScopeBase>
+  metrics: Array<CropProtectionRuleMetricBase>
+}
+
+export type CropProtectionRuleEvaluationRead = {
+  rule_id: number
+  rule_name: string
+  target: string
+  section_id: number
+  section_name: string
+  field_id: number
+  field_name: string
+  status: string
+  last_treatment_date?: string | null
+  last_treatment_product?: string | null
+  metrics: Array<CropProtectionMetricEvaluationRead>
+}
+
+export type CropProtectionRuleMetricBase = {
+  metric_type: "days_since" | "rain_since" | "gdd_since"
+  enabled?: boolean
+  threshold: number
+  warning_threshold?: number | null
+  metric_config?: {
+  [key: string]: unknown
+}
+}
+
+export type CropProtectionRuleMetricRead = {
+  metric_type: "days_since" | "rain_since" | "gdd_since"
+  enabled?: boolean
+  threshold: number
+  warning_threshold?: number | null
+  metric_config?: {
+  [key: string]: unknown
+}
+  id: number
+}
+
+export type CropProtectionRuleProductRead = {
+  id: number
+  product_name: string
+}
+
+export type CropProtectionRuleRead = {
+  id: number
+  name: string
+  target: string
+  enabled: boolean
+  season_start?: string | null
+  season_end?: string | null
+  logic: "any" | "all"
+  notes?: string | null
+  products: Array<CropProtectionRuleProductRead>
+  scopes: Array<CropProtectionRuleScopeRead>
+  metrics: Array<CropProtectionRuleMetricRead>
+}
+
+export type CropProtectionRuleScopeBase = {
+  scope_type: "field" | "planting" | "section"
+  scope_id: number
+}
+
+export type CropProtectionRuleScopeRead = {
+  scope_type: "field" | "planting" | "section"
+  scope_id: number
+  id: number
+}
+
+export type CropProtectionRuleUpdate = {
+  name: string
+  target: string
+  enabled?: boolean
+  season_start?: string | null
+  season_end?: string | null
+  logic?: "any" | "all"
+  notes?: string | null
+  product_names: Array<string>
+  scopes: Array<CropProtectionRuleScopeBase>
+  metrics: Array<CropProtectionRuleMetricBase>
+}
+
 export type FieldCreate = {
   group: string
   name: string
@@ -99,6 +209,36 @@ export type FieldUpdate = {
   drip_discharge?: number | null
   tree_strip_width?: number | null
   valve_open?: boolean
+}
+
+export type FieldWeatherBulkRefreshResponse = {
+  start: string
+  end: string
+  refreshed: Array<FieldWeatherRefreshResponse>
+  failed_field_ids: Array<number>
+  errors_by_field_id: {
+  [key: string]: string
+}
+  total_upserted_count: number
+}
+
+export type FieldWeatherDailyRead = {
+  date: string
+  field_id: number
+  precipitation: number
+  tmin?: number | null
+  tmax?: number | null
+  tmean?: number | null
+  source_provider: string
+  source_station: string
+  value_type: string
+}
+
+export type FieldWeatherRefreshResponse = {
+  field_id: number
+  start: string
+  end: string
+  upserted_count: number
 }
 
 export type HTTPValidationError = {
@@ -321,13 +461,61 @@ export type SectionUpdate = {
   valid_to?: string | null
 }
 
+export type TreatmentCsvImportResponse = {
+  import_summary: TreatmentImportRead
+  unresolved_external_section_names: Array<string>
+}
+
+export type TreatmentEventRead = {
+  id: number
+  source: string
+  season_year: number
+  date: string
+  external_section_name: string
+  section_id?: number | null
+  product_name: string
+  reason?: string | null
+  dose_per_hl?: number | null
+  hl?: number | null
+  cost?: number | null
+  row_hash: string
+  resolution_status: string
+}
+
+export type TreatmentImportRead = {
+  id: number
+  source: string
+  season_year: number
+  imported_at: string
+  row_count: number
+  unresolved_count: number
+}
+
+export type TreatmentSectionAliasCreate = {
+  source?: string
+  external_section_name: string
+  section_id: number
+}
+
+export type TreatmentSectionAliasRead = {
+  source?: string
+  external_section_name: string
+  section_id: number
+  id: number
+}
+
+export type TreatmentSectionAliasUpdate = {
+  source?: string
+  external_section_name: string
+  section_id: number
+}
+
 export type ValidationError = {
   loc: Array<string | number>
   msg: string
   type: string
   input?: unknown
-  ctx?: {
-}
+  ctx?: Record<string, never>
 }
 
 export type VarietyCreate = {
