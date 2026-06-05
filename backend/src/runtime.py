@@ -11,6 +11,7 @@ from .database.settings import get_database_url
 from .et import ET0Calculator
 from .et.et_correction import ETCorrection
 from .field import FieldContext
+from .field_weather import FieldWeatherCacheService
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
@@ -116,6 +117,14 @@ class RuntimeContext:
                 meteo_resampler=self.meteo_resampler,
                 min_sample_size=int(self.min_sample_size),
             ),
+        )
+        self.field_weather_service = FieldWeatherCacheService(
+            db=self.db,
+            meteo_loader=self.meteo_loader,
+            meteo_validator=self.meteo_validator,
+            meteo_resampler=self.meteo_resampler,
+            timezone=self.timezone,
+            min_sample_size=int(self.min_sample_size),
         )
 
     def update_runtime(self, config_file: str | Path):

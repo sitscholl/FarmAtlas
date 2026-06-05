@@ -4,6 +4,7 @@ from .nutrients import NutrientRequirementService
 from .phenology_events import PhenologyEventService
 from .plantings import PlantingService
 from .sections import SectionService
+from .treatments import TreatmentImportService
 
 __all__ = [
     "FieldService",
@@ -12,4 +13,5 @@ __all__ = [
     "PhenologyEventService",
     "PlantingService",
     "SectionService",
+    "TreatmentImportService",
 ]

@@ -5,12 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .fields import router as fields_router
+from .field_weather import router as field_weather_router
 from .frontend import router as frontend_router
 from .irrigation import router as irrigation_router
 from .nutrients import router as nutrients_router
 from .phenology import router as phenology_router
 from .plantings import router as plantings_router
 from .sections import router as sections_router
+from .treatments import router as treatments_router
 from .utils import frontend_assets_dir, lifespan, runtime
 from .varieties import router as varieties_router
 from .water_balance import router as water_balance_router
@@ -56,8 +58,10 @@ app.include_router(varieties_router)
 app.include_router(nutrients_router)
 app.include_router(phenology_router)
 app.include_router(fields_router)
+app.include_router(field_weather_router)
 app.include_router(plantings_router)
 app.include_router(sections_router)
 app.include_router(irrigation_router)
+app.include_router(treatments_router)
 app.include_router(water_balance_router)
 app.include_router(frontend_router)

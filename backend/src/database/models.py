@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     Date,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -72,6 +73,11 @@ class Field(Base):
     )
     water_balance = relationship(
         "WaterBalance",
+        back_populates="field",
+        cascade="all, delete-orphan",
+    )
+    field_weather_daily = relationship(
+        "FieldWeatherDaily",
         back_populates="field",
         cascade="all, delete-orphan",
     )
@@ -173,6 +179,16 @@ class Section(Base, ValidityRangeMixin):
         back_populates="section",
         cascade="all, delete-orphan",
         order_by="SectionPhenologyEvent.date",
+    )
+    treatment_events = relationship(
+        "TreatmentEvent",
+        back_populates="section",
+        cascade="all, delete-orphan",
+    )
+    treatment_aliases = relationship(
+        "TreatmentSectionAlias",
+        back_populates="section",
+        cascade="all, delete-orphan",
     )
 
     @property
@@ -310,6 +326,78 @@ class WaterBalance(Base):
     below_raw = Column(Boolean, nullable=True)
 
     field = relationship("Field", back_populates="water_balance")
+
+
+class FieldWeatherDaily(Base):
+    __tablename__ = "field_weather_daily"
+    __table_args__ = (
+        UniqueConstraint("field_id", "date", name="uq_field_weather_daily_field_date"),
+    )
+
+    date = Column(Date, primary_key=True)
+    field_id = Column(Integer, ForeignKey("fields.id"), primary_key=True)
+    precipitation = Column(Float, nullable=False)
+    tmin = Column(Float, nullable=True)
+    tmax = Column(Float, nullable=True)
+    tmean = Column(Float, nullable=True)
+    source_provider = Column(String, nullable=False)
+    source_station = Column(String, nullable=False)
+    value_type = Column(String, nullable=False, default="observed")
+
+    field = relationship("Field", back_populates="field_weather_daily")
+
+
+class TreatmentImport(Base):
+    __tablename__ = "treatment_imports"
+    __table_args__ = (
+        UniqueConstraint("source", "season_year", name="uq_treatment_imports_source_season"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String, nullable=False)
+    season_year = Column(Integer, nullable=False)
+    imported_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
+    row_count = Column(Integer, nullable=False)
+    unresolved_count = Column(Integer, nullable=False)
+
+
+class TreatmentSectionAlias(Base):
+    __tablename__ = "treatment_section_aliases"
+    __table_args__ = (
+        UniqueConstraint("source", "external_section_name", name="uq_treatment_section_aliases_source_name"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String, nullable=False)
+    external_section_name = Column(String, nullable=False)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
+
+    section = relationship("Section", back_populates="treatment_aliases")
+
+
+class TreatmentEvent(Base):
+    __tablename__ = "treatment_events"
+    __table_args__ = (
+        UniqueConstraint("source", "season_year", "row_hash", name="uq_treatment_events_source_season_hash"),
+        Index("ix_treatment_events_section_date", "section_id", "date"),
+        Index("ix_treatment_events_product", "product_name"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String, nullable=False)
+    season_year = Column(Integer, nullable=False)
+    date = Column(Date, nullable=False)
+    external_section_name = Column(String, nullable=False)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
+    product_name = Column(String, nullable=False)
+    reason = Column(String, nullable=True)
+    dose_per_hl = Column(Float, nullable=True)
+    hl = Column(Float, nullable=True)
+    cost = Column(Float, nullable=True)
+    row_hash = Column(String, nullable=False)
+    resolution_status = Column(String, nullable=False)
+
+    section = relationship("Section", back_populates="treatment_events")
 
 
 class SectionPhenologyEvent(Base):

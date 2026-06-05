@@ -1,4 +1,5 @@
 from .field import CadastralParcelRead, FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, FieldUpdate
+from .field_weather import FieldWeatherDailyRead, FieldWeatherRefreshResponse
 from .irrigation import (
     IrrigationBulkCreate,
     IrrigationBulkResponse,
@@ -18,6 +19,14 @@ from .phenology import (
 )
 from .planting import PlantingCreate, PlantingDetailRead, PlantingRead, PlantingUpdate
 from .section import SectionCreate, SectionRead, SectionUpdate
+from .treatment import (
+    TreatmentCsvImportResponse,
+    TreatmentEventRead,
+    TreatmentImportRead,
+    TreatmentSectionAliasCreate,
+    TreatmentSectionAliasRead,
+    TreatmentSectionAliasUpdate,
+)
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSeriesResponse, WaterBalanceSummary
 from .workflow import WorkflowErrorRead, WorkflowFieldResponseBase, WorkflowWarningRead
@@ -29,6 +38,8 @@ __all__ = [
     "FieldRead",
     "FieldSummaryRead",
     "FieldUpdate",
+    "FieldWeatherDailyRead",
+    "FieldWeatherRefreshResponse",
     "IrrigationBulkCreate",
     "IrrigationBulkResponse",
     "IrrigationBulkUpsertResponse",
@@ -51,6 +62,12 @@ __all__ = [
     "SectionCreate",
     "SectionRead",
     "SectionUpdate",
+    "TreatmentCsvImportResponse",
+    "TreatmentEventRead",
+    "TreatmentImportRead",
+    "TreatmentSectionAliasCreate",
+    "TreatmentSectionAliasRead",
+    "TreatmentSectionAliasUpdate",
     "VarietyCreate",
     "VarietyRead",
     "VarietyUpdate",
