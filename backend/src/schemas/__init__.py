@@ -1,3 +1,13 @@
+from .crop_protection import (
+    CropProtectionMetricEvaluationRead,
+    CropProtectionRuleCreate,
+    CropProtectionRuleEvaluationRead,
+    CropProtectionRuleMetricRead,
+    CropProtectionRuleProductRead,
+    CropProtectionRuleRead,
+    CropProtectionRuleScopeRead,
+    CropProtectionRuleUpdate,
+)
 from .field import CadastralParcelRead, FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, FieldUpdate
 from .field_weather import FieldWeatherDailyRead, FieldWeatherRefreshResponse
 from .irrigation import (
@@ -33,6 +43,14 @@ from .workflow import WorkflowErrorRead, WorkflowFieldResponseBase, WorkflowWarn
 
 __all__ = [
     "CadastralParcelRead",
+    "CropProtectionMetricEvaluationRead",
+    "CropProtectionRuleCreate",
+    "CropProtectionRuleEvaluationRead",
+    "CropProtectionRuleMetricRead",
+    "CropProtectionRuleProductRead",
+    "CropProtectionRuleRead",
+    "CropProtectionRuleScopeRead",
+    "CropProtectionRuleUpdate",
     "FieldCreate",
     "FieldDetailRead",
     "FieldRead",

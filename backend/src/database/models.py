@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     UniqueConstraint,
     text,
@@ -189,6 +190,10 @@ class Section(Base, ValidityRangeMixin):
         "TreatmentSectionAlias",
         back_populates="section",
         cascade="all, delete-orphan",
+    )
+    crop_protection_scopes = relationship(
+        "CropProtectionRuleScope",
+        back_populates="section",
     )
 
     @property
@@ -398,6 +403,102 @@ class TreatmentEvent(Base):
     resolution_status = Column(String, nullable=False)
 
     section = relationship("Section", back_populates="treatment_events")
+
+
+class CropProtectionRule(Base):
+    __tablename__ = "crop_protection_rules"
+    __table_args__ = (
+        CheckConstraint("logic IN ('any', 'all')", name="ck_crop_protection_rules_logic"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    target = Column(String, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    season_start = Column(Date, nullable=True)
+    season_end = Column(Date, nullable=True)
+    logic = Column(String, nullable=False, default="any")
+    notes = Column(String, nullable=True)
+
+    products = relationship(
+        "CropProtectionRuleProduct",
+        back_populates="rule",
+        cascade="all, delete-orphan",
+        order_by="CropProtectionRuleProduct.product_name",
+    )
+    scopes = relationship(
+        "CropProtectionRuleScope",
+        back_populates="rule",
+        cascade="all, delete-orphan",
+    )
+    metrics = relationship(
+        "CropProtectionRuleMetric",
+        back_populates="rule",
+        cascade="all, delete-orphan",
+        order_by="CropProtectionRuleMetric.metric_type",
+    )
+
+
+class CropProtectionRuleProduct(Base):
+    __tablename__ = "crop_protection_rule_products"
+    __table_args__ = (
+        UniqueConstraint("rule_id", "product_name", name="uq_crop_protection_rule_products_rule_product"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    rule_id = Column(Integer, ForeignKey("crop_protection_rules.id"), nullable=False)
+    product_name = Column(String, nullable=False)
+
+    rule = relationship("CropProtectionRule", back_populates="products")
+
+
+class CropProtectionRuleScope(Base):
+    __tablename__ = "crop_protection_rule_scopes"
+    __table_args__ = (
+        CheckConstraint(
+            "(field_id IS NOT NULL) + (planting_id IS NOT NULL) + (section_id IS NOT NULL) = 1",
+            name="ck_crop_protection_rule_scopes_one_scope",
+        ),
+        UniqueConstraint(
+            "rule_id",
+            "field_id",
+            "planting_id",
+            "section_id",
+            name="uq_crop_protection_rule_scopes_rule_scope",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    rule_id = Column(Integer, ForeignKey("crop_protection_rules.id"), nullable=False)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=True)
+    planting_id = Column(Integer, ForeignKey("plantings.id"), nullable=True)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
+
+    rule = relationship("CropProtectionRule", back_populates="scopes")
+    field = relationship("Field")
+    planting = relationship("Planting")
+    section = relationship("Section", back_populates="crop_protection_scopes")
+
+
+class CropProtectionRuleMetric(Base):
+    __tablename__ = "crop_protection_rule_metrics"
+    __table_args__ = (
+        CheckConstraint(
+            "metric_type IN ('days_since', 'rain_since', 'gdd_since')",
+            name="ck_crop_protection_rule_metrics_type",
+        ),
+        UniqueConstraint("rule_id", "metric_type", name="uq_crop_protection_rule_metrics_rule_type"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    rule_id = Column(Integer, ForeignKey("crop_protection_rules.id"), nullable=False)
+    metric_type = Column(String, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    threshold = Column(Float, nullable=False)
+    warning_threshold = Column(Float, nullable=True)
+    metric_config = Column(JSON, nullable=True)
+
+    rule = relationship("CropProtectionRule", back_populates="metrics")
 
 
 class SectionPhenologyEvent(Base):

@@ -1,3 +1,4 @@
+from .crop_protection import CropProtectionService
 from .fields import FieldService
 from .irrigation import IrrigationService
 from .nutrients import NutrientRequirementService
@@ -8,6 +9,7 @@ from .treatments import TreatmentImportService
 
 __all__ = [
     "FieldService",
+    "CropProtectionService",
     "IrrigationService",
     "NutrientRequirementService",
     "PhenologyEventService",

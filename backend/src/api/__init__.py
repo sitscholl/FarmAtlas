@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .crop_protection import router as crop_protection_router
 from .fields import router as fields_router
 from .field_weather import router as field_weather_router
 from .frontend import router as frontend_router
@@ -57,6 +58,7 @@ async def health_check():
 app.include_router(varieties_router)
 app.include_router(nutrients_router)
 app.include_router(phenology_router)
+app.include_router(crop_protection_router)
 app.include_router(fields_router)
 app.include_router(field_weather_router)
 app.include_router(plantings_router)

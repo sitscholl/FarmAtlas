@@ -1,3 +1,4 @@
+from .crop_protection import CropProtectionRepository
 from .fields import FieldRepository
 from .field_weather import FieldWeatherRepository
 from .irrigation import IrrigationRepository
@@ -11,6 +12,7 @@ from .water_balance import WaterBalanceRepository
 
 __all__ = [
     "FieldRepository",
+    "CropProtectionRepository",
     "FieldWeatherRepository",
     "IrrigationRepository",
     "NutrientRequirementRepository",
