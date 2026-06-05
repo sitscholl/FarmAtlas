@@ -413,7 +413,6 @@ class CropProtectionRule(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    target = Column(String, nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
     season_start = Column(Date, nullable=True)
     season_end = Column(Date, nullable=True)

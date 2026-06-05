@@ -84,7 +84,6 @@ class CropProtectionRepository:
         session: Session,
         *,
         name: str,
-        target: str,
         enabled: bool,
         season_start: datetime.date | None,
         season_end: datetime.date | None,
@@ -96,7 +95,6 @@ class CropProtectionRepository:
     ) -> models.CropProtectionRule:
         rule = models.CropProtectionRule(
             name=name.strip(),
-            target=target.strip(),
             enabled=bool(enabled),
             season_start=season_start,
             season_end=season_end,
@@ -114,7 +112,6 @@ class CropProtectionRepository:
         rule_id: int,
         *,
         name: str,
-        target: str,
         enabled: bool,
         season_start: datetime.date | None,
         season_end: datetime.date | None,
@@ -129,12 +126,15 @@ class CropProtectionRepository:
             raise ValueError(f"Could not find any crop protection rule with id {rule_id}")
 
         rule.name = name.strip()
-        rule.target = target.strip()
         rule.enabled = bool(enabled)
         rule.season_start = season_start
         rule.season_end = season_end
         rule.logic = logic.strip().lower()
         rule.notes = None if notes is None or notes.strip() == "" else notes.strip()
+        rule.products.clear()
+        rule.scopes.clear()
+        rule.metrics.clear()
+        session.flush()
         self._replace_children(session, rule, product_names=product_names, scopes=scopes, metrics=metrics)
         session.flush()
         return self.get_by_id(session, rule_id) or rule

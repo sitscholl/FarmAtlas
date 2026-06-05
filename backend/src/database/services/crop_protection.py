@@ -26,7 +26,6 @@ class CropProtectionMetricEvaluation:
 class CropProtectionRuleEvaluation:
     rule_id: int
     rule_name: str
-    target: str
     section_id: int
     section_name: str
     field_id: int
@@ -52,7 +51,6 @@ class CropProtectionService:
         self,
         *,
         name: str,
-        target: str,
         logic: str,
         product_names: list[str],
         scopes: list[dict[str, Any]],
@@ -61,8 +59,6 @@ class CropProtectionService:
     ) -> None:
         if not name.strip():
             raise ValueError("name must not be empty")
-        if not target.strip():
-            raise ValueError("target must not be empty")
         if logic.strip().lower() not in {"any", "all"}:
             raise ValueError("logic must be either 'any' or 'all'")
         if not [product for product in product_names if product.strip()]:
@@ -246,7 +242,6 @@ class CropProtectionService:
                             CropProtectionRuleEvaluation(
                                 rule_id=rule.id,
                                 rule_name=rule.name,
-                                target=rule.target,
                                 section_id=section.id,
                                 section_name=section.name,
                                 field_id=section.field.id,
@@ -283,7 +278,6 @@ class CropProtectionService:
                         CropProtectionRuleEvaluation(
                             rule_id=rule.id,
                             rule_name=rule.name,
-                            target=rule.target,
                             section_id=section.id,
                             section_name=section.name,
                             field_id=section.field.id,

@@ -35,7 +35,6 @@ type RuleFormMetricState = {
 type RuleFormState = {
   id: number | null
   name: string
-  target: string
   enabled: boolean
   logic: 'any' | 'all'
   seasonStart: string
@@ -57,7 +56,6 @@ const emptyMetricInputs: Record<MetricType, RuleFormMetricState> = {
 const emptyRuleForm: RuleFormState = {
   id: null,
   name: '',
-  target: '',
   enabled: true,
   logic: 'any',
   seasonStart: '',
@@ -156,7 +154,6 @@ function buildRuleForm(rule: CropProtectionRuleRead): RuleFormState {
   return {
     id: rule.id,
     name: rule.name,
-    target: rule.target,
     enabled: rule.enabled,
     logic: rule.logic,
     seasonStart: rule.season_start ?? '',
@@ -197,7 +194,6 @@ function buildRulePayload(form: RuleFormState): CropProtectionRuleCreate {
 
   return {
     name: form.name.trim(),
-    target: form.target.trim(),
     enabled: form.enabled,
     logic: form.logic,
     season_start: form.seasonStart || null,
@@ -223,7 +219,7 @@ export default function CropProtectionPage() {
   const [fieldDetails, setFieldDetails] = useState<FieldDetailRead[]>([])
   const [productNames, setProductNames] = useState<string[]>([])
   const [form, setForm] = useState<RuleFormState>(emptyRuleForm)
-  const [selectedScopeKey, setSelectedScopeKey] = useState('')
+  const [selectedScopeKeys, setSelectedScopeKeys] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -260,6 +256,10 @@ export default function CropProtectionPage() {
   }, [])
 
   const scopeOptions = useMemo(() => buildScopeOptions(fieldDetails), [fieldDetails])
+  const sectionScopeOptions = useMemo(
+    () => scopeOptions.filter((option) => option.type === 'section'),
+    [scopeOptions],
+  )
   const scopeLabelsByKey = useMemo(
     () => Object.fromEntries(scopeOptions.map((option) => [option.key, option.label])),
     [scopeOptions],
@@ -284,7 +284,6 @@ export default function CropProtectionPage() {
     { id: 'status', header: 'Status', cell: (row) => statusBadge(row.status) },
     { id: 'field', header: 'Anlage', cell: (row) => row.field_name },
     { id: 'section', header: 'Abschnitt', cell: (row) => row.section_name },
-    { id: 'target', header: 'Ziel', cell: (row) => row.target },
     { id: 'rule', header: 'Regel', cell: (row) => row.rule_name },
     {
       id: 'last',
@@ -308,7 +307,7 @@ export default function CropProtectionPage() {
 
   const handleSelectRule = (rule: CropProtectionRuleRead) => {
     setForm(buildRuleForm(rule))
-    setSelectedScopeKey('')
+    setSelectedScopeKeys([])
   }
 
   const handleNewRule = () => {
@@ -316,22 +315,49 @@ export default function CropProtectionPage() {
       ...emptyRuleForm,
       metricInputs: cloneMetricInputs(emptyMetricInputs),
     })
-    setSelectedScopeKey('')
+    setSelectedScopeKeys([])
   }
 
-  const handleAddScope = () => {
-    const option = scopeOptions.find((candidate) => candidate.key === selectedScopeKey)
-    if (!option) {
-      return
-    }
-    const nextScope = { scope_type: option.type, scope_id: option.id }
-    const exists = form.scopes.some(
-      (scope) => scope.scope_type === nextScope.scope_type && scope.scope_id === nextScope.scope_id,
+  const selectedScopeSet = useMemo(() => new Set(selectedScopeKeys), [selectedScopeKeys])
+  const addedScopeKeySet = useMemo(
+    () => new Set(form.scopes.map((scope) => `${scope.scope_type}-${scope.scope_id}`)),
+    [form.scopes],
+  )
+
+  const handleToggleScopeSelection = (scopeKey: string) => {
+    setSelectedScopeKeys((currentKeys) =>
+      currentKeys.includes(scopeKey)
+        ? currentKeys.filter((key) => key !== scopeKey)
+        : [...currentKeys, scopeKey],
     )
-    if (exists) {
+  }
+
+  const handleSelectAllSections = () => {
+    setSelectedScopeKeys(
+      sectionScopeOptions
+        .map((option) => option.key)
+        .filter((key) => !addedScopeKeySet.has(key)),
+    )
+  }
+
+  const handleAddSelectedScopes = () => {
+    const selectedOptions = sectionScopeOptions.filter((option) => selectedScopeSet.has(option.key))
+    if (selectedOptions.length === 0) {
       return
     }
-    setForm((currentForm) => ({ ...currentForm, scopes: [...currentForm.scopes, nextScope] }))
+
+    setForm((currentForm) => {
+      const currentScopeKeys = new Set(currentForm.scopes.map((scope) => `${scope.scope_type}-${scope.scope_id}`))
+      const nextScopes = selectedOptions
+        .filter((option) => !currentScopeKeys.has(option.key))
+        .map((option) => ({ scope_type: option.type, scope_id: option.id }))
+
+      return {
+        ...currentForm,
+        scopes: [...currentForm.scopes, ...nextScopes],
+      }
+    })
+    setSelectedScopeKeys([])
   }
 
   const handleSaveRule = async () => {
@@ -509,7 +535,7 @@ export default function CropProtectionPage() {
                       <div>
                         <div className="font-semibold text-slate-900">{rule.name}</div>
                         <div className="mt-1 text-sm text-slate-500">
-                          {rule.target} | {rule.products.length} Produkte | {rule.scopes.length} Bereiche
+                          {rule.products.length} Produkte | {rule.scopes.length} Bereiche
                         </div>
                       </div>
                       <span className={`text-xs font-semibold ${rule.enabled ? 'text-emerald-700' : 'text-slate-400'}`}>
@@ -546,14 +572,6 @@ export default function CropProtectionPage() {
                 <input
                   value={form.name}
                   onChange={(event) => setForm((currentForm) => ({ ...currentForm, name: event.target.value }))}
-                  className="mt-2 w-full border border-slate-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700">Ziel</span>
-                <input
-                  value={form.target}
-                  onChange={(event) => setForm((currentForm) => ({ ...currentForm, target: event.target.value }))}
                   className="mt-2 w-full border border-slate-200 px-3 py-2 text-sm"
                 />
               </label>
@@ -610,22 +628,63 @@ export default function CropProtectionPage() {
 
             <div className="mt-4">
               <div className="text-sm font-medium text-slate-700">Bereiche</div>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <select
-                  value={selectedScopeKey}
-                  onChange={(event) => setSelectedScopeKey(event.target.value)}
-                  className="min-w-0 flex-1 border border-slate-200 px-3 py-2 text-sm"
-                >
-                  <option value="">Bereich waehlen</option>
-                  {scopeOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="mt-2 border border-slate-200 bg-slate-50">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Abschnitte waehlen
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllSections}
+                      className="border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700"
+                    >
+                      Alle Auswaehlen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedScopeKeys([])}
+                      className="border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500"
+                    >
+                      Auswahl leeren
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto p-2">
+                  {sectionScopeOptions.length === 0 ? (
+                    <div className="px-3 py-6 text-sm text-slate-500">
+                      Keine Abschnitte verfuegbar.
+                    </div>
+                  ) : (
+                    <div className="grid gap-1">
+                      {sectionScopeOptions.map((option) => {
+                        const alreadyAdded = addedScopeKeySet.has(option.key)
+                        return (
+                          <label
+                            key={option.key}
+                            className={`flex items-start gap-3 px-3 py-2 text-sm ${
+                              alreadyAdded ? 'text-slate-400' : 'text-slate-700 hover:bg-white'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedScopeSet.has(option.key)}
+                              disabled={alreadyAdded}
+                              onChange={() => handleToggleScopeSelection(option.key)}
+                              className="mt-0.5 h-4 w-4"
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 flex justify-end">
                 <button
                   type="button"
-                  onClick={handleAddScope}
+                  onClick={handleAddSelectedScopes}
                   className="inline-flex items-center justify-center gap-1 border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold"
                 >
                   <LuPlus className="h-4 w-4" />

@@ -74,7 +74,6 @@ class CropProtectionRuleMetricRead(CropProtectionRuleMetricBase):
 
 class CropProtectionRulePayload(BaseModel):
     name: str
-    target: str
     enabled: bool = True
     season_start: DateType | None = None
     season_end: DateType | None = None
@@ -84,7 +83,7 @@ class CropProtectionRulePayload(BaseModel):
     scopes: list[CropProtectionRuleScopeBase]
     metrics: list[CropProtectionRuleMetricBase]
 
-    @field_validator("name", "target")
+    @field_validator("name")
     @classmethod
     def _validate_required_text(cls, value: str) -> str:
         normalized = value.strip()
@@ -135,7 +134,6 @@ class CropProtectionRuleUpdate(CropProtectionRulePayload):
 class CropProtectionRuleRead(BaseModel):
     id: int
     name: str
-    target: str
     enabled: bool
     season_start: DateType | None = None
     season_end: DateType | None = None
@@ -161,7 +159,6 @@ class CropProtectionMetricEvaluationRead(BaseModel):
 class CropProtectionRuleEvaluationRead(BaseModel):
     rule_id: int
     rule_name: str
-    target: str
     section_id: int
     section_name: str
     field_id: int

@@ -128,7 +128,6 @@ def main() -> None:
     step("6. Create a crop protection rule", debug=args.debug)
     rule = db.crop_protection_service.create_rule(
         name="Debug scab cover",
-        target="Apfelschorf",
         enabled=True,
         season_start=None,
         season_end=None,

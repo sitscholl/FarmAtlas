@@ -32,7 +32,6 @@ export type CropProtectionMetricEvaluationRead = {
 
 export type CropProtectionRuleCreate = {
   name: string
-  target: string
   enabled?: boolean
   season_start?: string | null
   season_end?: string | null
@@ -46,7 +45,6 @@ export type CropProtectionRuleCreate = {
 export type CropProtectionRuleEvaluationRead = {
   rule_id: number
   rule_name: string
-  target: string
   section_id: number
   section_name: string
   field_id: number
@@ -86,7 +84,6 @@ export type CropProtectionRuleProductRead = {
 export type CropProtectionRuleRead = {
   id: number
   name: string
-  target: string
   enabled: boolean
   season_start?: string | null
   season_end?: string | null
@@ -110,7 +107,6 @@ export type CropProtectionRuleScopeRead = {
 
 export type CropProtectionRuleUpdate = {
   name: string
-  target: string
   enabled?: boolean
   season_start?: string | null
   season_end?: string | null
