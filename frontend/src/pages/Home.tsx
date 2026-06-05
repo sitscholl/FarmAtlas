@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
-import { FiMoreVertical, FiX } from 'react-icons/fi'
+import { FiFilter, FiMoreVertical, FiX } from 'react-icons/fi'
 import { LuArrowDown, LuCalendarDays, LuRadioTower, LuTrees } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
 import { FaArrowRight } from 'react-icons/fa'
@@ -24,6 +24,8 @@ import {
 } from '../types/generated/api'
 
 const FORECAST_DAYS = 5
+
+type HomeFieldFilter = 'crop_attention' | 'crop_due' | 'water_status' | 'missing_crop'
 
 type FieldMetricDefinition = {
   key: string
@@ -89,6 +91,29 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     kind: 'date',
     emptyValueLabel: '-',
     getValue: (field) => field.last_irrigation_date,
+  },
+]
+
+const homeFieldFilters: Array<{ value: HomeFieldFilter; label: string; description: string }> = [
+  {
+    value: 'crop_attention',
+    label: 'Pflanzenschutz faellig oder bald',
+    description: 'Anlagen mit mindestens einer faelligen oder bald faelligen Pflanzenschutzregel.',
+  },
+  {
+    value: 'crop_due',
+    label: 'Nur faellige Pflanzenschutzregeln',
+    description: 'Anlagen mit mindestens einer faelligen Pflanzenschutzregel.',
+  },
+  {
+    value: 'missing_crop',
+    label: 'Pflanzenschutz offen',
+    description: 'Anlagen mit fehlender passender Behandlung oder fehlenden Bewertungsdaten.',
+  },
+  {
+    value: 'water_status',
+    label: 'Wasserbilanz vorhanden',
+    description: 'Anlagen mit berechnetem Wasserbilanzstatus.',
   },
 ]
 
@@ -330,8 +355,8 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
   const [waterBalanceModal, setWaterBalanceModal] = useState<WaterBalanceModalState | null>(null)
-  const [showOnlyFieldsWithStatus, setShowOnlyFieldsWithStatus] = useState(true)
-  const [cropProtectionFilter, setCropProtectionFilter] = useState<'all' | 'attention'>('all')
+  const [activeFilter, setActiveFilter] = useState<HomeFieldFilter | null>(null)
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -395,22 +420,35 @@ export default function Home() {
           return false
         }
 
-        if (!showOnlyFieldsWithStatus) {
-          if (cropProtectionFilter === 'all') {
-            return true
-          }
-        } else if (field.water_balance_summary.safe_ratio === null || field.water_balance_summary.safe_ratio === undefined) {
-          return false
-        }
-
-        if (cropProtectionFilter === 'all') {
+        if (activeFilter === null) {
           return true
         }
 
         const summary = cropProtectionByFieldId[field.id]
-        return summary?.status === 'due' || summary?.status === 'soon'
-      }),
-    [cropProtectionByFieldId, cropProtectionFilter, fields, showOnlyFieldsWithStatus],
+        if (activeFilter === 'crop_attention') {
+          return summary?.status === 'due' || summary?.status === 'soon'
+        }
+        if (activeFilter === 'crop_due') {
+          return summary?.status === 'due'
+        }
+        if (activeFilter === 'missing_crop') {
+          return summary?.status === 'missing'
+        }
+        if (activeFilter === 'water_status') {
+          return field.water_balance_summary.safe_ratio !== null && field.water_balance_summary.safe_ratio !== undefined
+        }
+
+        return true
+      }).sort(function (a, b) {
+          if (a.name < b.name) {
+            return -1;
+          }
+          if (a.name > b.name) {
+            return 1;
+          }
+          return 0;
+        }),
+    [activeFilter, cropProtectionByFieldId, fields],
   )
 
   const handleRefreshField = async (field: FieldSummaryRead) => {
@@ -505,43 +543,70 @@ export default function Home() {
 
     return (
       <>
-        <div className="mt-6 flex flex-col gap-3 border border-slate-200 bg-white p-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex w-full items-start gap-3 px-4 py-4 text-sm text-slate-700 shadow-sm sm:inline-flex sm:w-auto sm:items-center sm:px-5 sm:py-3">
-            <input
-              type="checkbox"
-              checked={showOnlyFieldsWithStatus}
-              onChange={(event) => setShowOnlyFieldsWithStatus(event.target.checked)}
-              className="mt-0.5 h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 sm:mt-0"
-            />
-            <span className="block font-medium text-slate-900">Nur Anlagen mit Status anzeigen</span>
-          </label>
-          <div className="inline-flex border border-slate-200 bg-slate-50 p-1">
-            {[
-              { value: 'all', label: 'Alle' },
-              { value: 'attention', label: 'Faellig/Bald' },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setCropProtectionFilter(option.value as 'all' | 'attention')}
-                className={`px-3 py-2 text-sm font-semibold transition ${
-                  cropProtectionFilter === option.value
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+        <div className="relative mt-6 flex justify-end sm:mt-8">
+          <button
+            type="button"
+            onClick={() => setIsFilterMenuOpen((currentState) => !currentState)}
+            className={`inline-flex items-center gap-2 border px-4 py-2 text-sm font-semibold transition ${
+              activeFilter === null
+                ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                : 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'
+            }`}
+            aria-expanded={isFilterMenuOpen}
+          >
+            <FiFilter className="h-4 w-4" aria-hidden="true" />
+            <span className="max-w-[calc(100vw-6rem)] truncate">
+              {activeFilter === null ? 'Filter' : homeFieldFilters.find((filter) => filter.value === activeFilter)?.label}
+            </span>
+          </button>
+
+          {isFilterMenuOpen ? (
+            <div className="absolute right-0 top-full z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] border border-slate-200 bg-white p-3 text-left shadow-xl">
+              <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Anlagen filtern
+                </div>
+                {activeFilter !== null ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter(null)
+                      setIsFilterMenuOpen(false)
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                  >
+                    Filter loeschen
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid gap-1">
+                {homeFieldFilters.map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter(filter.value)
+                      setIsFilterMenuOpen(false)
+                    }}
+                    className={`px-3 py-2 text-left transition ${
+                      activeFilter === filter.value ? 'bg-sky-50 text-sky-900' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold">{filter.label}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{filter.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {visibleFields.length === 0 ? (
           <div className="mt-6 border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:px-6 sm:py-10">
-            Keine aktiven Anlagen mit Wasserbilanz gefunden.
+            Keine aktiven Anlagen fuer diesen Filter gefunden.
           </div>
         ) : (
-          <div className="mt-6 grid gap-4 pb-80 sm:gap-5">
+          <div className="mt-6 grid grid-cols-1 gap-4 pb-80 sm:gap-5 lg:grid-cols-[repeat(auto-fill,minmax(24rem,1fr))]">
             {visibleFields.map((field) => (
               <FieldBox
                 key={field.id}
@@ -606,7 +671,7 @@ export default function Home() {
   })()
 
   return (
-    <section className="relative max-w-5xl">
+    <section className="relative w-full max-w-7xl">
       <div className="relative px-1 py-2 sm:px-0 lg:p-8">
         <div className="max-w-2xl text-left sm:mx-auto sm:text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">
