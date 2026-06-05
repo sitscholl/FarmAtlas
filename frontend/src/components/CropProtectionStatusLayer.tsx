@@ -45,6 +45,13 @@ const metricLabels: Record<string, string> = {
   gdd_since: 'GDD',
 }
 
+const statusLabels: Record<string, string> = {
+  due: 'Fällig',
+  soon: 'Bald',
+  ok: 'OK',
+  missing: 'Offen',
+}
+
 function normalizeStatus(value: string): CropProtectionStatus {
   if (value === 'due' || value === 'soon' || value === 'ok' || value === 'missing') {
     return value
@@ -155,7 +162,7 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-slate-600">{evaluation.section_name}</span>
                         <span className={`shrink-0 border px-1.5 py-0.5 text-[10px] font-semibold ${statusClasses[normalizeStatus(evaluation.status)]}`}>
-                          {normalizeStatus(evaluation.status)}
+                          {statusLabels[normalizeStatus(evaluation.status)]}
                         </span>
                       </div>
                       <MetricSummary metrics={evaluation.metrics} />
@@ -173,10 +180,8 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
 
 export default function CropProtectionStatusLayer({
   evaluations,
-  maxItems = 4,
 }: {
   evaluations: CropProtectionRuleEvaluationRead[]
-  maxItems?: number
 }) {
   if (evaluations.length === 0) {
     return (
@@ -188,8 +193,6 @@ export default function CropProtectionStatusLayer({
   }
 
   const ruleGroups = groupEvaluationsByRule(evaluations)
-  const visibleRuleGroups = ruleGroups.slice(0, maxItems)
-  const hiddenCount = ruleGroups.length - visibleRuleGroups.length
 
   return (
     <div>
@@ -197,7 +200,7 @@ export default function CropProtectionStatusLayer({
         Pflanzenschutz
       </div>
       <div className="flex flex-wrap gap-2">
-        {visibleRuleGroups.map((ruleGroup) => {
+        {ruleGroups.map((ruleGroup) => {
           const StatusIcon = statusIcons[ruleGroup.status]
 
           return (
@@ -214,11 +217,6 @@ export default function CropProtectionStatusLayer({
             </div>
           )
         })}
-        {hiddenCount > 0 ? (
-          <div className="inline-flex items-center border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500">
-            +{hiddenCount}
-          </div>
-        ) : null}
       </div>
     </div>
   )

@@ -541,7 +541,7 @@ export default function Home() {
             Keine aktiven Anlagen mit Wasserbilanz gefunden.
           </div>
         ) : (
-          <div className="mt-6 grid gap-4 sm:gap-5">
+          <div className="mt-6 grid gap-4 pb-80 sm:gap-5">
             {visibleFields.map((field) => (
               <FieldBox
                 key={field.id}
