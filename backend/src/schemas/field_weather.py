@@ -22,3 +22,12 @@ class FieldWeatherRefreshResponse(BaseModel):
     start: DateType
     end: DateType
     upserted_count: int
+
+
+class FieldWeatherBulkRefreshResponse(BaseModel):
+    start: DateType
+    end: DateType
+    refreshed: list[FieldWeatherRefreshResponse]
+    failed_field_ids: list[int]
+    errors_by_field_id: dict[int, str]
+    total_upserted_count: int
