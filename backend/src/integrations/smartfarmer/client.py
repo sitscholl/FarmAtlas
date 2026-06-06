@@ -226,7 +226,32 @@ class SmartFarmerClient:
             ],
             description=f"Smart Farmer Kalenderjahr {season_year} option",
         )
-        page.wait_for_load_state("networkidle", timeout=45_000)
+        self._wait_for_treatment_report_ready(season_year)
+
+    def _wait_for_treatment_report_ready(self, season_year: int) -> None:
+        logger.info("Waiting for Smart Farmer treatment report %s to render", season_year)
+        selector = self.settings.selectors.get("treatment_report_download_button")
+        candidates = [
+            ("empty", self.page.get_by_text(re.compile(r"Keine passenden Eintr.ge gefunden", re.IGNORECASE))),
+            ("download", self.page.get_by_role("button", name=re.compile(r"download|export", re.IGNORECASE))),
+            ("download", self.page.locator('button[title*="Download" i]')),
+            ("download", self.page.locator('button[title*="Export" i]')),
+            (
+                "download",
+                self.page.locator(
+                    "xpath=/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]"
+                ),
+            ),
+            ("table", self.page.locator("table, [role='table'], [role='grid']").first),
+        ]
+        if selector:
+            candidates.insert(0, ("download", self.page.locator(selector)))
+
+        self._wait_for_first_visible(
+            candidates,
+            description=f"Smart Farmer treatment report for {season_year}",
+            timeout_ms=45_000,
+        )
 
     def _download_treatment_report(self, season_year: int) -> SmartFarmerDownloadedReport:
         if re.search(r"Keine passenden Eintr.ge gefunden", self.page.content()):
