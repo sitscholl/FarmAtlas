@@ -1,13 +1,15 @@
 services:
   farm-atlas:
     image: ghcr.io/sitscholl/farmatlas:latest
+    # If no reverse proxy joins this container's Docker network, expose the app directly:
     # ports:
-    #   - "8080:8080"
+    #   - "8000:8000"
     environment:
       FARMATLAS_CONFIG_PATH: /app/config/config.yaml
       FARMATLAS_LOG_CONFIG_PATH: /app/config/config.logging.yaml
     volumes:
       - ./config:/app/config
       - ./db:/app/db
+      - ./var:/app/var
     restart: unless-stopped
     container_name: farm-atlas

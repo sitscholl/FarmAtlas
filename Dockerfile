@@ -28,8 +28,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV FARMATLAS_CONFIG_PATH=/app/config/config.yaml
 ENV FARMATLAS_LOG_CONFIG_PATH=/app/config/config.logging.yaml
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY --from=backend-builder /usr/local /usr/local
+RUN python -m playwright install --with-deps chromium \
+    && chmod -R 755 /ms-playwright
 COPY backend/ /app/backend/
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
