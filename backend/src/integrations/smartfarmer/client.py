@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class SmartFarmerDownloadedReport:
     content: bytes
     suggested_filename: str | None = None
+    path: Path | None = None
 
 
 class SmartFarmerClient:
@@ -42,12 +43,11 @@ class SmartFarmerClient:
             ) from exc
 
         self.settings.user_data_dir.mkdir(parents=True, exist_ok=True)
-        if self.settings.downloads_dir is not None:
-            self.settings.downloads_dir.mkdir(parents=True, exist_ok=True)
+        download_dir = self._download_dir()
+        download_dir.mkdir(parents=True, exist_ok=True)
         if self.settings.record_har_path is not None:
             self.settings.record_har_path.parent.mkdir(parents=True, exist_ok=True)
-        if self.settings.disable_password_manager:
-            self._disable_password_manager_preferences()
+        self._write_chromium_preferences(download_dir)
 
         self._playwright = sync_playwright().start()
         launch_kwargs = {
@@ -65,8 +65,8 @@ class SmartFarmerClient:
                 "--disable-features=PasswordManagerOnboarding,PasswordLeakDetection,AutofillServerCommunication",
                 "--password-store=basic",
             ]
-        if self.settings.downloads_dir is not None:
-            launch_kwargs["downloads_path"] = str(self.settings.downloads_dir)
+        if download_dir is not None:
+            launch_kwargs["downloads_path"] = str(download_dir)
         if self.settings.record_har_path is not None:
             launch_kwargs["record_har_path"] = str(self.settings.record_har_path)
 
@@ -76,9 +76,13 @@ class SmartFarmerClient:
         )
         self._context.set_default_timeout(self.settings.timeout_seconds * 1000)
         self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
+        self._configure_download_behavior(download_dir)
         return self
 
-    def _disable_password_manager_preferences(self) -> None:
+    def _download_dir(self) -> Path:
+        return self.settings.downloads_dir or self.settings.user_data_dir / "Downloads"
+
+    def _write_chromium_preferences(self, download_dir: Path) -> None:
         preferences_path = self.settings.user_data_dir / "Default" / "Preferences"
         preferences_path.parent.mkdir(parents=True, exist_ok=True)
         preferences = {}
@@ -88,16 +92,48 @@ class SmartFarmerClient:
             except json.JSONDecodeError:
                 logger.warning("Could not parse Chromium preferences at %s", preferences_path)
 
-        preferences["credentials_enable_service"] = False
+        download_preferences = preferences.setdefault("download", {})
+        if isinstance(download_preferences, dict):
+            download_preferences["default_directory"] = str(download_dir.resolve())
+            download_preferences["directory_upgrade"] = True
+            download_preferences["prompt_for_download"] = False
+
+        safebrowsing_preferences = preferences.setdefault("safebrowsing", {})
+        if isinstance(safebrowsing_preferences, dict):
+            safebrowsing_preferences["enabled"] = True
+
         profile_preferences = preferences.setdefault("profile", {})
         if isinstance(profile_preferences, dict):
-            profile_preferences["password_manager_enabled"] = False
-        preferences.setdefault("password_manager", {})["enabled"] = False
+            profile_preferences["default_content_setting_values"] = {
+                **profile_preferences.get("default_content_setting_values", {}),
+                "automatic_downloads": 1,
+            }
+            if self.settings.disable_password_manager:
+                profile_preferences["password_manager_enabled"] = False
+
+        if self.settings.disable_password_manager:
+            preferences["credentials_enable_service"] = False
+            preferences.setdefault("password_manager", {})["enabled"] = False
 
         preferences_path.write_text(
             json.dumps(preferences, separators=(",", ":")),
             encoding="utf-8",
         )
+
+    def _configure_download_behavior(self, download_dir: Path) -> None:
+        if self._context is None or self._page is None:
+            return
+        try:
+            cdp_session = self._context.new_cdp_session(self._page)
+            cdp_session.send(
+                "Page.setDownloadBehavior",
+                {
+                    "behavior": "allow",
+                    "downloadPath": str(download_dir.resolve()),
+                },
+            )
+        except Exception as exc:
+            logger.debug("Could not configure Chromium download behavior: %s", exc)
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         if self._context is not None:
@@ -214,8 +250,8 @@ class SmartFarmerClient:
 
         self._click_first(
             [
-                page.locator('span:has-text("Kalenderjahr")'),
                 page.locator('span:has-text("Erntejahr")'),
+                page.locator('span:has-text("Kalenderjahr")'),
             ],
             description="Smart Farmer year dropdown",
         )
@@ -230,22 +266,11 @@ class SmartFarmerClient:
 
     def _wait_for_treatment_report_ready(self, season_year: int) -> None:
         logger.info("Waiting for Smart Farmer treatment report %s to render", season_year)
-        selector = self.settings.selectors.get("treatment_report_download_button")
         candidates = [
             ("empty", self.page.get_by_text(re.compile(r"Keine passenden Eintr.ge gefunden", re.IGNORECASE))),
-            ("download", self.page.get_by_role("button", name=re.compile(r"download|export", re.IGNORECASE))),
-            ("download", self.page.locator('button[title*="Download" i]')),
-            ("download", self.page.locator('button[title*="Export" i]')),
-            (
-                "download",
-                self.page.locator(
-                    "xpath=/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]"
-                ),
-            ),
+            *[("download", locator) for locator in self._treatment_download_button_candidates()],
             ("table", self.page.locator("table, [role='table'], [role='grid']").first),
         ]
-        if selector:
-            candidates.insert(0, ("download", self.page.locator(selector)))
 
         self._wait_for_first_visible(
             candidates,
@@ -257,42 +282,70 @@ class SmartFarmerClient:
         if re.search(r"Keine passenden Eintr.ge gefunden", self.page.content()):
             raise SmartFarmerError(f"Smart Farmer contains no treatment rows for {season_year}.")
 
-        selector = self.settings.selectors.get("treatment_report_download_button")
-        candidates = []
-        if selector:
-            candidates.append(self.page.locator(selector))
-        candidates.extend(
-            [
-                self.page.get_by_role("button", name=re.compile(r"download|export", re.IGNORECASE)),
-                self.page.locator('button[title*="Download" i]'),
-                self.page.locator('button[title*="Export" i]'),
-                self.page.locator(
-                    "xpath=/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]"
-                ),
-            ]
-        )
+        candidates = self._treatment_download_button_candidates()
 
         logger.info("Downloading Smart Farmer treatment report for %s", season_year)
         try:
             with self.page.expect_download(timeout=self.settings.download_timeout_seconds * 1000) as download_info:
                 self._click_first(candidates, description="Smart Farmer treatment report download button")
             download = download_info.value
-            path = Path(download.path())
-            content = path.read_bytes()
+            failure = download.failure()
+            if failure:
+                raise SmartFarmerError(
+                    "Smart Farmer treatment report download failed in Chromium: "
+                    f"{failure}; suggested_filename={download.suggested_filename!r}"
+                )
+            path, content = self._read_download_content(download)
 
             if self.settings.keep_downloads and self.settings.downloads_dir is not None:
                 target = self.settings.downloads_dir / download.suggested_filename
-                download.save_as(str(target))
-                logger.info("Saved Smart Farmer download to %s", target)
+                if path != target:
+                    download.save_as(str(target))
+                    path = target
+                logger.info("Saved Smart Farmer download to %s", path)
 
             return SmartFarmerDownloadedReport(
                 content=content,
                 suggested_filename=download.suggested_filename,
+                path=path,
             )
         except SmartFarmerError:
             raise
         except Exception as exc:
             raise SmartFarmerError(f"Could not download Smart Farmer treatment report: {exc}") from exc
+
+    def _read_download_content(self, download) -> tuple[Path, bytes]:
+        artifact_path = Path(download.path())
+        if artifact_path.exists() and artifact_path.is_file():
+            return artifact_path, artifact_path.read_bytes()
+
+        suggested_filename = download.suggested_filename
+        if suggested_filename:
+            named_path = self._download_dir() / suggested_filename
+            if named_path.exists() and named_path.is_file():
+                return named_path, named_path.read_bytes()
+
+        raise SmartFarmerError(
+            "Smart Farmer treatment report download completed, but the file could not be read. "
+            f"artifact_path={artifact_path}, suggested_filename={suggested_filename!r}"
+        )
+
+    def _treatment_download_button_candidates(self):
+        selector = self.settings.selectors.get("treatment_report_download_button")
+        candidates = []
+        if selector:
+            candidates.append(self.page.locator(selector))
+        candidates.extend(
+            [
+                self.page.locator(
+                    "xpath=/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]"
+                ),
+                self.page.locator('button[title*="Download" i]'),
+                self.page.locator('button[title*="Export" i]'),
+                self.page.get_by_role("button", name=re.compile(r"download|export", re.IGNORECASE)),
+            ]
+        )
+        return candidates
 
     def _wait_for_first_visible(
         self,

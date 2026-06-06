@@ -87,6 +87,7 @@ def main() -> None:
     with SmartFarmerClient(settings) as client:
         report = client.fetch_treatment_report(args.year)
     print(f"downloaded filename={report.suggested_filename}")
+    print(f"downloaded path={report.path}")
     print(f"downloaded bytes={len(report.content)}")
 
     if args.output is not None:
