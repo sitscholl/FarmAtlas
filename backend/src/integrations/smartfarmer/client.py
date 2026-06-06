@@ -297,12 +297,19 @@ class SmartFarmerClient:
                 )
             path, content = self._read_download_content(download)
 
-            if self.settings.keep_downloads and self.settings.downloads_dir is not None:
+            if (
+                self.settings.keep_downloads
+                and self.settings.downloads_dir is not None
+                and download.suggested_filename
+            ):
                 target = self.settings.downloads_dir / download.suggested_filename
                 if path != target:
                     download.save_as(str(target))
                     path = target
                 logger.info("Saved Smart Farmer download to %s", path)
+            elif not self.settings.keep_downloads:
+                self._cleanup_download_files(download, path)
+                path = None
 
             return SmartFarmerDownloadedReport(
                 content=content,
@@ -329,6 +336,29 @@ class SmartFarmerClient:
             "Smart Farmer treatment report download completed, but the file could not be read. "
             f"artifact_path={artifact_path}, suggested_filename={suggested_filename!r}"
         )
+
+    def _cleanup_download_files(self, download, path: Path | None) -> None:
+        candidates: list[Path] = []
+        if path is not None:
+            candidates.append(path)
+
+        try:
+            artifact_path = Path(download.path())
+            candidates.append(artifact_path)
+        except Exception:
+            pass
+
+        suggested_filename = download.suggested_filename
+        if suggested_filename:
+            candidates.append(self._download_dir() / suggested_filename)
+
+        for candidate in {item.resolve() for item in candidates if item is not None}:
+            try:
+                if candidate.exists() and candidate.is_file():
+                    candidate.unlink()
+                    logger.debug("Deleted temporary Smart Farmer download %s", candidate)
+            except OSError as exc:
+                logger.warning("Could not delete temporary Smart Farmer download %s: %s", candidate, exc)
 
     def _treatment_download_button_candidates(self):
         selector = self.settings.selectors.get("treatment_report_download_button")
