@@ -59,12 +59,24 @@ class SmartFarmerClient:
                 "width": self.settings.viewport_width,
                 "height": self.settings.viewport_height,
             },
+            "args": [
+                f"--window-size={self.settings.viewport_width},{self.settings.viewport_height}",
+                "--disable-infobars",
+                "--disable-popup-blocking",
+                "--disable-session-crashed-bubble",
+                "--hide-crash-restore-bubble",
+                "--no-default-browser-check",
+                "--no-first-run",
+                "--noerrdialogs",
+            ],
         }
         if self.settings.disable_password_manager:
-            launch_kwargs["args"] = [
+            launch_kwargs["args"].extend(
+                [
                 "--disable-features=PasswordManagerOnboarding,PasswordLeakDetection,AutofillServerCommunication",
                 "--password-store=basic",
-            ]
+                ]
+            )
         if download_dir is not None:
             launch_kwargs["downloads_path"] = str(download_dir)
         if self.settings.record_har_path is not None:
@@ -76,6 +88,12 @@ class SmartFarmerClient:
         )
         self._context.set_default_timeout(self.settings.timeout_seconds * 1000)
         self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
+        self._page.set_viewport_size(
+            {
+                "width": self.settings.viewport_width,
+                "height": self.settings.viewport_height,
+            }
+        )
         self._configure_download_behavior(download_dir)
         return self
 
@@ -104,6 +122,8 @@ class SmartFarmerClient:
 
         profile_preferences = preferences.setdefault("profile", {})
         if isinstance(profile_preferences, dict):
+            profile_preferences["exited_cleanly"] = True
+            profile_preferences["exit_type"] = "Normal"
             profile_preferences["default_content_setting_values"] = {
                 **profile_preferences.get("default_content_setting_values", {}),
                 "automatic_downloads": 1,
@@ -247,6 +267,7 @@ class SmartFarmerClient:
             ],
             description="Smart Farmer Liste menu item",
         )
+        self._close_known_popups()
 
         self._click_first(
             [
@@ -397,10 +418,21 @@ class SmartFarmerClient:
 
     def _click_first(self, locators, *, description: str) -> None:
         timeout = min(self.settings.timeout_seconds * 1000, 5_000)
+        last_error: Exception | None = None
         for locator in locators:
+            target = locator.first
             try:
-                locator.first.click(timeout=timeout)
+                target.scroll_into_view_if_needed(timeout=timeout)
+                target.click(timeout=timeout)
                 return
-            except Exception:
+            except Exception as exc:
+                last_error = exc
+
+            try:
+                target.evaluate("(element) => element.click()")
+                return
+            except Exception as exc:
+                last_error = exc
                 continue
-        raise SmartFarmerError(f"Could not click {description}.")
+        detail = "" if last_error is None else f" Last error: {last_error}"
+        raise SmartFarmerError(f"Could not click {description}.{detail}")
