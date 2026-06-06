@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -9,6 +10,8 @@ from ..schemas import (
     TreatmentSectionAliasCreate,
     TreatmentSectionAliasRead,
     TreatmentSectionAliasUpdate,
+    TreatmentSmartFarmerSyncResponse,
+    TreatmentSmartFarmerSyncResult,
 )
 from .utils import raise_write_http_error, runtime
 
@@ -67,6 +70,58 @@ async def import_treatment_csv(
     except Exception as exc:
         logger.exception("Importing treatment CSV failed: %s", exc)
         raise_write_http_error(exc)
+
+
+@router.post("/sync-smartfarmer", response_model=TreatmentSmartFarmerSyncResponse)
+async def sync_smartfarmer_treatments():
+    workflow_config = runtime.config.get("workflows", {}).get("fetch_treatment_data", {})
+    run_kwargs = dict(workflow_config.get("run") or {})
+    try:
+        workflow_results = await asyncio.to_thread(
+            runtime.run_workflow,
+            "fetch_treatment_data",
+            **run_kwargs,
+        )
+    except Exception as exc:
+        logger.exception("Smart Farmer treatment sync failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc) or "Smart Farmer treatment sync failed.") from exc
+
+    results = [
+        TreatmentSmartFarmerSyncResult(
+            workflow_name=result.workflow_name,
+            source=result.source,
+            season_year=result.season_year,
+            status=result.status,
+            row_count=result.row_count,
+            unresolved_count=result.unresolved_count,
+            error=result.error,
+            metadata=result.metadata,
+        )
+        for result in workflow_results
+    ]
+    failed = [result for result in results if result.status == "failed"]
+    warnings = [result for result in results if result.status == "warning"]
+
+    if failed:
+        message = "Smart Farmer sync failed: " + " | ".join(
+            result.error or f"{result.source}/{result.season_year} failed"
+            for result in failed
+        )
+        status_text = "failed"
+    elif warnings:
+        unresolved_count = sum(result.unresolved_count for result in warnings)
+        message = f"Smart Farmer sync completed with {unresolved_count} unresolved section mapping(s)."
+        status_text = "warning"
+    else:
+        row_count = sum(result.row_count for result in results)
+        message = f"Smart Farmer sync completed. Imported {row_count} treatment row(s)."
+        status_text = "success"
+
+    return TreatmentSmartFarmerSyncResponse(
+        status=status_text,
+        message=message,
+        results=results,
+    )
 
 
 @router.get("/products", response_model=list[str])

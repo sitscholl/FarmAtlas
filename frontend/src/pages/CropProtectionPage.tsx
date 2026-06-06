@@ -3,7 +3,7 @@ import { LuPencil, LuPlus, LuRefreshCw, LuShieldAlert, LuTrash2 } from 'react-ic
 
 import api from '../api'
 import DataTable, { type DataTableColumn } from '../components/DataTable'
-import { notifyDataChanged } from '../lib/dataEvents'
+import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
   type CropProtectionRuleCreate,
   type CropProtectionRuleEvaluationRead,
@@ -253,6 +253,15 @@ export default function CropProtectionPage() {
 
   useEffect(() => {
     void fetchData()
+  }, [])
+
+  useEffect(() => {
+    const handleDataChanged = () => {
+      void fetchData()
+    }
+
+    window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged)
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
   }, [])
 
   const scopeOptions = useMemo(() => buildScopeOptions(fieldDetails), [fieldDetails])

@@ -37,6 +37,8 @@ from .treatment import (
     TreatmentSectionAliasCreate,
     TreatmentSectionAliasRead,
     TreatmentSectionAliasUpdate,
+    TreatmentSmartFarmerSyncResponse,
+    TreatmentSmartFarmerSyncResult,
 )
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSeriesResponse, WaterBalanceSummary
@@ -89,6 +91,8 @@ __all__ = [
     "TreatmentSectionAliasCreate",
     "TreatmentSectionAliasRead",
     "TreatmentSectionAliasUpdate",
+    "TreatmentSmartFarmerSyncResponse",
+    "TreatmentSmartFarmerSyncResult",
     "VarietyCreate",
     "VarietyRead",
     "VarietyUpdate",

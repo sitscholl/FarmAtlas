@@ -1,6 +1,7 @@
 from datetime import date as DateType, datetime
+from typing import Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from .base import ORMModel
 
@@ -59,3 +60,20 @@ class TreatmentSectionAliasRead(TreatmentSectionAliasBase, ORMModel):
 class TreatmentCsvImportResponse(BaseModel):
     import_summary: TreatmentImportRead
     unresolved_external_section_names: list[str]
+
+
+class TreatmentSmartFarmerSyncResult(BaseModel):
+    workflow_name: str
+    source: str
+    season_year: int
+    status: str
+    row_count: int = 0
+    unresolved_count: int = 0
+    error: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TreatmentSmartFarmerSyncResponse(BaseModel):
+    status: str
+    message: str
+    results: list[TreatmentSmartFarmerSyncResult]

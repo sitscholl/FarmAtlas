@@ -506,6 +506,25 @@ export type TreatmentSectionAliasUpdate = {
   section_id: number
 }
 
+export type TreatmentSmartFarmerSyncResponse = {
+  status: string
+  message: string
+  results: Array<TreatmentSmartFarmerSyncResult>
+}
+
+export type TreatmentSmartFarmerSyncResult = {
+  workflow_name: string
+  source: string
+  season_year: number
+  status: string
+  row_count?: number
+  unresolved_count?: number
+  error?: string | null
+  metadata?: {
+  [key: string]: unknown
+}
+}
+
 export type ValidationError = {
   loc: Array<string | number>
   msg: string
