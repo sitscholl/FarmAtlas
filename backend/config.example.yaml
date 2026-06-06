@@ -13,6 +13,24 @@ meteo:
     radiation_fallback_provider: province
     radiation_fallback_station: 09700MS
 
+integrations:
+  smartfarmer:
+    base_url: https://app.smartfarmer.it/#/auth/welcome/
+    username: ""
+    password: ""
+    keep_downloads: false
+    headless: true
+    timeout_seconds: 30
+    download_timeout_seconds: 90
+    timezone_id: Europe/Rome
+    locale: de-DE
+    disable_password_manager: true
+    # Useful while investigating whether the export can later be replaced with direct HTTP.
+    # record_har_path: ../var/smartfarmer/smartfarmer.har
+    selectors:
+      # Override this if Smart Farmer changes the export button and the fallback XPath breaks.
+      # treatment_report_download_button: 'button[title*="Export" i]'
+
 resampling:
     freq: D
     min_sample_size: 20
@@ -31,6 +49,15 @@ evapotranspiration:
             - {"name": "Kc_end", "value": 0.835, "start": "31-10", "end": "01-11"} #starts when leaves are falling
 
 workflows:
+  fetch_treatment_data:
+    enabled: false
+    schedule:
+      freq: D
+      time: "04:30"
+    run:
+      years: current
+      source: smartfarmer
+
   water_balance:
     enabled: true
     schedule:
