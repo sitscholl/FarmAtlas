@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import logging
 from pathlib import Path
 import re
+import time
 
 from .config import SmartFarmerSettings
 from .exceptions import SmartFarmerError
@@ -44,6 +46,8 @@ class SmartFarmerClient:
             self.settings.downloads_dir.mkdir(parents=True, exist_ok=True)
         if self.settings.record_har_path is not None:
             self.settings.record_har_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.settings.disable_password_manager:
+            self._disable_password_manager_preferences()
 
         self._playwright = sync_playwright().start()
         launch_kwargs = {
@@ -56,6 +60,11 @@ class SmartFarmerClient:
                 "height": self.settings.viewport_height,
             },
         }
+        if self.settings.disable_password_manager:
+            launch_kwargs["args"] = [
+                "--disable-features=PasswordManagerOnboarding,PasswordLeakDetection,AutofillServerCommunication",
+                "--password-store=basic",
+            ]
         if self.settings.downloads_dir is not None:
             launch_kwargs["downloads_path"] = str(self.settings.downloads_dir)
         if self.settings.record_har_path is not None:
@@ -68,6 +77,27 @@ class SmartFarmerClient:
         self._context.set_default_timeout(self.settings.timeout_seconds * 1000)
         self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
         return self
+
+    def _disable_password_manager_preferences(self) -> None:
+        preferences_path = self.settings.user_data_dir / "Default" / "Preferences"
+        preferences_path.parent.mkdir(parents=True, exist_ok=True)
+        preferences = {}
+        if preferences_path.exists():
+            try:
+                preferences = json.loads(preferences_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                logger.warning("Could not parse Chromium preferences at %s", preferences_path)
+
+        preferences["credentials_enable_service"] = False
+        profile_preferences = preferences.setdefault("profile", {})
+        if isinstance(profile_preferences, dict):
+            profile_preferences["password_manager_enabled"] = False
+        preferences.setdefault("password_manager", {})["enabled"] = False
+
+        preferences_path.write_text(
+            json.dumps(preferences, separators=(",", ":")),
+            encoding="utf-8",
+        )
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         if self._context is not None:
@@ -94,11 +124,19 @@ class SmartFarmerClient:
         page = self.page
         logger.info("Opening Smart Farmer")
         page.goto(self.settings.base_url, wait_until="domcontentloaded")
-        page.wait_for_load_state("networkidle", timeout=self.settings.timeout_seconds * 1000)
 
-        email_input = page.locator('input[type="email"]').first
-        if email_input.count() == 0 or not email_input.is_visible(timeout=2_000):
-            logger.info("Smart Farmer login form not visible; assuming persisted session")
+        state, locator = self._wait_for_first_visible(
+            [
+                ("login", page.locator('input[type="email"]')),
+                ("dashboard", page.get_by_role("button", name=re.compile(r"Berichte", re.IGNORECASE))),
+                ("popup", page.get_by_role("button", name=re.compile(r"sp.ter", re.IGNORECASE))),
+                ("popup", page.get_by_role("button", name=re.compile(r"jetzt nicht", re.IGNORECASE))),
+            ],
+            description="Smart Farmer login form, dashboard, or popup",
+            timeout_ms=self.settings.timeout_seconds * 1000,
+        )
+        if state != "login":
+            logger.info("Smart Farmer login form not visible; using persisted session")
             return
 
         username = self.settings.resolve_username()
@@ -109,7 +147,7 @@ class SmartFarmerClient:
             )
 
         logger.info("Logging into Smart Farmer")
-        email_input.fill(username)
+        locator.fill(username)
         self._click_first(
             [
                 page.get_by_role("button", name=re.compile(r"weiter", re.IGNORECASE)),
@@ -117,7 +155,9 @@ class SmartFarmerClient:
             ],
             description="Smart Farmer email continue button",
         )
-        page.locator('input[type="password"]').first.fill(password)
+        password_input = page.locator('input[type="password"]').first
+        password_input.wait_for(state="visible", timeout=self.settings.timeout_seconds * 1000)
+        password_input.fill(password)
         self._click_first(
             [
                 page.get_by_role("button", name=re.compile(r"login", re.IGNORECASE)),
@@ -128,11 +168,11 @@ class SmartFarmerClient:
         self._wait_for_dashboard()
 
     def _wait_for_dashboard(self) -> None:
-        self._clickable_first(
+        self._wait_for_first_visible(
             [
-                self.page.get_by_role("button", name=re.compile(r"Berichte", re.IGNORECASE)),
-                self.page.get_by_role("button", name=re.compile(r"sp.ter", re.IGNORECASE)),
-                self.page.get_by_role("button", name=re.compile(r"jetzt nicht", re.IGNORECASE)),
+                ("dashboard", self.page.get_by_role("button", name=re.compile(r"Berichte", re.IGNORECASE))),
+                ("popup", self.page.get_by_role("button", name=re.compile(r"sp.ter", re.IGNORECASE))),
+                ("popup", self.page.get_by_role("button", name=re.compile(r"jetzt nicht", re.IGNORECASE))),
             ],
             description="Smart Farmer dashboard or popup",
             timeout_ms=30_000,
@@ -229,14 +269,22 @@ class SmartFarmerClient:
         except Exception as exc:
             raise SmartFarmerError(f"Could not download Smart Farmer treatment report: {exc}") from exc
 
-    def _clickable_first(self, locators, *, description: str, timeout_ms: int | None = None):
-        timeout = timeout_ms or self.settings.timeout_seconds * 1000
-        for locator in locators:
-            try:
-                locator.first.wait_for(state="visible", timeout=timeout)
-                return locator.first
-            except Exception:
-                continue
+    def _wait_for_first_visible(
+        self,
+        candidates,
+        *,
+        description: str,
+        timeout_ms: int,
+    ):
+        deadline = time.monotonic() + timeout_ms / 1000
+        while time.monotonic() < deadline:
+            for name, locator in candidates:
+                try:
+                    if locator.count() > 0 and locator.first.is_visible():
+                        return name, locator.first
+                except Exception:
+                    continue
+            self.page.wait_for_timeout(250)
         raise SmartFarmerError(f"Could not find {description}.")
 
     def _click_first(self, locators, *, description: str) -> None:

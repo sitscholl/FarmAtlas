@@ -15,6 +15,7 @@ DEFAULT_TIMEZONE_ID = "Europe/Rome"
 DEFAULT_LOCALE = "de-DE"
 DEFAULT_VIEWPORT_WIDTH = 1920
 DEFAULT_VIEWPORT_HEIGHT = 1080
+DEFAULT_DISABLE_PASSWORD_MANAGER = True
 
 
 def _path_or_none(value: str | Path | None, *, base_dir: Path | None = None) -> Path | None:
@@ -41,6 +42,7 @@ class SmartFarmerSettings:
     locale: str = DEFAULT_LOCALE
     viewport_width: int = DEFAULT_VIEWPORT_WIDTH
     viewport_height: int = DEFAULT_VIEWPORT_HEIGHT
+    disable_password_manager: bool = DEFAULT_DISABLE_PASSWORD_MANAGER
     record_har_path: Path | None = None
     selectors: dict[str, Any] = field(default_factory=dict)
 
@@ -74,6 +76,9 @@ class SmartFarmerSettings:
             locale=str(config.get("locale", DEFAULT_LOCALE)),
             viewport_width=int(config.get("viewport_width", DEFAULT_VIEWPORT_WIDTH)),
             viewport_height=int(config.get("viewport_height", DEFAULT_VIEWPORT_HEIGHT)),
+            disable_password_manager=bool(
+                config.get("disable_password_manager", DEFAULT_DISABLE_PASSWORD_MANAGER)
+            ),
             record_har_path=_path_or_none(config.get("record_har_path"), base_dir=base_dir),
             selectors=dict(config.get("selectors") or {}),
         )
