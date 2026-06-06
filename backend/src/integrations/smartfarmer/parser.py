@@ -108,7 +108,7 @@ def _read_xlsx_without_styles(content: bytes) -> pd.DataFrame:
             dataframe["Datum"],
             unit="D",
             origin="1899-12-30",
-            errors="ignore",
+            errors="coerce",
         )
 
     return dataframe
@@ -125,15 +125,9 @@ def read_treatment_export(content: bytes, *, filename: str | None = None) -> pd.
 
     if _looks_like_xlsx(content, filename):
         try:
-            return pd.read_excel(BytesIO(content), engine="openpyxl")
+            return _read_xlsx_without_styles(content)
         except Exception as exc:
-            try:
-                return _read_xlsx_without_styles(content)
-            except Exception as fallback_exc:
-                raise SmartFarmerError(
-                    "Could not read Smart Farmer XLSX export with openpyxl or "
-                    f"style-agnostic fallback: openpyxl={exc}; fallback={fallback_exc}"
-                ) from fallback_exc
+            raise SmartFarmerError(f"Could not read Smart Farmer XLSX export: {exc}") from exc
 
     for encoding in ("utf-8-sig", "utf-8", "latin-1"):
         try:
