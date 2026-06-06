@@ -11,6 +11,7 @@ dependencies = [
     "matplotlib>=3.10.7",
     "pandas>=2.3.3",
     "pandera[pandas]>=0.26.1",
+    "playwright>=1.56.0",
     "plotly>=6.4.0",
     "pyet>=1.4.0",
     "pyyaml>=6.0.3",
