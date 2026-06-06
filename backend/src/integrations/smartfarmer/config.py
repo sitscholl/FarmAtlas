@@ -6,7 +6,9 @@ from typing import Any
 
 
 DEFAULT_BASE_URL = "https://app.smartfarmer.it/#/auth/welcome/"
-DEFAULT_USER_DATA_DIR = Path("var/smartfarmer/browser-profile")
+DEFAULT_SMARTFARMER_DIR = Path("var/smartfarmer")
+DEFAULT_USER_DATA_SUBDIR = Path("browser-profile")
+DEFAULT_DOWNLOADS_SUBDIR = Path("downloads")
 DEFAULT_KEEP_DOWNLOADS = False
 DEFAULT_HEADLESS = True
 DEFAULT_TIMEOUT_SECONDS = 30
@@ -27,13 +29,19 @@ def _path_or_none(value: str | Path | None, *, base_dir: Path | None = None) -> 
     return path
 
 
+def _default_storage_dir(base_dir: Path | None) -> Path:
+    if base_dir is None:
+        return DEFAULT_SMARTFARMER_DIR
+    return base_dir.parent / DEFAULT_SMARTFARMER_DIR
+
+
 @dataclass(slots=True)
 class SmartFarmerSettings:
     base_url: str = DEFAULT_BASE_URL
     username: str | None = None
     password: str | None = None
-    user_data_dir: Path = DEFAULT_USER_DATA_DIR
-    downloads_dir: Path | None = None
+    user_data_dir: Path = DEFAULT_SMARTFARMER_DIR / DEFAULT_USER_DATA_SUBDIR
+    downloads_dir: Path = DEFAULT_SMARTFARMER_DIR / DEFAULT_DOWNLOADS_SUBDIR
     keep_downloads: bool = DEFAULT_KEEP_DOWNLOADS
     headless: bool = DEFAULT_HEADLESS
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
@@ -55,17 +63,14 @@ class SmartFarmerSettings:
     ) -> "SmartFarmerSettings":
         config = config or {}
         base_dir = base_dir.resolve() if base_dir is not None else None
+        storage_dir = _default_storage_dir(base_dir)
 
         return cls(
             base_url=str(config.get("base_url", DEFAULT_BASE_URL)),
             username=config.get("username"),
             password=config.get("password"),
-            user_data_dir=_path_or_none(
-                config.get("user_data_dir", DEFAULT_USER_DATA_DIR),
-                base_dir=base_dir,
-            )
-            or DEFAULT_USER_DATA_DIR,
-            downloads_dir=_path_or_none(config.get("downloads_dir"), base_dir=base_dir),
+            user_data_dir=storage_dir / DEFAULT_USER_DATA_SUBDIR,
+            downloads_dir=storage_dir / DEFAULT_DOWNLOADS_SUBDIR,
             keep_downloads=bool(config.get("keep_downloads", DEFAULT_KEEP_DOWNLOADS)),
             headless=bool(config.get("headless", DEFAULT_HEADLESS)),
             timeout_seconds=int(config.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)),
