@@ -248,8 +248,8 @@ export default function CropProtectionStatusLayer({
             >
               <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="truncate">{ruleGroup.ruleName}</span>
-              <div className="absolute left-0 top-full z-40 hidden h-2 w-96 max-w-[calc(100vw-3rem)] group-hover/protection:block" />
-              <div className="pointer-events-auto absolute left-0 top-full z-50 mt-2 hidden w-96 max-w-[calc(100vw-3rem)] border border-slate-200 bg-white p-3 text-left text-xs font-normal text-slate-700 opacity-0 shadow-xl transition duration-150 group-hover/protection:block group-hover/protection:opacity-100">
+              <div className="absolute left-0 top-full z-40 hidden h-2 w-96 max-w-[calc(100vw-3rem)] group-hover/protection:sm:block" />
+              <div className="pointer-events-auto fixed inset-x-4 bottom-4 z-50 hidden max-h-[70vh] overflow-y-auto border border-slate-200 bg-white p-3 text-left text-xs font-normal text-slate-700 opacity-0 shadow-xl transition duration-150 group-hover/protection:block group-hover/protection:opacity-100 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:w-96 sm:max-w-[calc(100vw-3rem)] sm:overflow-visible">
                 <RuleTooltip ruleGroup={ruleGroup} />
               </div>
             </div>
