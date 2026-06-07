@@ -100,7 +100,6 @@ class TreatmentRepository:
         records: Iterable[dict[str, Any]],
     ) -> int:
         session.query(models.TreatmentEvent).filter(
-            models.TreatmentEvent.source == source,
             models.TreatmentEvent.season_year == season_year,
         ).delete(synchronize_session=False)
 

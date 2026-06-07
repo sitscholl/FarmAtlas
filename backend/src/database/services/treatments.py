@@ -1,12 +1,14 @@
 import datetime
 import hashlib
 import math
+import re
 from io import StringIO
 from collections.abc import Iterable
 from typing import Any
 
 import pandas as pd
 
+from .. import models
 from ..core import DatabaseCore
 from ..repositories import TreatmentRepository
 
@@ -26,6 +28,10 @@ def _normalize_text(value: Any) -> str:
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return ""
     return str(value).strip()
+
+
+def _normalize_external_section_name(value: Any) -> str:
+    return re.sub(r"\s+", " ", _normalize_text(value)).strip().lower()
 
 
 def _parse_optional_float(value: Any) -> float | None:
@@ -62,6 +68,29 @@ class TreatmentImportService:
         self._core = core
         self._treatments = treatments
 
+    @staticmethod
+    def _resolve_events_for_normalized_alias(
+        session,
+        *,
+        source: str | None = None,
+        external_section_name: str,
+        section_id: int | None,
+    ) -> int:
+        normalized_name = _normalize_external_section_name(external_section_name)
+        resolved_count = 0
+        query = session.query(models.TreatmentEvent)
+        if source is not None:
+            query = query.filter(models.TreatmentEvent.source == source)
+        events = query.all()
+        for event in events:
+            if _normalize_external_section_name(event.external_section_name) != normalized_name:
+                continue
+            event.external_section_name = normalized_name
+            event.section_id = section_id
+            event.resolution_status = "resolved" if section_id is not None else "unresolved"
+            resolved_count += 1
+        return resolved_count
+
     def _parse_frame(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
         missing_columns = [column for column in CSV_COLUMNS.values() if column not in frame.columns]
         if missing_columns:
@@ -70,7 +99,7 @@ class TreatmentImportService:
         parsed_rows: list[dict[str, Any]] = []
         for _, row in frame.iterrows():
             date_value = pd.to_datetime(row[CSV_COLUMNS["date"]], dayfirst=True, errors="raise").date()
-            external_section_name = _normalize_text(row[CSV_COLUMNS["external_section_name"]])
+            external_section_name = _normalize_external_section_name(row[CSV_COLUMNS["external_section_name"]])
             product_name = _normalize_text(row[CSV_COLUMNS["product_name"]])
             if external_section_name == "":
                 raise ValueError("Treatment CSV contains an empty Anlage value")
@@ -104,6 +133,10 @@ class TreatmentImportService:
             values = dict(record)
             values["source"] = source
             values["season_year"] = int(season_year)
+            values["external_section_name"] = _normalize_external_section_name(
+                values.get("external_section_name"),
+            )
+            values["product_name"] = _normalize_text(values.get("product_name"))
             if not values.get("external_section_name"):
                 raise ValueError("Treatment export contains an empty Anlage value")
             if not values.get("product_name"):
@@ -127,7 +160,10 @@ class TreatmentImportService:
         )
 
         with self._core.session_scope() as session:
-            alias_map = self._treatments.get_alias_map(session, source=normalized_source)
+            alias_map = {
+                _normalize_external_section_name(alias.external_section_name): alias.section_id
+                for alias in self._treatments.list_aliases(session, source=None)
+            }
             for record in prepared_records:
                 section_id = alias_map.get(record["external_section_name"])
                 record["section_id"] = section_id
@@ -179,19 +215,35 @@ class TreatmentImportService:
 
     def create_alias(self, *, source: str, external_section_name: str, section_id: int):
         normalized_source = source.strip() or "legal_export"
-        normalized_name = external_section_name.strip()
+        normalized_name = _normalize_external_section_name(external_section_name)
         if not normalized_name:
             raise ValueError("external_section_name must not be empty")
         with self._core.session_scope() as session:
-            alias = self._treatments.create_alias(
-                session,
-                source=normalized_source,
-                external_section_name=normalized_name,
-                section_id=section_id,
+            existing_alias = next(
+                (
+                    alias
+                    for alias in self._treatments.list_aliases(session, source=None)
+                    if _normalize_external_section_name(alias.external_section_name) == normalized_name
+                ),
+                None,
             )
-            self._treatments.resolve_events_for_alias(
+            if existing_alias is None:
+                alias = self._treatments.create_alias(
+                    session,
+                    source=normalized_source,
+                    external_section_name=normalized_name,
+                    section_id=section_id,
+                )
+            else:
+                alias = self._treatments.update_alias(
+                    session,
+                    existing_alias.id,
+                    source=normalized_source,
+                    external_section_name=normalized_name,
+                    section_id=section_id,
+                )
+            self._resolve_events_for_normalized_alias(
                 session,
-                source=normalized_source,
                 external_section_name=normalized_name,
                 section_id=section_id,
             )
@@ -199,14 +251,13 @@ class TreatmentImportService:
 
     def update_alias(self, alias_id: int, *, source: str, external_section_name: str, section_id: int):
         normalized_source = source.strip() or "legal_export"
-        normalized_name = external_section_name.strip()
+        normalized_name = _normalize_external_section_name(external_section_name)
         if not normalized_name:
             raise ValueError("external_section_name must not be empty")
         with self._core.session_scope() as session:
             old_alias = self._treatments.get_alias_by_id(session, alias_id)
             if old_alias is None:
                 raise ValueError(f"Could not find any treatment section alias with id {alias_id}")
-            old_source = old_alias.source
             old_name = old_alias.external_section_name
             alias = self._treatments.update_alias(
                 session,
@@ -215,15 +266,13 @@ class TreatmentImportService:
                 external_section_name=normalized_name,
                 section_id=section_id,
             )
-            self._treatments.resolve_events_for_alias(
+            self._resolve_events_for_normalized_alias(
                 session,
-                source=old_source,
                 external_section_name=old_name,
                 section_id=None,
             )
-            self._treatments.resolve_events_for_alias(
+            self._resolve_events_for_normalized_alias(
                 session,
-                source=normalized_source,
                 external_section_name=normalized_name,
                 section_id=section_id,
             )
@@ -234,13 +283,11 @@ class TreatmentImportService:
             alias = self._treatments.get_alias_by_id(session, alias_id)
             if alias is None:
                 return False
-            source = alias.source
             external_section_name = alias.external_section_name
             deleted = self._treatments.delete_alias(session, alias_id)
             if deleted:
-                self._treatments.resolve_events_for_alias(
+                self._resolve_events_for_normalized_alias(
                     session,
-                    source=source,
                     external_section_name=external_section_name,
                     section_id=None,
                 )

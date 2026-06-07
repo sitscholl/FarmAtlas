@@ -4,6 +4,7 @@ import { LuPencil, LuPlus, LuRefreshCw, LuShieldAlert, LuTrash2 } from 'react-ic
 import api from '../api'
 import DataTable, { type DataTableColumn } from '../components/DataTable'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
+import { getApiErrorMessage } from '../lib/apiErrors'
 import {
   type CropProtectionRuleCreate,
   type CropProtectionRuleEvaluationRead,
@@ -12,9 +13,11 @@ import {
   type CropProtectionRuleScopeBase,
   type FieldDetailRead,
   type FieldRead,
+  type TreatmentEventRead,
+  type TreatmentSectionAliasRead,
 } from '../types/generated/api'
 
-type StatusFilter = 'all' | 'due' | 'soon' | 'missing' | 'ok'
+type StatusKey = 'due' | 'soon' | 'missing' | 'ok'
 type ScopeType = CropProtectionRuleScopeBase['scope_type']
 type MetricType = CropProtectionRuleMetricBase['metric_type']
 
@@ -46,6 +49,8 @@ type RuleFormState = {
 }
 
 const metricTypes: MetricType[] = ['days_since', 'rain_since', 'gdd_since']
+const SMARTFARMER_SOURCE = 'smartfarmer'
+const CURRENT_SEASON_YEAR = new Date().getFullYear()
 
 const emptyMetricInputs: Record<MetricType, RuleFormMetricState> = {
   days_since: { enabled: true, threshold: '7', warningThreshold: '5', baseTemperature: '10' },
@@ -73,17 +78,20 @@ const statusLabels: Record<string, string> = {
   missing: 'Offen',
 }
 
-const statusClasses: Record<string, string> = {
-  due: 'border-rose-200 bg-rose-50 text-rose-800',
-  soon: 'border-amber-200 bg-amber-50 text-amber-900',
-  ok: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  missing: 'border-slate-200 bg-slate-50 text-slate-600',
-}
-
 const metricLabels: Record<MetricType, string> = {
   days_since: 'Tage',
   rain_since: 'Regen',
   gdd_since: 'GDD',
+}
+
+const treatmentResolutionLabels: Record<string, string> = {
+  resolved: 'Zugeordnet',
+  unresolved: 'Offen',
+}
+
+const treatmentResolutionClasses: Record<string, string> = {
+  resolved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  unresolved: 'border-amber-200 bg-amber-50 text-amber-900',
 }
 
 function formatDate(value: string | null | undefined) {
@@ -205,10 +213,10 @@ function buildRulePayload(form: RuleFormState): CropProtectionRuleCreate {
   }
 }
 
-function statusBadge(status: string) {
+function treatmentResolutionBadge(status: string) {
   return (
-    <span className={`inline-flex border px-2 py-1 text-xs font-semibold ${statusClasses[status] ?? statusClasses.missing}`}>
-      {statusLabels[status] ?? status}
+    <span className={`inline-flex border px-2 py-1 text-xs font-semibold ${treatmentResolutionClasses[status] ?? treatmentResolutionClasses.unresolved}`}>
+      {treatmentResolutionLabels[status] ?? status}
     </span>
   )
 }
@@ -216,23 +224,46 @@ function statusBadge(status: string) {
 export default function CropProtectionPage() {
   const [rules, setRules] = useState<CropProtectionRuleRead[]>([])
   const [evaluations, setEvaluations] = useState<CropProtectionRuleEvaluationRead[]>([])
+  const [treatments, setTreatments] = useState<TreatmentEventRead[]>([])
   const [fieldDetails, setFieldDetails] = useState<FieldDetailRead[]>([])
   const [productNames, setProductNames] = useState<string[]>([])
+  const [aliases, setAliases] = useState<TreatmentSectionAliasRead[]>([])
+  const [unresolvedNames, setUnresolvedNames] = useState<string[]>([])
+  const [aliasSelections, setAliasSelections] = useState<Record<string, string>>({})
   const [form, setForm] = useState<RuleFormState>(emptyRuleForm)
   const [selectedScopeKeys, setSelectedScopeKeys] = useState<string[]>([])
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAliasSubmitting, setIsAliasSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [aliasMessage, setAliasMessage] = useState<string | null>(null)
+  const [aliasErrorMessage, setAliasErrorMessage] = useState<string | null>(null)
 
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const [rulesResponse, evaluationsResponse, fieldsResponse, productsResponse] = await Promise.all([
+      const [
+        rulesResponse,
+        evaluationsResponse,
+        treatmentsResponse,
+        fieldsResponse,
+        productsResponse,
+        unresolvedResponse,
+        aliasesResponse,
+      ] = await Promise.all([
         api.get<CropProtectionRuleRead[]>('/crop-protection/rules'),
         api.get<CropProtectionRuleEvaluationRead[]>('/crop-protection/evaluations'),
+        api.get<TreatmentEventRead[]>('/treatments', {
+          params: {
+            season_year: CURRENT_SEASON_YEAR,
+          },
+        }),
         api.get<FieldRead[]>('/fields'),
         api.get<string[]>('/treatments/products'),
+        api.get<string[]>('/treatments/unresolved-sections', {
+          params: { season_year: CURRENT_SEASON_YEAR },
+        }),
+        api.get<TreatmentSectionAliasRead[]>('/treatments/section-aliases'),
       ])
       const detailResponses = await Promise.all(
         fieldsResponse.data.map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
@@ -240,8 +271,11 @@ export default function CropProtectionPage() {
 
       setRules(rulesResponse.data)
       setEvaluations(evaluationsResponse.data)
+      setTreatments(treatmentsResponse.data)
       setFieldDetails(detailResponses.map((response) => response.data))
       setProductNames(productsResponse.data)
+      setUnresolvedNames(unresolvedResponse.data)
+      setAliases(aliasesResponse.data)
       setErrorMessage(null)
     } catch (error) {
       console.error('Error loading crop protection data', error)
@@ -269,15 +303,13 @@ export default function CropProtectionPage() {
     () => scopeOptions.filter((option) => option.type === 'section'),
     [scopeOptions],
   )
+  const sectionLabelsById = useMemo(
+    () => Object.fromEntries(sectionScopeOptions.map((option) => [option.id, option.label])),
+    [sectionScopeOptions],
+  )
   const scopeLabelsByKey = useMemo(
     () => Object.fromEntries(scopeOptions.map((option) => [option.key, option.label])),
     [scopeOptions],
-  )
-
-  const visibleEvaluations = useMemo(
-    () =>
-      evaluations.filter((evaluation) => statusFilter === 'all' || evaluation.status === statusFilter),
-    [evaluations, statusFilter],
   )
 
   const countsByStatus = useMemo(
@@ -289,29 +321,29 @@ export default function CropProtectionPage() {
     [evaluations],
   )
 
-  const evaluationColumns: DataTableColumn<CropProtectionRuleEvaluationRead>[] = [
-    { id: 'status', header: 'Status', cell: (row) => statusBadge(row.status) },
-    { id: 'field', header: 'Anlage', cell: (row) => row.field_name },
-    { id: 'section', header: 'Abschnitt', cell: (row) => row.section_name },
-    { id: 'rule', header: 'Regel', cell: (row) => row.rule_name },
+  const treatmentColumns: DataTableColumn<TreatmentEventRead>[] = [
+    { id: 'date', header: 'Datum', cell: (row) => formatDate(row.date) },
+    { id: 'external-section', header: 'Smartfarmer Anlage', cell: (row) => row.external_section_name },
     {
-      id: 'last',
-      header: 'Letzte Behandlung',
-      cell: (row) => `${formatDate(row.last_treatment_date)}${row.last_treatment_product ? ` | ${row.last_treatment_product}` : ''}`,
+      id: 'resolution',
+      header: 'Zuordnung',
+      cell: (row) => treatmentResolutionBadge(row.resolution_status),
     },
     {
-      id: 'metrics',
-      header: 'Metriken',
-      cell: (row) => (
-        <div className="flex flex-wrap gap-1">
-          {row.metrics.map((metric) => (
-            <span key={metric.metric_type} className="border border-slate-200 bg-slate-50 px-2 py-1 text-xs">
-              {metricLabels[metric.metric_type as MetricType] ?? metric.metric_type}: {formatMetricValue(metric.value)}
-            </span>
-          ))}
-        </div>
-      ),
+      id: 'section',
+      header: 'Abschnitt',
+      cell: (row) => {
+        if (row.section_id === null || row.section_id === undefined) {
+          return '-'
+        }
+        return sectionLabelsById[row.section_id] ?? `Abschnitt ${row.section_id}`
+      },
     },
+    { id: 'product', header: 'Mittel', cell: (row) => row.product_name },
+    { id: 'dose', header: 'Dosis /hl', cell: (row) => formatMetricValue(row.dose_per_hl) },
+    { id: 'hl', header: 'hl', cell: (row) => formatMetricValue(row.hl) },
+    { id: 'reason', header: 'Grund', cell: (row) => row.reason ?? '-' },
+    { id: 'source', header: 'Quelle', cell: (row) => row.source },
   ]
 
   const handleSelectRule = (rule: CropProtectionRuleRead) => {
@@ -412,6 +444,55 @@ export default function CropProtectionPage() {
     }
   }
 
+  const handleSaveAlias = async (externalSectionName: string) => {
+    const sectionId = Number(aliasSelections[externalSectionName])
+    if (!Number.isFinite(sectionId) || sectionId <= 0) {
+      setAliasErrorMessage('Bitte zuerst einen Farm Atlas Abschnitt auswaehlen.')
+      return
+    }
+
+    setIsAliasSubmitting(true)
+    setAliasMessage(null)
+    setAliasErrorMessage(null)
+    try {
+      await api.post('/treatments/section-aliases', {
+        source: SMARTFARMER_SOURCE,
+        external_section_name: externalSectionName,
+        section_id: sectionId,
+      })
+      setAliasSelections((currentSelections) => {
+        const nextSelections = { ...currentSelections }
+        delete nextSelections[externalSectionName]
+        return nextSelections
+      })
+      setAliasMessage('Smartfarmer Zuordnung gespeichert.')
+      notifyDataChanged()
+      await fetchData()
+    } catch (error) {
+      console.error('Error saving treatment section alias', error)
+      setAliasErrorMessage(getApiErrorMessage(error, 'Die Smartfarmer Zuordnung konnte nicht gespeichert werden.'))
+    } finally {
+      setIsAliasSubmitting(false)
+    }
+  }
+
+  const handleDeleteAlias = async (alias: TreatmentSectionAliasRead) => {
+    setIsAliasSubmitting(true)
+    setAliasMessage(null)
+    setAliasErrorMessage(null)
+    try {
+      await api.delete(`/treatments/section-aliases/${alias.id}`)
+      setAliasMessage('Smartfarmer Zuordnung geloescht.')
+      notifyDataChanged()
+      await fetchData()
+    } catch (error) {
+      console.error('Error deleting treatment section alias', error)
+      setAliasErrorMessage(getApiErrorMessage(error, 'Die Smartfarmer Zuordnung konnte nicht geloescht werden.'))
+    } finally {
+      setIsAliasSubmitting(false)
+    }
+  }
+
   const handleMetricChange = (
     metricType: MetricType,
     updates: Partial<RuleFormMetricState>,
@@ -427,6 +508,107 @@ export default function CropProtectionPage() {
       },
     }))
   }
+
+  const aliasManagementPanel = (
+    <div className="border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <h3 className="text-lg font-semibold text-slate-900">Smartfarmer Zuordnung</h3>
+        <span className="border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
+          {unresolvedNames.length} offen
+        </span>
+      </div>
+      {aliasErrorMessage ? (
+        <div className="mt-3 border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {aliasErrorMessage}
+        </div>
+      ) : null}
+      {aliasMessage ? (
+        <div className="mt-3 border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {aliasMessage}
+        </div>
+      ) : null}
+
+      <div className="mt-4">
+        <div className="text-sm font-semibold text-slate-900">Offene Anlagen</div>
+        <div className="mt-2 grid gap-2">
+          {unresolvedNames.length === 0 ? (
+            <div className="border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-500">
+              Keine offenen Smartfarmer Anlagen.
+            </div>
+          ) : (
+            unresolvedNames.map((externalName) => (
+              <div key={externalName} className="border border-slate-200 bg-slate-50 p-3">
+                <div className="text-sm font-semibold text-slate-900">{externalName}</div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <select
+                    value={aliasSelections[externalName] ?? ''}
+                    onChange={(event) =>
+                      setAliasSelections((currentSelections) => ({
+                        ...currentSelections,
+                        [externalName]: event.target.value,
+                      }))
+                    }
+                    className="w-full border border-slate-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Abschnitt auswaehlen</option>
+                    {sectionScopeOptions.map((option) => (
+                      <option key={option.key} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveAlias(externalName)}
+                    disabled={isAliasSubmitting}
+                    className="inline-flex items-center justify-center border border-sky-700 bg-sky-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    Zuordnen
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="text-sm font-semibold text-slate-900">Bestehende Zuordnungen</div>
+        <div className="mt-2 grid gap-2">
+          {aliases.length === 0 ? (
+            <div className="border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-500">
+              Keine Smartfarmer Zuordnungen vorhanden.
+            </div>
+          ) : (
+            aliases.map((alias) => (
+              <div
+                key={alias.id}
+                className="grid gap-2 border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-slate-900">
+                    {alias.external_section_name}
+                  </div>
+                  <div className="mt-1 truncate text-sm text-slate-500">
+                    {sectionLabelsById[alias.section_id] ?? `Abschnitt ${alias.section_id}`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteAlias(alias)}
+                  disabled={isAliasSubmitting}
+                  className="inline-flex items-center justify-center gap-1 border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                >
+                  <LuTrash2 className="h-4 w-4" />
+                  Loeschen
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <section className="w-full max-w-7xl">
@@ -457,14 +639,10 @@ export default function CropProtectionPage() {
         ) : null}
 
         <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          {(['due', 'soon', 'missing', 'ok'] as StatusFilter[]).map((status) => (
-            <button
+          {(['due', 'soon', 'missing', 'ok'] as StatusKey[]).map((status) => (
+            <div
               key={status}
-              type="button"
-              onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
-              className={`border px-4 py-3 text-left transition ${
-                statusFilter === status ? 'border-slate-900 bg-white shadow-sm' : 'border-slate-200 bg-slate-50 hover:bg-white'
-              }`}
+              className="border border-slate-200 bg-slate-50 px-4 py-3 text-left"
             >
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {statusLabels[status]}
@@ -472,7 +650,7 @@ export default function CropProtectionPage() {
               <div className="mt-1 text-3xl font-semibold text-slate-900">
                 {countsByStatus[status] ?? 0}
               </div>
-            </button>
+            </div>
           ))}
         </div>
 
@@ -486,29 +664,7 @@ export default function CropProtectionPage() {
               Lade Pflanzenschutzstatus...
             </div>
           ) : (
-            <DataTable
-              columns={evaluationColumns}
-              rows={visibleEvaluations}
-              getRowKey={(row) => `${row.rule_id}-${row.section_id}`}
-              emptyMessage="Keine Pflanzenschutzbewertungen vorhanden."
-              filters={[
-                {
-                  id: 'status',
-                  label: 'Status',
-                  type: 'select',
-                  value: statusFilter,
-                  options: [
-                    { label: 'Alle', value: 'all' },
-                    { label: 'Faellig', value: 'due' },
-                    { label: 'Bald', value: 'soon' },
-                    { label: 'Offen', value: 'missing' },
-                    { label: 'OK', value: 'ok' },
-                  ],
-                },
-              ]}
-              onFilterChange={(_, value) => setStatusFilter(value as StatusFilter)}
-              onResetFilters={() => setStatusFilter('all')}
-            />
+            aliasManagementPanel
           )}
         </section>
 
@@ -803,6 +959,26 @@ export default function CropProtectionPage() {
               </button>
             </div>
           </div>
+        </section>
+
+        <section className="mt-8">
+          <div className="mb-3">
+            <h2 className="text-xl font-semibold text-slate-900">Spritzungen</h2>
+          </div>
+          {isLoading ? (
+            <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
+              Lade Spritzungen...
+            </div>
+          ) : (
+            <div className="max-h-[32rem] overflow-y-auto">
+              <DataTable
+                columns={treatmentColumns}
+                rows={treatments}
+                getRowKey={(row) => row.id}
+                emptyMessage="Keine Spritzungen vorhanden."
+              />
+            </div>
+          )}
         </section>
       </div>
     </section>
