@@ -1,3 +1,7 @@
+##Run with:
+#uv run python -m tests.debug_smartfarmer_fetch --year 2026 --show-browser --keep-downloads
+##
+
 from __future__ import annotations
 
 import argparse
