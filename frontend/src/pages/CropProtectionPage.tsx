@@ -112,14 +112,14 @@ function buildScopeOptions(fieldDetails: FieldDetailRead[]): ScopeOption[] {
       key: `field-${fieldDetail.field.id}`,
       type: 'field',
       id: fieldDetail.field.id,
-      label: `${fieldDetail.field.group} | ${fieldDetail.field.name}`,
+      label: fieldDetail.field.name,
     }
 
     const plantingOptions = fieldDetail.plantings.map((planting) => ({
       key: `planting-${planting.id}`,
       type: 'planting' as const,
       id: planting.id,
-      label: `${fieldDetail.field.group} | ${fieldDetail.field.name} | ${planting.variety}`,
+      label: `${fieldDetail.field.name} | ${planting.variety}`,
     }))
 
     const sectionOptions = fieldDetail.plantings.flatMap((planting) =>
@@ -127,7 +127,7 @@ function buildScopeOptions(fieldDetails: FieldDetailRead[]): ScopeOption[] {
         key: `section-${section.id}`,
         type: 'section' as const,
         id: section.id,
-        label: `${fieldDetail.field.group} | ${fieldDetail.field.name} | ${planting.variety} | ${section.name}`,
+        label: `${fieldDetail.field.name} | ${planting.variety} | ${section.name}`,
       })),
     )
 
@@ -229,6 +229,8 @@ export default function CropProtectionPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [aliasMessage, setAliasMessage] = useState<string | null>(null)
   const [aliasErrorMessage, setAliasErrorMessage] = useState<string | null>(null)
+  const [treatmentLimit, setTreatmentLimit] = useState(TREATMENT_TABLE_LIMIT)
+  const [treatmentLimitInput, setTreatmentLimitInput] = useState(String(TREATMENT_TABLE_LIMIT))
 
   const fetchData = async () => {
     try {
@@ -245,7 +247,7 @@ export default function CropProtectionPage() {
         api.get<TreatmentEventRead[]>('/treatments', {
           params: {
             season_year: CURRENT_SEASON_YEAR,
-            limit: TREATMENT_TABLE_LIMIT,
+            limit: treatmentLimit,
           },
         }),
         api.get<FieldRead[]>('/fields'),
@@ -276,7 +278,7 @@ export default function CropProtectionPage() {
 
   useEffect(() => {
     void fetchData()
-  }, [])
+  }, [treatmentLimit])
 
   useEffect(() => {
     const handleDataChanged = () => {
@@ -285,7 +287,7 @@ export default function CropProtectionPage() {
 
     window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged)
     return () => window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged)
-  }, [])
+  }, [treatmentLimit])
 
   const scopeOptions = useMemo(() => buildScopeOptions(fieldDetails), [fieldDetails])
   const sectionScopeOptions = useMemo(
@@ -471,6 +473,17 @@ export default function CropProtectionPage() {
     } finally {
       setIsAliasSubmitting(false)
     }
+  }
+
+  const handleApplyTreatmentLimit = () => {
+    const nextLimit = Math.min(5000, Math.max(1, Number(treatmentLimitInput)))
+    if (!Number.isFinite(nextLimit)) {
+      setTreatmentLimitInput(String(treatmentLimit))
+      return
+    }
+    const normalizedLimit = Math.trunc(nextLimit)
+    setTreatmentLimitInput(String(normalizedLimit))
+    setTreatmentLimit(normalizedLimit)
   }
 
   const handleMetricChange = (
@@ -930,9 +943,41 @@ export default function CropProtectionPage() {
         </section>
 
         <section className="mt-8">
-          <div className="mb-3 flex items-center gap-2">
-            <LuSprayCan className="h-5 w-5 text-slate-500" />
-            <h2 className="text-xl font-semibold text-slate-900">Eingetragene Spritzungen</h2>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-center gap-2">
+              <LuSprayCan className="h-5 w-5 text-slate-500" />
+              <h2 className="text-xl font-semibold text-slate-900">Eingetragene Spritzungen</h2>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="text-sm text-slate-500">
+                {treatments.length} von maximal
+              </div>
+              <label className="block">
+                <span className="sr-only">Maximale Anzahl Spritzungen</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5000}
+                  step={50}
+                  value={treatmentLimitInput}
+                  onChange={(event) => setTreatmentLimitInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      handleApplyTreatmentLimit()
+                    }
+                  }}
+                  className="w-24 border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="text-sm text-slate-500">neuesten</div>
+              <button
+                type="button"
+                onClick={handleApplyTreatmentLimit}
+                className="border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Anwenden
+              </button>
+            </div>
           </div>
           {isLoading ? (
             <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
