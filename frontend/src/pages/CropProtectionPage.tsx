@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LuPencil, LuPlus, LuRefreshCw, LuShieldAlert, LuTrash2 } from 'react-icons/lu'
+import { LuLink2, LuListChecks, LuPencil, LuPlus, LuRefreshCw, LuSprayCan, LuTrash2 } from 'react-icons/lu'
 
 import api from '../api'
 import DataTable, { type DataTableColumn } from '../components/DataTable'
@@ -7,7 +7,6 @@ import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import { getApiErrorMessage } from '../lib/apiErrors'
 import {
   type CropProtectionRuleCreate,
-  type CropProtectionRuleEvaluationRead,
   type CropProtectionRuleMetricBase,
   type CropProtectionRuleRead,
   type CropProtectionRuleScopeBase,
@@ -17,7 +16,6 @@ import {
   type TreatmentSectionAliasRead,
 } from '../types/generated/api'
 
-type StatusKey = 'due' | 'soon' | 'missing' | 'ok'
 type ScopeType = CropProtectionRuleScopeBase['scope_type']
 type MetricType = CropProtectionRuleMetricBase['metric_type']
 
@@ -51,6 +49,7 @@ type RuleFormState = {
 const metricTypes: MetricType[] = ['days_since', 'rain_since', 'gdd_since']
 const SMARTFARMER_SOURCE = 'smartfarmer'
 const CURRENT_SEASON_YEAR = new Date().getFullYear()
+const TREATMENT_TABLE_LIMIT = 300
 
 const emptyMetricInputs: Record<MetricType, RuleFormMetricState> = {
   days_since: { enabled: true, threshold: '7', warningThreshold: '5', baseTemperature: '10' },
@@ -69,13 +68,6 @@ const emptyRuleForm: RuleFormState = {
   productsText: '',
   scopes: [],
   metricInputs: emptyMetricInputs,
-}
-
-const statusLabels: Record<string, string> = {
-  due: 'Faellig',
-  soon: 'Bald',
-  ok: 'OK',
-  missing: 'Offen',
 }
 
 const metricLabels: Record<MetricType, string> = {
@@ -223,7 +215,6 @@ function treatmentResolutionBadge(status: string) {
 
 export default function CropProtectionPage() {
   const [rules, setRules] = useState<CropProtectionRuleRead[]>([])
-  const [evaluations, setEvaluations] = useState<CropProtectionRuleEvaluationRead[]>([])
   const [treatments, setTreatments] = useState<TreatmentEventRead[]>([])
   const [fieldDetails, setFieldDetails] = useState<FieldDetailRead[]>([])
   const [productNames, setProductNames] = useState<string[]>([])
@@ -244,7 +235,6 @@ export default function CropProtectionPage() {
       setIsLoading(true)
       const [
         rulesResponse,
-        evaluationsResponse,
         treatmentsResponse,
         fieldsResponse,
         productsResponse,
@@ -252,10 +242,10 @@ export default function CropProtectionPage() {
         aliasesResponse,
       ] = await Promise.all([
         api.get<CropProtectionRuleRead[]>('/crop-protection/rules'),
-        api.get<CropProtectionRuleEvaluationRead[]>('/crop-protection/evaluations'),
         api.get<TreatmentEventRead[]>('/treatments', {
           params: {
             season_year: CURRENT_SEASON_YEAR,
+            limit: TREATMENT_TABLE_LIMIT,
           },
         }),
         api.get<FieldRead[]>('/fields'),
@@ -270,7 +260,6 @@ export default function CropProtectionPage() {
       )
 
       setRules(rulesResponse.data)
-      setEvaluations(evaluationsResponse.data)
       setTreatments(treatmentsResponse.data)
       setFieldDetails(detailResponses.map((response) => response.data))
       setProductNames(productsResponse.data)
@@ -310,15 +299,6 @@ export default function CropProtectionPage() {
   const scopeLabelsByKey = useMemo(
     () => Object.fromEntries(scopeOptions.map((option) => [option.key, option.label])),
     [scopeOptions],
-  )
-
-  const countsByStatus = useMemo(
-    () =>
-      evaluations.reduce<Record<string, number>>((counts, evaluation) => {
-        counts[evaluation.status] = (counts[evaluation.status] ?? 0) + 1
-        return counts
-      }, {}),
-    [evaluations],
   )
 
   const treatmentColumns: DataTableColumn<TreatmentEventRead>[] = [
@@ -510,7 +490,7 @@ export default function CropProtectionPage() {
   }
 
   const aliasManagementPanel = (
-    <div className="border border-slate-200 bg-white p-4">
+    <div className="min-w-0 border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <h3 className="text-lg font-semibold text-slate-900">Smartfarmer Zuordnung</h3>
         <span className="border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
@@ -538,7 +518,7 @@ export default function CropProtectionPage() {
           ) : (
             unresolvedNames.map((externalName) => (
               <div key={externalName} className="border border-slate-200 bg-slate-50 p-3">
-                <div className="text-sm font-semibold text-slate-900">{externalName}</div>
+                <div className="break-words text-sm font-semibold text-slate-900">{externalName}</div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <select
                     value={aliasSelections[externalName] ?? ''}
@@ -638,40 +618,14 @@ export default function CropProtectionPage() {
           </div>
         ) : null}
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          {(['due', 'soon', 'missing', 'ok'] as StatusKey[]).map((status) => (
-            <div
-              key={status}
-              className="border border-slate-200 bg-slate-50 px-4 py-3 text-left"
-            >
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {statusLabels[status]}
-              </div>
-              <div className="mt-1 text-3xl font-semibold text-slate-900">
-                {countsByStatus[status] ?? 0}
-              </div>
-            </div>
-          ))}
+        <div className="mt-8 mb-3 flex items-center gap-2">
+          <LuListChecks className="h-5 w-5 text-slate-500" />
+          <h2 className="text-xl font-semibold text-slate-900">Pflanzenschutz Regeln</h2>
         </div>
-
-        <section className="mt-6">
-          <div className="mb-3 flex items-center gap-2">
-            <LuShieldAlert className="h-5 w-5 text-slate-500" />
-            <h2 className="text-xl font-semibold text-slate-900">Aktueller Status</h2>
-          </div>
-          {isLoading ? (
-            <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
-              Lade Pflanzenschutzstatus...
-            </div>
-          ) : (
-            aliasManagementPanel
-          )}
-        </section>
-
-        <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="border border-slate-200 bg-white p-4">
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="min-w-0 border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <h2 className="text-xl font-semibold text-slate-900">Regeln</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Bestehende Regeln</h2>
               <button
                 type="button"
                 onClick={handleNewRule}
@@ -713,7 +667,7 @@ export default function CropProtectionPage() {
             </div>
           </div>
 
-          <div className="border border-slate-200 bg-white p-4">
+          <div className="min-w-0 border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <h2 className="text-xl font-semibold text-slate-900">
                 {form.id === null ? 'Neue Regel' : 'Regel bearbeiten'}
@@ -961,9 +915,24 @@ export default function CropProtectionPage() {
           </div>
         </section>
 
+        <section className="mt-6">
+          <div className="mb-3 flex items-center gap-2">
+            <LuLink2 className="h-5 w-5 text-slate-500" />
+            <h2 className="text-xl font-semibold text-slate-900">Smartfarmer - FarmAtlas Zuordnungen</h2>
+          </div>
+          {isLoading ? (
+            <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
+              Lade Pflanzenschutzstatus...
+            </div>
+          ) : (
+            aliasManagementPanel
+          )}
+        </section>
+
         <section className="mt-8">
-          <div className="mb-3">
-            <h2 className="text-xl font-semibold text-slate-900">Spritzungen</h2>
+          <div className="mb-3 flex items-center gap-2">
+            <LuSprayCan className="h-5 w-5 text-slate-500" />
+            <h2 className="text-xl font-semibold text-slate-900">Eingetragene Spritzungen</h2>
           </div>
           {isLoading ? (
             <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">

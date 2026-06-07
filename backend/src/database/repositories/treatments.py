@@ -21,6 +21,7 @@ class TreatmentRepository:
         season_year: int | None = None,
         section_id: int | None = None,
         resolution_status: str | None = None,
+        limit: int | None = None,
     ) -> list[models.TreatmentEvent]:
         query = session.query(models.TreatmentEvent).options(selectinload(models.TreatmentEvent.section))
         if source is not None:
@@ -31,7 +32,10 @@ class TreatmentRepository:
             query = query.filter(models.TreatmentEvent.section_id == section_id)
         if resolution_status is not None:
             query = query.filter(models.TreatmentEvent.resolution_status == resolution_status)
-        return query.order_by(models.TreatmentEvent.date.desc(), models.TreatmentEvent.id.desc()).all()
+        query = query.order_by(models.TreatmentEvent.date.desc(), models.TreatmentEvent.id.desc())
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     def list_imports(
         self,

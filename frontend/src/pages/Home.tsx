@@ -17,6 +17,7 @@ import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
   type CropProtectionFieldSummaryRead,
+  type CropProtectionRuleRead,
   type FieldDetailRead,
   type FieldSummaryRead,
   type WaterBalanceSeriesPoint,
@@ -24,8 +25,6 @@ import {
 } from '../types/generated/api'
 
 const FORECAST_DAYS = 5
-
-type HomeFieldFilter = 'crop_attention' | 'crop_due' | 'water_status' | 'missing_crop'
 
 type FieldMetricDefinition = {
   key: string
@@ -91,29 +90,6 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     kind: 'date',
     emptyValueLabel: '-',
     getValue: (field) => field.last_irrigation_date,
-  },
-]
-
-const homeFieldFilters: Array<{ value: HomeFieldFilter; label: string; description: string }> = [
-  {
-    value: 'crop_attention',
-    label: 'Pflanzenschutz faellig oder bald',
-    description: 'Anlagen mit mindestens einer faelligen oder bald faelligen Pflanzenschutzregel.',
-  },
-  {
-    value: 'crop_due',
-    label: 'Nur faellige Pflanzenschutzregeln',
-    description: 'Anlagen mit mindestens einer faelligen Pflanzenschutzregel.',
-  },
-  {
-    value: 'missing_crop',
-    label: 'Pflanzenschutz offen',
-    description: 'Anlagen mit fehlender passender Behandlung oder fehlenden Bewertungsdaten.',
-  },
-  {
-    value: 'water_status',
-    label: 'Wasserbilanz vorhanden',
-    description: 'Anlagen mit berechnetem Wasserbilanzstatus.',
   },
 ]
 
@@ -351,11 +327,12 @@ export default function Home() {
   const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [phenologyEventsByFieldId, setPhenologyEventsByFieldId] = useState<Record<number, FieldPhenologyEvent[]>>({})
   const [cropProtectionByFieldId, setCropProtectionByFieldId] = useState<Record<number, CropProtectionFieldSummaryRead>>({})
+  const [cropProtectionRules, setCropProtectionRules] = useState<CropProtectionRuleRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
   const [waterBalanceModal, setWaterBalanceModal] = useState<WaterBalanceModalState | null>(null)
-  const [activeFilter, setActiveFilter] = useState<HomeFieldFilter | null>(null)
+  const [selectedRuleIds, setSelectedRuleIds] = useState<number[]>([])
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -365,11 +342,12 @@ export default function Home() {
         if (!Array.isArray(response.data)) {
           throw new TypeError('Expected /fields/summary to return an array.')
         }
-        const [detailResponses, cropProtectionResponse] = await Promise.all([
+        const [detailResponses, cropProtectionResponse, cropProtectionRulesResponse] = await Promise.all([
           Promise.all(
             response.data.map((field) => api.get<FieldDetailRead>(`/fields/${field.id}`)),
           ),
           api.get<CropProtectionFieldSummaryRead[]>('/crop-protection/field-summaries'),
+          api.get<CropProtectionRuleRead[]>('/crop-protection/rules'),
         ])
         const cropProtectionGroups = cropProtectionResponse.data.reduce<Record<number, CropProtectionFieldSummaryRead>>(
           (groups, summary) => {
@@ -383,6 +361,7 @@ export default function Home() {
           buildPhenologyEventsByFieldId(detailResponses.map((detailResponse) => detailResponse.data)),
         )
         setCropProtectionByFieldId(cropProtectionGroups)
+        setCropProtectionRules(cropProtectionRulesResponse.data)
         setErrorMessage(null)
       } catch (error) {
         console.error('Error fetching field summaries', error)
@@ -390,6 +369,7 @@ export default function Home() {
         setFields([])
         setPhenologyEventsByFieldId({})
         setCropProtectionByFieldId({})
+        setCropProtectionRules([])
       } finally {
         setIsLoading(false)
       }
@@ -420,25 +400,18 @@ export default function Home() {
           return false
         }
 
-        if (activeFilter === null) {
+        if (selectedRuleIds.length === 0) {
           return true
         }
 
         const summary = cropProtectionByFieldId[field.id]
-        if (activeFilter === 'crop_attention') {
-          return summary?.status === 'due' || summary?.status === 'soon'
-        }
-        if (activeFilter === 'crop_due') {
-          return summary?.status === 'due'
-        }
-        if (activeFilter === 'missing_crop') {
-          return summary?.status === 'missing'
-        }
-        if (activeFilter === 'water_status') {
-          return field.water_balance_summary.safe_ratio !== null && field.water_balance_summary.safe_ratio !== undefined
-        }
-
-        return true
+        return selectedRuleIds.every((ruleId) =>
+          (summary?.evaluations ?? []).some(
+            (evaluation) =>
+              evaluation.rule_id === ruleId &&
+              (evaluation.status === 'due' || evaluation.status === 'soon'),
+          ),
+        )
       }).sort(function (a, b) {
           if (a.name < b.name) {
             return -1;
@@ -448,8 +421,18 @@ export default function Home() {
           }
           return 0;
         }),
-    [activeFilter, cropProtectionByFieldId, fields],
+    [cropProtectionByFieldId, fields, selectedRuleIds],
   )
+
+  const selectedRuleSet = useMemo(() => new Set(selectedRuleIds), [selectedRuleIds])
+
+  const toggleRuleFilter = (ruleId: number) => {
+    setSelectedRuleIds((currentRuleIds) =>
+      currentRuleIds.includes(ruleId)
+        ? currentRuleIds.filter((currentRuleId) => currentRuleId !== ruleId)
+        : [...currentRuleIds, ruleId],
+    )
+  }
 
   const handleRefreshField = async (field: FieldSummaryRead) => {
     try {
@@ -548,30 +531,28 @@ export default function Home() {
             type="button"
             onClick={() => setIsFilterMenuOpen((currentState) => !currentState)}
             className={`inline-flex items-center gap-2 border px-4 py-2 text-sm font-semibold transition ${
-              activeFilter === null
+              selectedRuleIds.length === 0
                 ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 : 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'
             }`}
+            aria-label="Pflanzenschutzregeln filtern"
             aria-expanded={isFilterMenuOpen}
           >
             <FiFilter className="h-4 w-4" aria-hidden="true" />
-            <span className="max-w-[calc(100vw-6rem)] truncate">
-              {activeFilter === null ? 'Filter' : homeFieldFilters.find((filter) => filter.value === activeFilter)?.label}
-            </span>
+            {selectedRuleIds.length > 0 ? <span>{selectedRuleIds.length}</span> : null}
           </button>
 
           {isFilterMenuOpen ? (
             <div className="absolute right-0 top-full z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] border border-slate-200 bg-white p-3 text-left shadow-xl">
               <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Anlagen filtern
+                  Pflanzenschutzregeln
                 </div>
-                {activeFilter !== null ? (
+                {selectedRuleIds.length > 0 ? (
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveFilter(null)
-                      setIsFilterMenuOpen(false)
+                      setSelectedRuleIds([])
                     }}
                     className="text-xs font-semibold text-slate-500 hover:text-slate-900"
                   >
@@ -579,24 +560,35 @@ export default function Home() {
                   </button>
                 ) : null}
               </div>
-              <div className="grid gap-1">
-                {homeFieldFilters.map((filter) => (
-                  <button
-                    key={filter.value}
-                    type="button"
-                    onClick={() => {
-                      setActiveFilter(filter.value)
-                      setIsFilterMenuOpen(false)
-                    }}
-                    className={`px-3 py-2 text-left transition ${
-                      activeFilter === filter.value ? 'bg-sky-50 text-sky-900' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="text-sm font-semibold">{filter.label}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{filter.description}</div>
-                  </button>
-                ))}
-              </div>
+              {cropProtectionRules.length === 0 ? (
+                <div className="px-3 py-6 text-sm text-slate-500">
+                  Keine Pflanzenschutzregeln vorhanden.
+                </div>
+              ) : (
+                <div className="grid max-h-80 gap-1 overflow-y-auto pr-1">
+                  {cropProtectionRules.map((rule) => (
+                    <label
+                      key={rule.id}
+                      className={`flex items-start gap-3 px-3 py-2 text-sm transition ${
+                        selectedRuleSet.has(rule.id) ? 'bg-sky-50 text-sky-900' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRuleSet.has(rule.id)}
+                        onChange={() => toggleRuleFilter(rule.id)}
+                        className="mt-0.5 h-4 w-4"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{rule.name}</span>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          {rule.products.length} Produkte | {rule.scopes.length} Bereiche
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           ) : null}
         </div>

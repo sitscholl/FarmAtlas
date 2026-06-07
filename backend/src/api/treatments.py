@@ -26,7 +26,10 @@ async def list_treatment_events(
     season_year: int | None = None,
     section_id: int | None = None,
     resolution_status: str | None = None,
+    limit: int | None = None,
 ):
+    if limit is not None and limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be greater than 0")
     with runtime.db.session_scope() as session:
         events = runtime.db.treatments.list_events(
             session,
@@ -34,6 +37,7 @@ async def list_treatment_events(
             season_year=season_year,
             section_id=section_id,
             resolution_status=resolution_status,
+            limit=limit,
         )
     return [TreatmentEventRead.model_validate(event) for event in events]
 
