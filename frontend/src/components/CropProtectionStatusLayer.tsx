@@ -1,4 +1,4 @@
-import { LuCircleHelp, LuShieldAlert, LuShieldCheck, LuShieldX } from 'react-icons/lu'
+import { LuCalendarDays, LuCircleHelp, LuCloudRain, LuShieldAlert, LuShieldCheck, LuShieldX, LuThermometerSun } from 'react-icons/lu'
 
 import type { CropProtectionMetricEvaluationRead, CropProtectionRuleEvaluationRead } from '../types/generated/api'
 
@@ -43,6 +43,25 @@ const metricLabels: Record<string, string> = {
   days_since: 'Tage',
   rain_since: 'Regen',
   gdd_since: 'GDD',
+}
+
+const metricUnits: Record<string, string> = {
+  days_since: 'd',
+  rain_since: 'mm',
+  gdd_since: 'GDD',
+}
+
+const metricIcons = {
+  days_since: LuCalendarDays,
+  rain_since: LuCloudRain,
+  gdd_since: LuThermometerSun,
+}
+
+const metricStatusClasses: Record<CropProtectionStatus, string> = {
+  due: 'border-rose-200 bg-rose-50 text-rose-900',
+  soon: 'border-amber-200 bg-amber-50 text-amber-950',
+  ok: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  missing: 'border-slate-200 bg-slate-50 text-slate-600',
 }
 
 const statusLabels: Record<string, string> = {
@@ -131,12 +150,31 @@ function MetricSummary({ metrics }: { metrics: CropProtectionMetricEvaluationRea
   }
 
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
-      {metrics.map((metric) => (
-        <span key={metric.metric_type} className="border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
-          {metricLabels[metric.metric_type] ?? metric.metric_type}: {formatMetricValue(metric.value)}
-        </span>
-      ))}
+    <div className="mt-2 grid grid-cols-3 gap-1.5">
+      {metrics.map((metric) => {
+        const status = normalizeStatus(metric.status)
+        const MetricIcon = metricIcons[metric.metric_type as keyof typeof metricIcons] ?? LuCircleHelp
+        const unit = metricUnits[metric.metric_type] ?? ''
+        const valueLabel = formatMetricValue(metric.value)
+
+        return (
+          <div
+            key={metric.metric_type}
+            className={`min-w-0 border px-2 py-1.5 ${metricStatusClasses[status]}`}
+          >
+            <div className="flex items-center gap-1.5">
+              <MetricIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">
+                {metricLabels[metric.metric_type] ?? metric.metric_type}
+              </span>
+            </div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-base font-semibold leading-none">{valueLabel}</span>
+              {unit ? <span className="text-[10px] font-semibold opacity-70">{unit}</span> : null}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
