@@ -22,6 +22,7 @@ integrations:
     headless: true
     timeout_seconds: 30
     download_timeout_seconds: 90
+    report_ready_delay_seconds: 5
     timezone_id: Europe/Rome
     locale: de-DE
     disable_password_manager: true

@@ -54,6 +54,8 @@ def build_settings(args) -> SmartFarmerSettings:
         overrides["timeout_seconds"] = args.timeout_seconds
     if args.download_timeout_seconds is not None:
         overrides["download_timeout_seconds"] = args.download_timeout_seconds
+    if args.report_ready_delay_seconds is not None:
+        overrides["report_ready_delay_seconds"] = args.report_ready_delay_seconds
 
     return replace(settings, **overrides)
 
@@ -77,6 +79,7 @@ def main() -> None:
     parser.add_argument("--keep-downloads", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=None)
     parser.add_argument("--download-timeout-seconds", type=int, default=None)
+    parser.add_argument("--report-ready-delay-seconds", type=float, default=None)
     args = parser.parse_args()
     args.config = args.config.resolve()
 
@@ -85,6 +88,7 @@ def main() -> None:
     print(f"user_data_dir={settings.user_data_dir}")
     print(f"downloads_dir={settings.downloads_dir}")
     print(f"headless={settings.headless}")
+    print(f"report_ready_delay_seconds={settings.report_ready_delay_seconds}")
     print(f"record_har_path={settings.record_har_path}")
 
     step("2. Open browser and download treatment export", debug=args.debug, pause=args.pause)

@@ -13,6 +13,7 @@ DEFAULT_KEEP_DOWNLOADS = False
 DEFAULT_HEADLESS = True
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 90
+DEFAULT_REPORT_READY_DELAY_SECONDS = 0.0
 DEFAULT_TIMEZONE_ID = "Europe/Rome"
 DEFAULT_LOCALE = "de-DE"
 DEFAULT_VIEWPORT_WIDTH = 1920
@@ -46,6 +47,7 @@ class SmartFarmerSettings:
     headless: bool = DEFAULT_HEADLESS
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     download_timeout_seconds: int = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS
+    report_ready_delay_seconds: float = DEFAULT_REPORT_READY_DELAY_SECONDS
     timezone_id: str = DEFAULT_TIMEZONE_ID
     locale: str = DEFAULT_LOCALE
     viewport_width: int = DEFAULT_VIEWPORT_WIDTH
@@ -76,6 +78,9 @@ class SmartFarmerSettings:
             timeout_seconds=int(config.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)),
             download_timeout_seconds=int(
                 config.get("download_timeout_seconds", DEFAULT_DOWNLOAD_TIMEOUT_SECONDS)
+            ),
+            report_ready_delay_seconds=float(
+                config.get("report_ready_delay_seconds", DEFAULT_REPORT_READY_DELAY_SECONDS)
             ),
             timezone_id=str(config.get("timezone_id", DEFAULT_TIMEZONE_ID)),
             locale=str(config.get("locale", DEFAULT_LOCALE)),

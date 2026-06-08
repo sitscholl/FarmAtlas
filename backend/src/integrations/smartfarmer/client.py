@@ -178,7 +178,7 @@ class SmartFarmerClient:
 
     def _login_if_required(self) -> None:
         page = self.page
-        logger.info("Opening Smart Farmer")
+        logger.debug("Opening Smart Farmer")
         page.goto(self.settings.base_url, wait_until="domcontentloaded")
 
         state, locator = self._wait_for_first_visible(
@@ -192,7 +192,7 @@ class SmartFarmerClient:
             timeout_ms=self.settings.timeout_seconds * 1000,
         )
         if state != "login":
-            logger.info("Smart Farmer login form not visible; using persisted session")
+            logger.debug("Smart Farmer login form not visible; using persisted session")
             return
 
         username = self.settings.resolve_username()
@@ -202,7 +202,7 @@ class SmartFarmerClient:
                 "Smart Farmer login is required but username/password are missing."
             )
 
-        logger.info("Logging into Smart Farmer")
+        logger.debug("Logging into Smart Farmer")
         locator.fill(username)
         self._click_first(
             [
@@ -245,7 +245,7 @@ class SmartFarmerClient:
 
     def _navigate_to_treatment_report(self, season_year: int) -> None:
         page = self.page
-        logger.info("Navigating to Smart Farmer treatment report for %s", season_year)
+        logger.debug("Navigating to Smart Farmer treatment report for %s", season_year)
         self._click_first(
             [
                 page.get_by_role("button", name=re.compile(r"Berichte", re.IGNORECASE)),
@@ -286,7 +286,7 @@ class SmartFarmerClient:
         self._wait_for_treatment_report_ready(season_year)
 
     def _wait_for_treatment_report_ready(self, season_year: int) -> None:
-        logger.info("Waiting for Smart Farmer treatment report %s to render", season_year)
+        logger.debug("Waiting for Smart Farmer treatment report %s to render", season_year)
         candidates = [
             ("empty", self.page.get_by_text(re.compile(r"Keine passenden Eintr.ge gefunden", re.IGNORECASE))),
             *[("download", locator) for locator in self._treatment_download_button_candidates()],
@@ -304,8 +304,15 @@ class SmartFarmerClient:
             raise SmartFarmerError(f"Smart Farmer contains no treatment rows for {season_year}.")
 
         candidates = self._treatment_download_button_candidates()
+        if self.settings.report_ready_delay_seconds > 0:
+            delay_ms = int(self.settings.report_ready_delay_seconds * 1000)
+            logger.debug(
+                "Waiting %.1f seconds before downloading Smart Farmer treatment report",
+                self.settings.report_ready_delay_seconds,
+            )
+            self.page.wait_for_timeout(delay_ms)
 
-        logger.info("Downloading Smart Farmer treatment report for %s", season_year)
+        logger.debug("Downloading Smart Farmer treatment report for %s", season_year)
         try:
             with self.page.expect_download(timeout=self.settings.download_timeout_seconds * 1000) as download_info:
                 self._click_first(candidates, description="Smart Farmer treatment report download button")
@@ -327,7 +334,7 @@ class SmartFarmerClient:
                 if path != target:
                     download.save_as(str(target))
                     path = target
-                logger.info("Saved Smart Farmer download to %s", path)
+                logger.debug("Saved Smart Farmer download to %s", path)
             elif not self.settings.keep_downloads:
                 self._cleanup_download_files(download, path)
                 path = None
