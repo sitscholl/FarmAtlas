@@ -38,6 +38,15 @@ class CropProtectionRuleEvaluation:
     metrics: list[CropProtectionMetricEvaluation]
 
 
+@dataclass(frozen=True)
+class _CropProtectionEvaluationCase:
+    order: int
+    rule: models.CropProtectionRule
+    section: models.Section
+    last_treatment: models.TreatmentEvent
+    enabled_metrics: list[models.CropProtectionRuleMetric]
+
+
 class CropProtectionService:
     def __init__(
         self,
@@ -241,6 +250,69 @@ class CropProtectionService:
             return "missing"
         return "ok"
 
+    def _metrics_require_weather(self, metrics: list[models.CropProtectionRuleMetric]) -> bool:
+        return any(metric.metric_type in {"rain_since", "gdd_since"} for metric in metrics)
+
+    def _empty_weather_frame(
+        self,
+        field: models.Field,
+        *,
+        start: datetime.date | datetime.datetime,
+        end: datetime.date | datetime.datetime,
+    ) -> WeatherFrame:
+        return WeatherFrame(
+            data=pd.DataFrame(),
+            resolution="1h",
+            start=pd.Timestamp(start),
+            end=pd.Timestamp(end),
+            source_provider=field.reference_provider,
+            source_station=field.reference_station,
+        )
+
+    def _weather_frames_for_cases(
+        self,
+        session,
+        cases: list[_CropProtectionEvaluationCase],
+        *,
+        end: datetime.date | datetime.datetime,
+    ) -> dict[int, WeatherFrame]:
+        weather_cases = [
+            case
+            for case in cases
+            if self._metrics_require_weather(case.enabled_metrics)
+        ]
+        if not weather_cases:
+            return {}
+
+        field_contexts_by_id: dict[int, FieldContext] = {}
+        fields_by_id: dict[int, models.Field] = {}
+        start_by_field_id: dict[int, datetime.date] = {}
+        for case in weather_cases:
+            field = case.section.field
+            fields_by_id[field.id] = field
+            current_start = start_by_field_id.get(field.id)
+            if current_start is None or case.last_treatment.date < current_start:
+                start_by_field_id[field.id] = case.last_treatment.date
+            if self._weather_cache_service is not None:
+                field_contexts_by_id[field.id] = FieldContext.from_model(field)
+
+        if self._weather_cache_service is not None:
+            return self._weather_cache_service.ensure_fields_hourly_weather(
+                list(field_contexts_by_id.values()),
+                start=start_by_field_id,
+                end=end,
+            )
+
+        return {
+            field_id: self._weather_frame(
+                session,
+                field=fields_by_id[field_id],
+                start=start,
+                end=end,
+            )
+            for field_id, start in start_by_field_id.items()
+        }
+
     def evaluate_rules(
         self,
         *,
@@ -266,14 +338,16 @@ class CropProtectionService:
                     raise ValueError(f"Could not find any crop protection rule with id {rule_id}")
                 rules = [rule] if include_disabled or rule.enabled else []
 
-            evaluations: list[CropProtectionRuleEvaluation] = []
+            ordered_evaluations: list[tuple[int, CropProtectionRuleEvaluation]] = []
+            all_evaluation_cases: list[_CropProtectionEvaluationCase] = []
+            next_order = 0
             for rule in rules:
                 section_ids = self._crop_protection.expand_rule_section_ids(session, rule)
                 sections_by_id = self._crop_protection.get_section_contexts(session, section_ids)
                 product_names = [product.product_name for product in rule.products]
                 enabled_metrics = [metric for metric in rule.metrics if metric.enabled]
                 season_start, season_end = self._season_bounds(rule, season_year=season_year, as_of=as_of_date)
-                evaluation_cases: list[tuple[models.Section, models.TreatmentEvent]] = []
+                rule_evaluation_cases: list[tuple[models.Section, models.TreatmentEvent]] = []
 
                 for section_id in section_ids:
                     section = sections_by_id.get(section_id)
@@ -288,66 +362,84 @@ class CropProtectionService:
                         end=season_end,
                     )
                     if last_treatment is None:
-                        evaluations.append(
-                            CropProtectionRuleEvaluation(
-                                rule_id=rule.id,
-                                rule_name=rule.name,
-                                section_id=section.id,
-                                section_name=section.name,
-                                field_id=section.field.id,
-                                field_name=section.field.name,
-                                status="missing",
-                                last_treatment_date=None,
-                                last_treatment_product=None,
-                                metrics=[],
+                        ordered_evaluations.append(
+                            (
+                                next_order,
+                                CropProtectionRuleEvaluation(
+                                    rule_id=rule.id,
+                                    rule_name=rule.name,
+                                    section_id=section.id,
+                                    section_name=section.name,
+                                    field_id=section.field.id,
+                                    field_name=section.field.name,
+                                    status="missing",
+                                    last_treatment_date=None,
+                                    last_treatment_product=None,
+                                    metrics=[],
+                                ),
                             )
                         )
+                        next_order += 1
                         continue
 
-                    evaluation_cases.append((section, last_treatment))
+                    rule_evaluation_cases.append((section, last_treatment))
 
-                weather_by_field_id: dict[int, WeatherFrame] = {}
-                if self._weather_cache_service is not None and evaluation_cases:
-                    field_contexts_by_id: dict[int, FieldContext] = {}
-                    start_by_field_id: dict[int, datetime.date] = {}
-                    for section, last_treatment in evaluation_cases:
-                        field_contexts_by_id[section.field.id] = FieldContext.from_model(section.field)
-                        current_start = start_by_field_id.get(section.field.id)
-                        if current_start is None or last_treatment.date < current_start:
-                            start_by_field_id[section.field.id] = last_treatment.date
-                    weather_by_field_id = self._weather_cache_service.ensure_fields_hourly_weather(
-                        list(field_contexts_by_id.values()),
-                        start=start_by_field_id,
-                        end=weather_end,
+                for section, last_treatment in rule_evaluation_cases:
+                    all_evaluation_cases.append(
+                        _CropProtectionEvaluationCase(
+                            order=next_order,
+                            rule=rule,
+                            section=section,
+                            last_treatment=last_treatment,
+                            enabled_metrics=enabled_metrics,
+                        )
                     )
+                    next_order += 1
 
-                for section, last_treatment in evaluation_cases:
-                    weather = weather_by_field_id.get(section.field.id)
-                    if weather is None:
+            weather_by_field_id = self._weather_frames_for_cases(
+                session,
+                all_evaluation_cases,
+                end=weather_end,
+            )
+
+            for case in all_evaluation_cases:
+                section = case.section
+                last_treatment = case.last_treatment
+                weather = weather_by_field_id.get(section.field.id)
+                if weather is None:
+                    if self._metrics_require_weather(case.enabled_metrics):
                         weather = self._weather_frame(
                             session,
                             field=section.field,
                             start=last_treatment.date,
                             end=weather_end,
                         )
-                    accumulator = MetricAccumulatorService(weather)
-                    metric_evaluations = [
-                        self._evaluate_metric(
-                            metric,
-                            accumulator,
-                            start_date=last_treatment.date,
-                            as_of=as_of,
+                    else:
+                        weather = self._empty_weather_frame(
+                            section.field,
+                            start=last_treatment.date,
+                            end=weather_end,
                         )
-                        for metric in enabled_metrics
-                    ]
-                    status = self._combine_metric_statuses(
-                        rule,
-                        [metric.status for metric in metric_evaluations],
+                accumulator = MetricAccumulatorService(weather)
+                metric_evaluations = [
+                    self._evaluate_metric(
+                        metric,
+                        accumulator,
+                        start_date=last_treatment.date,
+                        as_of=as_of,
                     )
-                    evaluations.append(
+                    for metric in case.enabled_metrics
+                ]
+                status = self._combine_metric_statuses(
+                    case.rule,
+                    [metric.status for metric in metric_evaluations],
+                )
+                ordered_evaluations.append(
+                    (
+                        case.order,
                         CropProtectionRuleEvaluation(
-                            rule_id=rule.id,
-                            rule_name=rule.name,
+                            rule_id=case.rule.id,
+                            rule_name=case.rule.name,
                             section_id=section.id,
                             section_name=section.name,
                             field_id=section.field.id,
@@ -356,7 +448,11 @@ class CropProtectionService:
                             last_treatment_date=last_treatment.date,
                             last_treatment_product=last_treatment.product_name,
                             metrics=metric_evaluations,
-                        )
+                        ),
                     )
+                )
 
-            return evaluations
+            return [
+                evaluation
+                for _, evaluation in sorted(ordered_evaluations, key=lambda item: item[0])
+            ]
