@@ -19,6 +19,7 @@ class WeatherRefreshStationResult:
     workflow_name: str
     source_provider: str
     source_station: str
+    cache_kind: str
     status: str
     start: datetime.datetime
     end: datetime.datetime
@@ -107,6 +108,9 @@ class WeatherRefreshWorkflow:
         max_age_hours: float = 0,
         force: bool = False,
         active_only: bool = True,
+        refresh_forecast: bool = True,
+        forecast_provider: str = "open-meteo",
+        forecast_days: int = 7,
         cleanup_older_than_days: int | None = None,
     ) -> WeatherRefreshResult:
         start_ts, end_ts = self._resolve_window(
@@ -133,6 +137,7 @@ class WeatherRefreshWorkflow:
                         workflow_name=self.name,
                         source_provider=provider,
                         source_station=station,
+                        cache_kind="observed",
                         status="success",
                         start=start_ts.to_pydatetime(),
                         end=end_ts.to_pydatetime(),
@@ -152,9 +157,73 @@ class WeatherRefreshWorkflow:
                         workflow_name=self.name,
                         source_provider=provider,
                         source_station=station,
+                        cache_kind="observed",
                         status="failed",
                         start=start_ts.to_pydatetime(),
                         end=end_ts.to_pydatetime(),
+                        field_ids=sorted(field.id for field in station_fields),
+                        error=str(exc),
+                    )
+                )
+
+            if not refresh_forecast or int(forecast_days) <= 0:
+                continue
+
+            forecast_start = end_ts.floor("h")
+            forecast_end = forecast_start + pd.Timedelta(days=int(forecast_days))
+            try:
+                forecast_result = self.cache_service.refresh_station_hourly(
+                    provider=forecast_provider,
+                    station=station,
+                    start=forecast_start,
+                    end=forecast_end,
+                    value_type="forecast",
+                )
+                stale_before_count = self.cache_service.clear_station_hourly_cache(
+                    provider=forecast_provider,
+                    station=station,
+                    end=forecast_start,
+                    value_type="forecast",
+                )
+                stale_after_count = self.cache_service.clear_station_hourly_cache(
+                    provider=forecast_provider,
+                    station=station,
+                    start=forecast_end,
+                    value_type="forecast",
+                )
+                station_results.append(
+                    WeatherRefreshStationResult(
+                        workflow_name=self.name,
+                        source_provider=forecast_provider,
+                        source_station=station,
+                        cache_kind="forecast",
+                        status="success",
+                        start=forecast_start.to_pydatetime(),
+                        end=forecast_end.to_pydatetime(),
+                        field_ids=sorted(field.id for field in station_fields),
+                        row_count=forecast_result.upserted_count,
+                        refreshed=True,
+                        metadata={
+                            "stale_before_count": stale_before_count,
+                            "stale_after_count": stale_after_count,
+                        },
+                    )
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Refreshing weather forecast cache failed for station %s/%s",
+                    forecast_provider,
+                    station,
+                )
+                station_results.append(
+                    WeatherRefreshStationResult(
+                        workflow_name=self.name,
+                        source_provider=forecast_provider,
+                        source_station=station,
+                        cache_kind="forecast",
+                        status="failed",
+                        start=forecast_start.to_pydatetime(),
+                        end=forecast_end.to_pydatetime(),
                         field_ids=sorted(field.id for field in station_fields),
                         error=str(exc),
                     )
@@ -177,7 +246,7 @@ class WeatherRefreshWorkflow:
         return WeatherRefreshResult(
             workflow_name=self.name,
             status=status,
-            station_count=len(station_results),
+            station_count=len(station_groups),
             field_count=sum(len(station_fields) for station_fields in station_groups.values()),
             start=start_ts.to_pydatetime(),
             end=end_ts.to_pydatetime(),
@@ -188,6 +257,9 @@ class WeatherRefreshWorkflow:
                 "force": force,
                 "lookback_days": int(lookback_days),
                 "max_age_hours": float(max_age_hours),
+                "refresh_forecast": refresh_forecast,
+                "forecast_provider": forecast_provider,
+                "forecast_days": int(forecast_days),
                 "cleanup_older_than_days": cleanup_older_than_days,
             },
         )

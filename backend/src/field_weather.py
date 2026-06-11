@@ -140,6 +140,7 @@ class FieldWeatherCacheService:
         provider: str,
         station: str,
         hourly: pd.DataFrame,
+        value_type: str | None = None,
     ) -> pd.DataFrame:
         if hourly.empty:
             return hourly.copy()
@@ -158,7 +159,9 @@ class FieldWeatherCacheService:
                 continue
             frame[column] = pd.to_numeric(hourly[column], errors="coerce") if column in hourly.columns else None
 
-        if "model" in hourly.columns:
+        if value_type is not None:
+            frame["value_type"] = value_type
+        elif "model" in hourly.columns:
             frame["value_type"] = hourly["model"].eq("observation").map({True: "observed", False: "forecast"})
         else:
             frame["value_type"] = "observed"
@@ -172,6 +175,7 @@ class FieldWeatherCacheService:
         station: str,
         start: datetime.datetime | datetime.date | str | pd.Timestamp,
         end: datetime.datetime | datetime.date | str | pd.Timestamp,
+        value_type: str | None = None,
     ) -> WeatherRefreshResult:
         start_ts, end_ts = self._normalize_hourly_window(start, end)
 
@@ -191,6 +195,7 @@ class FieldWeatherCacheService:
             provider=provider,
             station=station,
             hourly=hourly,
+            value_type=value_type,
         )
         with self.db.session_scope() as session:
             upserted_count = self.db.field_weather.add_station_hourly(
@@ -207,6 +212,30 @@ class FieldWeatherCacheService:
             end=end_ts,
             upserted_count=upserted_count,
         )
+
+    def clear_station_hourly_cache(
+        self,
+        *,
+        provider: str,
+        station: str,
+        start: datetime.datetime | datetime.date | str | pd.Timestamp | None = None,
+        end: datetime.datetime | datetime.date | str | pd.Timestamp | None = None,
+        value_type: str | None = None,
+    ) -> int:
+        start_ts = None if start is None else self._to_timestamp(start)
+        end_ts = None if end is None else self._to_timestamp(end)
+        if start_ts is not None and end_ts is not None and start_ts >= end_ts:
+            raise ValueError("start must be before end")
+
+        with self.db.session_scope() as session:
+            return self.db.field_weather.clear_station_hourly(
+                session,
+                provider=provider,
+                station=station,
+                start=start_ts,
+                end=end_ts,
+                value_type=value_type,
+            )
 
     def _refresh_start_for_cache_state(
         self,

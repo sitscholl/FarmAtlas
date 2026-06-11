@@ -69,6 +69,9 @@ workflows:
       max_age_hours: 0
       force: false
       active_only: true
+      refresh_forecast: true
+      forecast_provider: open-meteo
+      forecast_days: 7
       cleanup_older_than_days: 400
 
   water_balance:

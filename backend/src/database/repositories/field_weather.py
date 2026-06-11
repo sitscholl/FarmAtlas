@@ -137,6 +137,7 @@ class FieldWeatherRepository:
         station: str,
         start: datetime.datetime | datetime.date | None = None,
         end: datetime.datetime | datetime.date | None = None,
+        value_type: str | None = None,
     ) -> int:
         query = session.query(models.StationWeatherHourly).filter(
             models.StationWeatherHourly.source_provider == provider,
@@ -146,6 +147,8 @@ class FieldWeatherRepository:
             query = query.filter(models.StationWeatherHourly.timestamp >= pd.Timestamp(start).to_pydatetime())
         if end is not None:
             query = query.filter(models.StationWeatherHourly.timestamp < pd.Timestamp(end).to_pydatetime())
+        if value_type is not None:
+            query = query.filter(models.StationWeatherHourly.value_type == value_type)
         deleted = query.delete(synchronize_session=False)
         logger.info("Cleared %s hourly weather rows for %s/%s", deleted, provider, station)
         return deleted
