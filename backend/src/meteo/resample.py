@@ -33,6 +33,8 @@ DEFAULT_RESAMPLE_COLMAP = {
     "air_pressure": "mean",
     "sun_duration": "sum",
     "solar_radiation": "sum",
+    "et0": "sum",
+    "et0_corrected": "sum",
     "snow_height": "mean",
     "water_level": "mean",
     "discharge": "mean"

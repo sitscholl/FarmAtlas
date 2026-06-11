@@ -218,20 +218,28 @@ export type FieldWeatherBulkRefreshResponse = {
   total_upserted_count: number
 }
 
-export type FieldWeatherDailyRead = {
-  date: string
-  field_id: number
-  precipitation: number
-  tmin?: number | null
-  tmax?: number | null
-  tmean?: number | null
+export type StationWeatherHourlyRead = {
   source_provider: string
   source_station: string
+  timestamp: string
+  precipitation: number
+  tair_2m?: number | null
+  relative_humidity?: number | null
+  wind_speed?: number | null
+  wind_gust?: number | null
+  air_pressure?: number | null
+  sun_duration?: number | null
+  solar_radiation?: number | null
+  et0?: number | null
+  et0_corrected?: number | null
   value_type: string
+  updated_at: string
 }
 
 export type FieldWeatherRefreshResponse = {
   field_id: number
+  source_provider: string
+  source_station: string
   start: string
   end: string
   upserted_count: number

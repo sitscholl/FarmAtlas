@@ -77,12 +77,6 @@ class Field(Base):
         back_populates="field",
         cascade="all, delete-orphan",
     )
-    field_weather_daily = relationship(
-        "FieldWeatherDaily",
-        back_populates="field",
-        cascade="all, delete-orphan",
-    )
-
     @property
     def sections(self) -> list["Section"]:
         return [section for planting in self.plantings for section in planting.sections]
@@ -333,23 +327,32 @@ class WaterBalance(Base):
     field = relationship("Field", back_populates="water_balance")
 
 
-class FieldWeatherDaily(Base):
-    __tablename__ = "field_weather_daily"
+class StationWeatherHourly(Base):
+    __tablename__ = "station_weather_hourly"
     __table_args__ = (
-        UniqueConstraint("field_id", "date", name="uq_field_weather_daily_field_date"),
+        UniqueConstraint(
+            "source_provider",
+            "source_station",
+            "timestamp",
+            name="uq_station_weather_hourly_station_timestamp",
+        ),
     )
 
-    date = Column(Date, primary_key=True)
-    field_id = Column(Integer, ForeignKey("fields.id"), primary_key=True)
-    precipitation = Column(Float, nullable=False)
-    tmin = Column(Float, nullable=True)
-    tmax = Column(Float, nullable=True)
-    tmean = Column(Float, nullable=True)
-    source_provider = Column(String, nullable=False)
-    source_station = Column(String, nullable=False)
+    source_provider = Column(String, primary_key=True)
+    source_station = Column(String, primary_key=True)
+    timestamp = Column(DateTime(timezone=True), primary_key=True)
+    precipitation = Column(Float, nullable=False, default=0.0)
+    tair_2m = Column(Float, nullable=True)
+    relative_humidity = Column(Float, nullable=True)
+    wind_speed = Column(Float, nullable=True)
+    wind_gust = Column(Float, nullable=True)
+    air_pressure = Column(Float, nullable=True)
+    sun_duration = Column(Float, nullable=True)
+    solar_radiation = Column(Float, nullable=True)
+    et0 = Column(Float, nullable=True)
+    et0_corrected = Column(Float, nullable=True)
     value_type = Column(String, nullable=False, default="observed")
-
-    field = relationship("Field", back_populates="field_weather_daily")
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
 
 
 class TreatmentImport(Base):

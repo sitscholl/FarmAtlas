@@ -13,97 +13,139 @@ logger = logging.getLogger(__name__)
 
 
 class FieldWeatherRepository:
-    def __init__(self, field_repository: FieldRepository) -> None:
+    HOURLY_COLUMNS = [
+        "source_provider",
+        "source_station",
+        "timestamp",
+        "precipitation",
+        "tair_2m",
+        "relative_humidity",
+        "wind_speed",
+        "wind_gust",
+        "air_pressure",
+        "sun_duration",
+        "solar_radiation",
+        "et0",
+        "et0_corrected",
+        "value_type",
+        "updated_at",
+    ]
+
+    def __init__(self, field_repository: FieldRepository | None = None) -> None:
         self._fields = field_repository
 
-    def list_for_field(
+    def list_station_hourly(
         self,
         session: Session,
         *,
-        field_id: int,
-        start: datetime.date | None = None,
-        end: datetime.date | None = None,
-    ) -> list[models.FieldWeatherDaily]:
-        field = self._fields.get_by_id(session, field_id)
-        if field is None:
-            raise ValueError(f"No field with id {field_id} found. Cannot query field weather")
-
-        query = session.query(models.FieldWeatherDaily).filter(models.FieldWeatherDaily.field_id == field_id)
+        provider: str,
+        station: str,
+        start: datetime.datetime | datetime.date | None = None,
+        end: datetime.datetime | datetime.date | None = None,
+    ) -> list[models.StationWeatherHourly]:
+        query = session.query(models.StationWeatherHourly).filter(
+            models.StationWeatherHourly.source_provider == provider,
+            models.StationWeatherHourly.source_station == station,
+        )
         if start is not None:
-            query = query.filter(models.FieldWeatherDaily.date >= pd.Timestamp(start).date())
+            query = query.filter(models.StationWeatherHourly.timestamp >= pd.Timestamp(start).to_pydatetime())
         if end is not None:
-            query = query.filter(models.FieldWeatherDaily.date < pd.Timestamp(end).date())
-        return query.order_by(models.FieldWeatherDaily.date).all()
+            query = query.filter(models.StationWeatherHourly.timestamp < pd.Timestamp(end).to_pydatetime())
+        return query.order_by(models.StationWeatherHourly.timestamp).all()
 
-    def add(self, session: Session, engine: Engine, daily_weather: pd.DataFrame, *, field_id: int | None = None) -> int:
-        df = daily_weather.copy()
-        if field_id is not None:
-            df["field_id"] = field_id
-        if "field_id" not in df.columns:
-            raise ValueError("Field id not provided as argument and not present in dataframe.")
+    def add_station_hourly(
+        self,
+        session: Session,
+        engine: Engine,
+        hourly_weather: pd.DataFrame,
+        *,
+        provider: str | None = None,
+        station: str | None = None,
+        updated_at: datetime.datetime | None = None,
+    ) -> int:
+        df = hourly_weather.copy()
+        if df.empty:
+            return 0
 
-        required_cols = [
-            "field_id",
-            "precipitation",
-            "source_provider",
-            "source_station",
-            "value_type",
-        ]
-        optional_cols = ["tmin", "tmax", "tmean"]
+        if provider is not None:
+            df["source_provider"] = provider
+        if station is not None:
+            df["source_station"] = station
+        if "timestamp" not in df.columns:
+            if not isinstance(df.index, pd.DatetimeIndex):
+                raise ValueError("Station weather dataframe must have a timestamp column or DatetimeIndex.")
+            df = df.rename_axis("timestamp").reset_index()
+
+        required_cols = ["source_provider", "source_station", "timestamp", "precipitation", "value_type"]
         missing_required = [column for column in required_cols if column not in df.columns]
         if missing_required:
-            raise ValueError(f"Missing required field weather columns: {', '.join(missing_required)}")
+            raise ValueError(f"Missing required station weather columns: {', '.join(missing_required)}")
 
-        if "date" not in df.columns:
-            if not isinstance(df.index, pd.DatetimeIndex):
-                raise ValueError("Field weather dataframe must have a date column or DatetimeIndex.")
-            df = df.rename_axis("date").reset_index()
+        optional_cols = [
+            "tair_2m",
+            "relative_humidity",
+            "wind_speed",
+            "wind_gust",
+            "air_pressure",
+            "sun_duration",
+            "solar_radiation",
+            "et0",
+            "et0_corrected",
+        ]
+        for column in optional_cols:
+            if column not in df.columns:
+                df[column] = None
 
-        for col in optional_cols:
-            if col not in df.columns:
-                df[col] = None
+        if updated_at is None:
+            updated_at = datetime.datetime.now(datetime.UTC)
+        df["updated_at"] = pd.Timestamp(updated_at).to_pydatetime()
+        df["timestamp"] = pd.to_datetime(df["timestamp"]).map(lambda value: pd.Timestamp(value).to_pydatetime())
+        df["precipitation"] = pd.to_numeric(df["precipitation"], errors="coerce").fillna(0.0)
 
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df = df[["date"] + required_cols + optional_cols]
+        df = df[self.HOURLY_COLUMNS]
         records = df.to_dict(orient="records")
         if not records:
             return 0
 
         if engine.dialect.name == "sqlite":
-            stmt = sqlite_insert(models.FieldWeatherDaily).values(records)
+            stmt = sqlite_insert(models.StationWeatherHourly).values(records)
             update_cols = {
                 col: getattr(stmt.excluded, col)
-                for col in required_cols + optional_cols
-                if col != "field_id"
+                for col in self.HOURLY_COLUMNS
+                if col not in {"source_provider", "source_station", "timestamp"}
             }
             stmt = stmt.on_conflict_do_update(
-                index_elements=[models.FieldWeatherDaily.field_id, models.FieldWeatherDaily.date],
+                index_elements=[
+                    models.StationWeatherHourly.source_provider,
+                    models.StationWeatherHourly.source_station,
+                    models.StationWeatherHourly.timestamp,
+                ],
                 set_=update_cols,
             )
             result = session.execute(stmt)
             return result.rowcount or 0
 
         for record in records:
-            session.merge(models.FieldWeatherDaily(**record))
+            session.merge(models.StationWeatherHourly(**record))
         return len(records)
 
-    def clear_for_field(
+    def clear_station_hourly(
         self,
         session: Session,
         *,
-        field_id: int,
-        start: datetime.date | None = None,
-        end: datetime.date | None = None,
+        provider: str,
+        station: str,
+        start: datetime.datetime | datetime.date | None = None,
+        end: datetime.datetime | datetime.date | None = None,
     ) -> int:
-        field = self._fields.get_by_id(session, field_id)
-        if field is None:
-            raise ValueError(f"No field with id {field_id} found. Cannot clear field weather")
-
-        query = session.query(models.FieldWeatherDaily).filter(models.FieldWeatherDaily.field_id == field_id)
+        query = session.query(models.StationWeatherHourly).filter(
+            models.StationWeatherHourly.source_provider == provider,
+            models.StationWeatherHourly.source_station == station,
+        )
         if start is not None:
-            query = query.filter(models.FieldWeatherDaily.date >= pd.Timestamp(start).date())
+            query = query.filter(models.StationWeatherHourly.timestamp >= pd.Timestamp(start).to_pydatetime())
         if end is not None:
-            query = query.filter(models.FieldWeatherDaily.date < pd.Timestamp(end).date())
+            query = query.filter(models.StationWeatherHourly.timestamp < pd.Timestamp(end).to_pydatetime())
         deleted = query.delete(synchronize_session=False)
-        logger.info("Cleared %s field weather rows for field %s", deleted, field_id)
+        logger.info("Cleared %s hourly weather rows for %s/%s", deleted, provider, station)
         return deleted

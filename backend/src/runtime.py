@@ -141,6 +141,7 @@ class RuntimeContext:
             timezone=self.timezone,
             min_sample_size=int(self.min_sample_size),
         )
+        self.db.crop_protection_service.set_weather_cache_service(self.field_weather_service)
 
     def update_runtime(self, config_file: str | Path):
         self.config_file = Path(config_file)

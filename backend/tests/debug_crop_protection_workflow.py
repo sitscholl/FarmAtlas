@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.database.db import Database
 from src.metrics import MetricAccumulatorService
+from src.weather_frame import WeatherFrame
 from src.schemas import CropProtectionRuleEvaluationRead, CropProtectionRuleRead
 
 
@@ -85,26 +86,25 @@ def main() -> None:
     print(f"Created alias_id={alias.id}; unresolved names now={unresolved}")
     print(f"Resolved treatment section_id={events[0].section_id}, product={events[0].product_name}")
 
-    step("4. Add daily field weather cache rows", debug=args.debug)
+    step("4. Add hourly station weather cache rows", debug=args.debug)
     weather = pd.DataFrame(
         {
-            "date": pd.date_range("2026-04-01", "2026-04-10", freq="D"),
+            "timestamp": pd.date_range("2026-04-01 12:00", "2026-04-10 12:00", freq="D"),
             "precipitation": [0, 2, 3, 1, 0, 4, 2, 0, 1, 2],
-            "tmin": [8, 9, 10, 11, 8, 9, 12, 13, 10, 11],
-            "tmax": [18, 19, 20, 21, 18, 19, 22, 23, 20, 21],
+            "tair_2m": [13, 14, 15, 16, 13, 14, 17, 18, 15, 16],
             "source_provider": "demo",
             "source_station": "demo-station",
             "value_type": "observed",
         }
     )
-    weather["tmean"] = (weather["tmin"] + weather["tmax"]) / 2
     with db.session_scope() as session:
-        upserted = db.field_weather.add(session, db.engine, weather, field_id=field_id)
-        cached_weather = db.field_weather.list_for_field(
+        upserted = db.field_weather.add_station_hourly(session, db.engine, weather)
+        cached_weather = db.field_weather.list_station_hourly(
             session,
-            field_id=field_id,
-            start=datetime.date(2026, 4, 1),
-            end=datetime.date(2026, 4, 11),
+            provider="demo",
+            station="demo-station",
+            start=datetime.datetime(2026, 4, 1),
+            end=datetime.datetime(2026, 4, 11),
         )
     print(f"Upserted weather rows={upserted}; cached rows={len(cached_weather)}")
 
@@ -112,15 +112,14 @@ def main() -> None:
     weather_frame = pd.DataFrame(
         [
             {
-                "date": row.date,
+                "timestamp": row.timestamp,
                 "precipitation": row.precipitation,
-                "tmin": row.tmin,
-                "tmax": row.tmax,
+                "tair_2m": row.tair_2m,
             }
             for row in cached_weather
         ]
     )
-    accumulator = MetricAccumulatorService(weather_frame)
+    accumulator = MetricAccumulatorService(WeatherFrame(data=weather_frame, resolution="1h"))
     print("Days since treatment:", accumulator.days_since("2026-04-01", "2026-04-10"))
     print("Rain since treatment:", accumulator.precipitation_since("2026-04-01", "2026-04-10"))
     print("GDD since treatment:", accumulator.gdd_since("2026-04-01", "2026-04-10", base_temperature=10))

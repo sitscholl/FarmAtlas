@@ -4,7 +4,9 @@ from typing import Any
 
 import pandas as pd
 
+from ...field import FieldContext
 from ...metrics import MetricAccumulatorService
+from ...weather_frame import WeatherFrame
 from .. import models
 from ..core import DatabaseCore
 from ..repositories import CropProtectionRepository, FieldWeatherRepository
@@ -46,6 +48,10 @@ class CropProtectionService:
         self._core = core
         self._crop_protection = crop_protection
         self._field_weather = field_weather
+        self._weather_cache_service: Any | None = None
+
+    def set_weather_cache_service(self, weather_cache_service: Any) -> None:
+        self._weather_cache_service = weather_cache_service
 
     def _validate_rule_payload(
         self,
@@ -103,32 +109,73 @@ class CropProtectionService:
         end = rule.season_end or datetime.date(season_year, 12, 31)
         return start, min(end, as_of)
 
-    def _weather_dataframe(
+    def _weather_frame(
         self,
         session,
         *,
-        field_id: int,
-        start: datetime.date,
-        end: datetime.date,
-    ) -> pd.DataFrame:
-        rows = self._field_weather.list_for_field(
+        field: models.Field,
+        start: datetime.date | datetime.datetime,
+        end: datetime.date | datetime.datetime,
+    ) -> WeatherFrame:
+        if self._weather_cache_service is not None:
+            return self._weather_cache_service.get_field_hourly_weather(
+                FieldContext.from_model(field),
+                start=start,
+                end=end,
+                ensure=True,
+            )
+
+        rows = self._field_weather.list_station_hourly(
             session,
-            field_id=field_id,
+            provider=field.reference_provider,
+            station=field.reference_station,
             start=start,
-            end=end + datetime.timedelta(days=1),
+            end=end,
         )
-        return pd.DataFrame(
+        frame = pd.DataFrame(
             [
                 {
-                    "date": row.date,
+                    "timestamp": row.timestamp,
                     "precipitation": row.precipitation,
-                    "tmin": row.tmin,
-                    "tmax": row.tmax,
-                    "tmean": row.tmean,
+                    "tair_2m": row.tair_2m,
+                    "relative_humidity": row.relative_humidity,
+                    "wind_speed": row.wind_speed,
+                    "wind_gust": row.wind_gust,
+                    "air_pressure": row.air_pressure,
+                    "sun_duration": row.sun_duration,
+                    "solar_radiation": row.solar_radiation,
+                    "et0": row.et0,
+                    "et0_corrected": row.et0_corrected,
                 }
                 for row in rows
             ]
         )
+        return WeatherFrame(
+            data=frame,
+            resolution="1h",
+            start=pd.Timestamp(start),
+            end=pd.Timestamp(end),
+            source_provider=field.reference_provider,
+            source_station=field.reference_station,
+        )
+
+    def _resolve_as_of(
+        self,
+        as_of: datetime.date | datetime.datetime | None,
+    ) -> datetime.date | datetime.datetime:
+        if as_of is not None:
+            return as_of
+        if self._weather_cache_service is not None:
+            return pd.Timestamp.now(tz=self._weather_cache_service.timezone).floor("h").to_pydatetime()
+        return datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
+
+    def _weather_window_end(
+        self,
+        as_of: datetime.date | datetime.datetime,
+    ) -> datetime.date | datetime.datetime:
+        if isinstance(as_of, datetime.datetime):
+            return as_of + datetime.timedelta(hours=1)
+        return as_of + datetime.timedelta(days=1)
 
     def _evaluate_metric(
         self,
@@ -136,7 +183,7 @@ class CropProtectionService:
         accumulator: MetricAccumulatorService,
         *,
         start_date: datetime.date,
-        as_of: datetime.date,
+        as_of: datetime.date | datetime.datetime,
     ) -> CropProtectionMetricEvaluation:
         metric_type = metric.metric_type
         value: float | int | None
@@ -199,11 +246,13 @@ class CropProtectionService:
         *,
         rule_id: int | None = None,
         season_year: int | None = None,
-        as_of: datetime.date | None = None,
+        as_of: datetime.date | datetime.datetime | None = None,
         include_disabled: bool = False,
     ) -> list[CropProtectionRuleEvaluation]:
-        as_of = as_of or datetime.date.today()
-        season_year = season_year or as_of.year
+        as_of = self._resolve_as_of(as_of)
+        as_of_date = as_of.date() if isinstance(as_of, datetime.datetime) else as_of
+        weather_end = self._weather_window_end(as_of)
+        season_year = season_year or as_of_date.year
 
         with self._core.session_scope() as session:
             if rule_id is None:
@@ -223,7 +272,8 @@ class CropProtectionService:
                 sections_by_id = self._crop_protection.get_section_contexts(session, section_ids)
                 product_names = [product.product_name for product in rule.products]
                 enabled_metrics = [metric for metric in rule.metrics if metric.enabled]
-                season_start, season_end = self._season_bounds(rule, season_year=season_year, as_of=as_of)
+                season_start, season_end = self._season_bounds(rule, season_year=season_year, as_of=as_of_date)
+                evaluation_cases: list[tuple[models.Section, models.TreatmentEvent]] = []
 
                 for section_id in section_ids:
                     section = sections_by_id.get(section_id)
@@ -254,12 +304,32 @@ class CropProtectionService:
                         )
                         continue
 
-                    weather = self._weather_dataframe(
-                        session,
-                        field_id=section.field.id,
-                        start=last_treatment.date,
-                        end=as_of,
+                    evaluation_cases.append((section, last_treatment))
+
+                weather_by_field_id: dict[int, WeatherFrame] = {}
+                if self._weather_cache_service is not None and evaluation_cases:
+                    field_contexts_by_id: dict[int, FieldContext] = {}
+                    start_by_field_id: dict[int, datetime.date] = {}
+                    for section, last_treatment in evaluation_cases:
+                        field_contexts_by_id[section.field.id] = FieldContext.from_model(section.field)
+                        current_start = start_by_field_id.get(section.field.id)
+                        if current_start is None or last_treatment.date < current_start:
+                            start_by_field_id[section.field.id] = last_treatment.date
+                    weather_by_field_id = self._weather_cache_service.ensure_fields_hourly_weather(
+                        list(field_contexts_by_id.values()),
+                        start=start_by_field_id,
+                        end=weather_end,
                     )
+
+                for section, last_treatment in evaluation_cases:
+                    weather = weather_by_field_id.get(section.field.id)
+                    if weather is None:
+                        weather = self._weather_frame(
+                            session,
+                            field=section.field,
+                            start=last_treatment.date,
+                            end=weather_end,
+                        )
                     accumulator = MetricAccumulatorService(weather)
                     metric_evaluations = [
                         self._evaluate_metric(

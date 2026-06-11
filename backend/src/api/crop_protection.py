@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -86,7 +86,7 @@ async def delete_crop_protection_rule(rule_id: int):
 async def evaluate_crop_protection_rules(
     rule_id: int | None = None,
     season_year: int | None = None,
-    as_of: date | None = None,
+    as_of: datetime | None = None,
     include_disabled: bool = False,
 ):
     try:
@@ -105,7 +105,7 @@ async def evaluate_crop_protection_rules(
 @router.get("/field-summaries", response_model=list[CropProtectionFieldSummaryRead])
 async def summarize_crop_protection_by_field(
     season_year: int | None = None,
-    as_of: date | None = None,
+    as_of: datetime | None = None,
     include_disabled: bool = False,
 ):
     try:
@@ -159,7 +159,7 @@ async def summarize_crop_protection_by_field(
 async def evaluate_crop_protection_rule(
     rule_id: int,
     season_year: int | None = None,
-    as_of: date | None = None,
+    as_of: datetime | None = None,
     include_disabled: bool = False,
 ):
     return await evaluate_crop_protection_rules(

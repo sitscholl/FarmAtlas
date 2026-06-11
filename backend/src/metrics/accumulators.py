@@ -1,8 +1,7 @@
 import datetime
 from dataclasses import dataclass
 
-import pandas as pd
-
+from ..weather_frame import WeatherFrame
 from .gdd import calculate_gdd_sum
 from .periods import calculate_days_since
 from .precipitation import calculate_precipitation_sum
@@ -10,19 +9,19 @@ from .precipitation import calculate_precipitation_sum
 
 @dataclass(frozen=True)
 class MetricAccumulatorService:
-    daily_weather: pd.DataFrame
+    daily_weather: WeatherFrame
 
     def days_since(
         self,
-        start_date: datetime.date | str,
-        end_date: datetime.date | str | None = None,
+        start_date: datetime.date | datetime.datetime | str,
+        end_date: datetime.date | datetime.datetime | str | None = None,
     ) -> int:
         return calculate_days_since(start_date, end_date)
 
     def precipitation_since(
         self,
-        start_date: datetime.date | str,
-        end_date: datetime.date | str | None = None,
+        start_date: datetime.date | datetime.datetime | str,
+        end_date: datetime.date | datetime.datetime | str | None = None,
         *,
         include_start: bool = False,
     ) -> float:
@@ -35,8 +34,8 @@ class MetricAccumulatorService:
 
     def gdd_since(
         self,
-        start_date: datetime.date | str,
-        end_date: datetime.date | str | None = None,
+        start_date: datetime.date | datetime.datetime | str,
+        end_date: datetime.date | datetime.datetime | str | None = None,
         *,
         base_temperature: float,
         include_start: bool = False,
