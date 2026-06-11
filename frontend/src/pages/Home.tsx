@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
-import { FiFilter, FiMoreVertical, FiX } from 'react-icons/fi'
+import { FiMoreVertical, FiX } from 'react-icons/fi'
 import { LuArrowDown, LuCalendarDays, LuRadioTower, LuTrees } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
 import { FaArrowRight } from 'react-icons/fa'
@@ -51,6 +51,13 @@ type FieldPhenologyEvent = {
   variety: string
   stageName: string
   date: string
+}
+
+type CropProtectionRuleChip = {
+  rule: CropProtectionRuleRead
+  dueCount: number
+  soonCount: number
+  affectedCount: number
 }
 
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
@@ -149,6 +156,14 @@ function buildPhenologyEventsByFieldId(fieldDetails: FieldDetailRead[]) {
         .sort((left, right) => right.date.localeCompare(left.date)),
     ]),
   ) as Record<number, FieldPhenologyEvent[]>
+}
+
+function hasRuleAlert(summary: CropProtectionFieldSummaryRead | undefined, ruleId: number) {
+  return (summary?.evaluations ?? []).some(
+    (evaluation) =>
+      evaluation.rule_id === ruleId &&
+      (evaluation.status === 'due' || evaluation.status === 'soon'),
+  )
 }
 
 function FieldPhenologyTooltip({ events }: { events: FieldPhenologyEvent[] | undefined }) {
@@ -332,8 +347,7 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
   const [waterBalanceModal, setWaterBalanceModal] = useState<WaterBalanceModalState | null>(null)
-  const [selectedRuleIds, setSelectedRuleIds] = useState<number[]>([])
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -400,18 +414,11 @@ export default function Home() {
           return false
         }
 
-        if (selectedRuleIds.length === 0) {
+        if (selectedRuleId === null) {
           return true
         }
 
-        const summary = cropProtectionByFieldId[field.id]
-        return selectedRuleIds.every((ruleId) =>
-          (summary?.evaluations ?? []).some(
-            (evaluation) =>
-              evaluation.rule_id === ruleId &&
-              (evaluation.status === 'due' || evaluation.status === 'soon'),
-          ),
-        )
+        return hasRuleAlert(cropProtectionByFieldId[field.id], selectedRuleId)
       }).sort(function (a, b) {
           if (a.name < b.name) {
             return -1;
@@ -421,17 +428,46 @@ export default function Home() {
           }
           return 0;
         }),
-    [cropProtectionByFieldId, fields, selectedRuleIds],
+    [cropProtectionByFieldId, fields, selectedRuleId],
   )
 
-  const selectedRuleSet = useMemo(() => new Set(selectedRuleIds), [selectedRuleIds])
+  const ruleChips = useMemo<CropProtectionRuleChip[]>(() => {
+    const activeFields = fields.filter((field) => field.active)
+    return cropProtectionRules
+      .filter((rule) => rule.enabled)
+      .map((rule) => {
+        let dueCount = 0
+        let soonCount = 0
+
+        for (const field of activeFields) {
+          const evaluations = cropProtectionByFieldId[field.id]?.evaluations ?? []
+          const statuses = evaluations
+            .filter((evaluation) => evaluation.rule_id === rule.id)
+            .map((evaluation) => evaluation.status)
+
+          if (statuses.includes('due')) {
+            dueCount += 1
+          } else if (statuses.includes('soon')) {
+            soonCount += 1
+          }
+        }
+
+        return {
+          rule,
+          dueCount,
+          soonCount,
+          affectedCount: dueCount + soonCount,
+        }
+      })
+  }, [cropProtectionByFieldId, cropProtectionRules, fields])
+
+  const selectedRuleName = useMemo(
+    () => cropProtectionRules.find((rule) => rule.id === selectedRuleId)?.name ?? null,
+    [cropProtectionRules, selectedRuleId],
+  )
 
   const toggleRuleFilter = (ruleId: number) => {
-    setSelectedRuleIds((currentRuleIds) =>
-      currentRuleIds.includes(ruleId)
-        ? currentRuleIds.filter((currentRuleId) => currentRuleId !== ruleId)
-        : [...currentRuleIds, ruleId],
-    )
+    setSelectedRuleId((currentRuleId) => currentRuleId === ruleId ? null : ruleId)
   }
 
   const handleRefreshField = async (field: FieldSummaryRead) => {
@@ -526,76 +562,44 @@ export default function Home() {
 
     return (
       <>
-        <div className="relative mt-6 flex justify-end sm:mt-8">
-          <button
-            type="button"
-            onClick={() => setIsFilterMenuOpen((currentState) => !currentState)}
-            className={`inline-flex items-center gap-2 border px-4 py-2 text-sm font-semibold transition ${
-              selectedRuleIds.length === 0
-                ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                : 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'
-            }`}
-            aria-label="Pflanzenschutzregeln filtern"
-            aria-expanded={isFilterMenuOpen}
-          >
-            <FiFilter className="h-4 w-4" aria-hidden="true" />
-            {selectedRuleIds.length > 0 ? <span>{selectedRuleIds.length}</span> : null}
-          </button>
+        {ruleChips.length > 0 ? (
+          <div className="mt-6 sm:mt-8">
+            <div className="flex flex-wrap gap-2">
+              {ruleChips.map((chip) => {
+                const isSelected = selectedRuleId === chip.rule.id
+                const alertClass = chip.dueCount > 0
+                  ? 'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100'
+                  : chip.soonCount > 0
+                    ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
 
-          {isFilterMenuOpen ? (
-            <div className="absolute right-0 top-full z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] border border-slate-200 bg-white p-3 text-left shadow-xl">
-              <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Pflanzenschutzregeln
-                </div>
-                {selectedRuleIds.length > 0 ? (
+                return (
                   <button
+                    key={chip.rule.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedRuleIds([])
-                    }}
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                    onClick={() => toggleRuleFilter(chip.rule.id)}
+                    className={`inline-flex max-w-full items-center gap-2 border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition ${
+                      isSelected ? 'ring-2 ring-sky-400 ring-offset-2' : ''
+                    } ${alertClass}`}
+                    aria-pressed={isSelected}
+                    title={chip.rule.name}
                   >
-                    Filter loeschen
+                    <span className="truncate">{chip.rule.name}</span>
+                    <span className="inline-flex min-w-6 justify-center border border-current/20 bg-white/70 px-1.5 py-0.5 text-[11px] leading-none">
+                      {chip.affectedCount}
+                    </span>
                   </button>
-                ) : null}
-              </div>
-              {cropProtectionRules.length === 0 ? (
-                <div className="px-3 py-6 text-sm text-slate-500">
-                  Keine Pflanzenschutzregeln vorhanden.
-                </div>
-              ) : (
-                <div className="grid max-h-80 gap-1 overflow-y-auto pr-1">
-                  {cropProtectionRules.map((rule) => (
-                    <label
-                      key={rule.id}
-                      className={`flex items-start gap-3 px-3 py-2 text-sm transition ${
-                        selectedRuleSet.has(rule.id) ? 'bg-sky-50 text-sky-900' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedRuleSet.has(rule.id)}
-                        onChange={() => toggleRuleFilter(rule.id)}
-                        className="mt-0.5 h-4 w-4"
-                      />
-                      <span className="min-w-0">
-                        <span className="block font-semibold">{rule.name}</span>
-                        <span className="mt-0.5 block text-xs text-slate-500">
-                          {rule.products.length} Produkte | {rule.scopes.length} Bereiche
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
+                )
+              })}
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {visibleFields.length === 0 ? (
           <div className="mt-6 border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500 sm:px-6 sm:py-10">
-            Keine aktiven Anlagen fuer diesen Filter gefunden.
+            {selectedRuleName === null
+              ? 'Keine aktiven Anlagen gefunden.'
+              : `Keine aktiven Anlagen mit faelliger oder bald faelliger Regel "${selectedRuleName}" gefunden.`}
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4 pb-80 sm:gap-5 lg:grid-cols-[repeat(auto-fill,minmax(24rem,1fr))]">
