@@ -59,6 +59,18 @@ workflows:
       years: current
       source: smartfarmer
 
+  refresh_weather_cache:
+    enabled: true
+    schedule:
+      freq: 1h
+      time: "00:00"
+    run:
+      lookback_days: 180
+      max_age_hours: 0
+      force: false
+      active_only: true
+      cleanup_older_than_days: 400
+
   water_balance:
     enabled: true
     schedule:

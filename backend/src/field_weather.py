@@ -451,3 +451,20 @@ class FieldWeatherCacheService:
             end=end,
         )
         return result.upserted_count
+
+    def cleanup_station_hourly_cache(
+        self,
+        *,
+        older_than: datetime.timedelta,
+        now: datetime.datetime | pd.Timestamp | None = None,
+    ) -> int:
+        if older_than <= datetime.timedelta(0):
+            raise ValueError("older_than must be greater than zero")
+
+        now_ts = pd.Timestamp.now(tz=self.timezone) if now is None else self._to_timestamp(now)
+        cutoff = now_ts - pd.Timedelta(older_than)
+        with self.db.session_scope() as session:
+            return self.db.field_weather.delete_station_hourly_before(
+                session,
+                cutoff=cutoff,
+            )

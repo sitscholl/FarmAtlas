@@ -18,6 +18,7 @@ from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
 from .workflows.base import WorkflowFieldResult
 from .workflows.fetch_treatment_data import FetchTreatmentDataWorkflow
+from .workflows.refresh_weather_cache import WeatherRefreshWorkflow
 from .workflows.water_balance import WaterBalanceWorkflow
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ def load_config_file(config_file: str | Path) -> dict:
 class WorkflowCollection:
     water_balance: WaterBalanceWorkflow
     fetch_treatment_data: FetchTreatmentDataWorkflow
+    refresh_weather_cache: WeatherRefreshWorkflow
 
     def get(self, workflow_name: str):
         workflow = getattr(self, workflow_name, None)
@@ -116,6 +118,15 @@ class RuntimeContext:
             base_dir=config_base_dir,
         )
 
+        self.field_weather_service = FieldWeatherCacheService(
+            db=self.db,
+            meteo_loader=self.meteo_loader,
+            meteo_validator=self.meteo_validator,
+            meteo_resampler=self.meteo_resampler,
+            timezone=self.timezone,
+            min_sample_size=int(self.min_sample_size),
+        )
+
         self.workflows = WorkflowCollection(
             water_balance=WaterBalanceWorkflow(
                 db=self.db,
@@ -132,14 +143,10 @@ class RuntimeContext:
                 settings=smartfarmer_settings,
                 timezone=self.timezone,
             ),
-        )
-        self.field_weather_service = FieldWeatherCacheService(
-            db=self.db,
-            meteo_loader=self.meteo_loader,
-            meteo_validator=self.meteo_validator,
-            meteo_resampler=self.meteo_resampler,
-            timezone=self.timezone,
-            min_sample_size=int(self.min_sample_size),
+            refresh_weather_cache=WeatherRefreshWorkflow(
+                cache_service=self.field_weather_service,
+                timezone=self.timezone,
+            ),
         )
         self.db.crop_protection_service.set_weather_cache_service(self.field_weather_service)
 

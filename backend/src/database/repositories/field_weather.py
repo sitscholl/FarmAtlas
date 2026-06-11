@@ -149,3 +149,17 @@ class FieldWeatherRepository:
         deleted = query.delete(synchronize_session=False)
         logger.info("Cleared %s hourly weather rows for %s/%s", deleted, provider, station)
         return deleted
+
+    def delete_station_hourly_before(
+        self,
+        session: Session,
+        *,
+        cutoff: datetime.datetime | datetime.date,
+    ) -> int:
+        deleted = (
+            session.query(models.StationWeatherHourly)
+            .filter(models.StationWeatherHourly.timestamp < pd.Timestamp(cutoff).to_pydatetime())
+            .delete(synchronize_session=False)
+        )
+        logger.info("Deleted %s hourly weather rows older than %s", deleted, cutoff)
+        return deleted
