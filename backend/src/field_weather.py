@@ -44,7 +44,7 @@ class FieldWeatherCacheService:
     timezone: ZoneInfo
     min_sample_size: int = 1
     hourly_min_sample_size: int = 1
-    default_max_age: datetime.timedelta = datetime.timedelta(hours=1)
+    default_max_age: datetime.timedelta = datetime.timedelta(hours=3)
     refresh_lookback: datetime.timedelta = datetime.timedelta(days=2)
 
     def _to_timestamp(self, value: datetime.datetime | datetime.date | str | pd.Timestamp) -> pd.Timestamp:
