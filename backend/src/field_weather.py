@@ -419,6 +419,32 @@ class FieldWeatherCacheService:
             max_age=max_age,
         )
 
+    def get_station_hourly_weather(
+        self,
+        *,
+        provider: str,
+        station: str,
+        start: datetime.datetime | datetime.date | str | pd.Timestamp,
+        end: datetime.datetime | datetime.date | str | pd.Timestamp,
+    ) -> WeatherFrame:
+        start_ts, end_ts = self._normalize_hourly_window(start, end)
+        frame = self._read_station_hourly(
+            provider=provider,
+            station=station,
+            start=start_ts,
+            end=end_ts,
+        )
+        return WeatherFrame(
+            data=frame,
+            resolution="1h",
+            start=start_ts,
+            end=end_ts,
+            source_provider=provider,
+            source_station=station,
+            refreshed=False,
+            max_age=None,
+        )
+
     def aggregate_daily(self, hourly_weather: WeatherFrame) -> WeatherFrame:
         if hourly_weather.resolution != "1h":
             raise ValueError(f"aggregate_daily expects 1h weather, got {hourly_weather.resolution!r}")

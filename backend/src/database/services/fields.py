@@ -1,21 +1,16 @@
 from typing import Any
 
 from ..core import DatabaseCore
-from ..repositories import FieldRepository, WaterBalanceRepository
+from ..repositories import FieldRepository
 
 class FieldService:
     def __init__(
         self,
         core: DatabaseCore,
         fields: FieldRepository,
-        water_balance: WaterBalanceRepository,
-        *,
-        water_balance_trigger_fields: set[str],
     ) -> None:
         self._core = core
         self._fields = fields
-        self._water_balance = water_balance
-        self._water_balance_trigger_fields = water_balance_trigger_fields
 
     def create(self, **kwargs):
         with self._core.session_scope() as session:
@@ -23,9 +18,7 @@ class FieldService:
 
     def update(self, field_id: int, updates: dict[str, Any]):
         with self._core.session_scope() as session:
-            updated_field, changed_keys = self._fields.update(session, field_id, updates)
-            if changed_keys & self._water_balance_trigger_fields:
-                self._water_balance.clear_for_field(session, updated_field.id)
+            updated_field, _ = self._fields.update(session, field_id, updates)
             return updated_field
 
     def delete(self, field_id: int) -> bool:

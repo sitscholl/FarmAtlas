@@ -16,6 +16,7 @@ from .integrations.smartfarmer import SmartFarmerSettings
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
+from .water_balance import WaterBalanceService
 from .workflows.base import WorkflowFieldResult
 from .workflows.fetch_treatment_data import FetchTreatmentDataWorkflow
 from .workflows.refresh_weather_cache import WeatherRefreshWorkflow
@@ -149,6 +150,14 @@ class RuntimeContext:
             ),
         )
         self.db.crop_protection_service.set_weather_cache_service(self.field_weather_service)
+        weather_refresh_run_config = config.get("workflows", {}).get("refresh_weather_cache", {}).get("run", {})
+        self.water_balance_service = WaterBalanceService(
+            db=self.db,
+            weather_cache=self.field_weather_service,
+            et_corrector=self.et_corrector,
+            timezone=self.timezone,
+            forecast_provider=weather_refresh_run_config.get("forecast_provider", "open-meteo"),
+        )
 
     def update_runtime(self, config_file: str | Path):
         self.config_file = Path(config_file)

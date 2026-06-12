@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 import pandas as pd
-from fastapi import BackgroundTasks, FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from ..app_config import get_app_config_path
@@ -209,34 +209,6 @@ def get_irrigation_event(event_id: int):
     return event
 
 
-def queue_water_balance_refresh(background_tasks: BackgroundTasks, field_ids: list[int]) -> None:
-    for field_id in sorted(set(field_ids)):
-        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
-
-
-def serialize_water_balance_series(records) -> list[WaterBalanceSeriesPoint]:
-    return [
-        WaterBalanceSeriesPoint(
-            date=record.date,
-            precipitation=record.precipitation,
-            irrigation=record.irrigation,
-            evapotranspiration=record.evapotranspiration,
-            kc=None,
-            incoming=record.incoming,
-            net=record.net,
-            soil_water_content=record.soil_water_content,
-            available_water_storage=record.available_water_storage,
-            water_deficit=record.water_deficit,
-            readily_available_water=record.readily_available_water,
-            safe_ratio=record.safe_ratio,
-            below_raw=None if record.below_raw is None else bool(record.below_raw),
-            value_type="observed",
-            model="observation",
-        )
-        for record in records
-    ]
-
-
 def serialize_forecast_water_balance(dataframe: pd.DataFrame) -> list[WaterBalanceSeriesPoint]:
     series = dataframe.reset_index().rename(columns={"index": "date"})
     return [
@@ -302,36 +274,3 @@ def serialize_water_balance_workflow_result(
         metadata=result.metadata,
         data=data,
     )
-
-
-def get_water_balance_summary_for_field(field_id: int) -> WaterBalanceSummary:
-    with runtime.db.session_scope() as session:
-        summaries = runtime.db.water_balance.get_summary(session, field_ids=[field_id])
-    if not summaries:
-        return WaterBalanceSummary(
-            field_id=field_id,
-            as_of=None,
-            current_water_deficit=None,
-            current_soil_water_content=None,
-            available_water_storage=None,
-            readily_available_water=None,
-            below_raw=None,
-            safe_ratio=None,
-        )
-    return WaterBalanceSummary(**summaries[0])
-
-
-def get_field_id_for_section_id(section_id: int) -> int | None:
-    with runtime.db.session_scope() as session:
-        section = runtime.db.sections.get_by_id(session, section_id)
-        if section is None or section.field is None:
-            return None
-        return section.field.id
-
-
-def get_field_id_for_phenology_event_id(event_id: int) -> int | None:
-    with runtime.db.session_scope() as session:
-        event = runtime.db.phenology_events.get_by_id(session, event_id)
-        if event is None or event.section is None or event.section.field is None:
-            return None
-        return event.section.field.id

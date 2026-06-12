@@ -25,16 +25,6 @@ from .services import (
 
 
 class Database:
-    WATER_BALANCE_TRIGGER_FIELDS = {
-        "soil_type",
-        "soil_weight",
-        "humus_pct",
-        "effective_root_depth_cm",
-        "p_allowable",
-        "reference_provider",
-        "reference_station",
-    }
-
     def __init__(
         self,
         engine_url: str = "sqlite:///db/database.db",
@@ -64,14 +54,11 @@ class Database:
         self.field_service = FieldService(
             self.core,
             self.fields,
-            self.water_balance,
-            water_balance_trigger_fields=self.WATER_BALANCE_TRIGGER_FIELDS,
         )
         self.irrigation_service = IrrigationService(
             self.core,
             self.fields,
             self.irrigation,
-            self.water_balance,
         )
         self.planting_service = PlantingService(
             self.core,
@@ -84,7 +71,6 @@ class Database:
         self.phenology_event_service = PhenologyEventService(
             self.core,
             self.phenology_events,
-            self.water_balance,
         )
         self.section_service = SectionService(
             self.core,

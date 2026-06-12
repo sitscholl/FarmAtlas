@@ -75,7 +75,7 @@ workflows:
       cleanup_older_than_days: 400
 
   water_balance:
-    enabled: true
+    enabled: false
     schedule:
       freq: D  # examples: D, W-MON, 6H, MS
       time: "05:00"

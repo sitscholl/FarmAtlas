@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException, status
 
 from ..schemas import FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, WaterBalanceSummary, FieldUpdate
 from .utils import (
-    get_water_balance_summary_for_field,
     raise_write_http_error,
     runtime,
     serialize_field,
@@ -29,10 +28,12 @@ async def list_field_summaries():
     with runtime.db.session_scope() as session:
         fields = runtime.db.fields.list_all(session)
         latest_irrigation_dates = runtime.db.irrigation.get_latest_dates(session, field_ids=[field.id for field in fields])
-        water_balance_summaries = {
-            summary.field_id: summary
-            for summary in [WaterBalanceSummary(**item) for item in runtime.db.water_balance.get_summary(session)]
-        }
+
+    field_contexts = runtime.get_fields_by_ids([field.id for field in fields])
+    water_balance_summaries = {
+        summary.field_id: summary
+        for summary in runtime.water_balance_service.get_summaries(field_contexts)
+    }
 
     return [
         serialize_field_summary(

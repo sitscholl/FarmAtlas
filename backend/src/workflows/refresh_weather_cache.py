@@ -146,6 +146,7 @@ class WeatherRefreshWorkflow:
                         refreshed=weather.refreshed,
                     )
                 )
+                logger.info("Cached %s weather rows for provider %s and station %s", int(len(weather.data.index)), provider, station)
             except Exception as exc:
                 logger.exception(
                     "Refreshing weather cache failed for station %s/%s",
@@ -169,7 +170,7 @@ class WeatherRefreshWorkflow:
             if not refresh_forecast or int(forecast_days) <= 0:
                 continue
 
-            forecast_start = end_ts.floor("h")
+            forecast_start = end_ts.floor("D")
             forecast_end = forecast_start + pd.Timedelta(days=int(forecast_days))
             try:
                 forecast_result = self.cache_service.refresh_station_hourly(
@@ -179,6 +180,7 @@ class WeatherRefreshWorkflow:
                     end=forecast_end,
                     value_type="forecast",
                 )
+                logger.info("Loaded %s forecast weather rows for provider %s and station %s")
                 stale_before_count = self.cache_service.clear_station_hourly_cache(
                     provider=forecast_provider,
                     station=station,

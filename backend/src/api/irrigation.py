@@ -1,7 +1,7 @@
 import logging
 from datetime import date, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from ..schemas import (
     IrrigationBulkCreate,
@@ -15,7 +15,6 @@ from ..schemas import (
 from .utils import (
     get_irrigation_event,
     get_write_error_detail,
-    queue_water_balance_refresh,
     raise_write_http_error,
     runtime,
     serialize_irrigation_event,
@@ -69,7 +68,7 @@ async def list_all_irrigation_events():
 
 
 @router.post("/api/fields/{field_id}/irrigation", response_model=IrrigationRead, status_code=status.HTTP_201_CREATED)
-async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: int, irrigation_event: IrrigationCreate):
+async def create_irrigation_event(field_id: int, irrigation_event: IrrigationCreate):
     validate_field_id(field_id)
     try:
         new_event = runtime.db.irrigation_service.create(
@@ -79,7 +78,6 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
             duration=irrigation_event.duration,
             amount=irrigation_event.amount,
         )
-        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field_id)
         return serialize_irrigation_event(new_event)
     except Exception as exc:
         logger.exception("Adding irrigation event for field with id %s failed: %s", field_id, exc)
@@ -88,12 +86,10 @@ async def create_irrigation_event(background_tasks: BackgroundTasks, field_id: i
 
 @router.post("/api/irrigation/bulk", response_model=IrrigationBulkResponse, status_code=status.HTTP_201_CREATED)
 async def create_bulk_irrigation_events(
-    background_tasks: BackgroundTasks,
     irrigation_event: IrrigationBulkCreate,
 ):
     unique_field_ids = sorted(set(irrigation_event.field_ids))
     created_event_ids: list[int] = []
-    created_field_ids: list[int] = []
     skipped_field_ids: list[int] = []
     errors_by_field_id: dict[int, str] = {}
 
@@ -108,13 +104,10 @@ async def create_bulk_irrigation_events(
                 amount=irrigation_event.amount,
             )
             created_event_ids.append(new_event.id)
-            created_field_ids.append(field_id)
         except Exception as exc:
             logger.exception("Adding irrigation event for field with id %s failed: %s", field_id, exc)
             skipped_field_ids.append(field_id)
             errors_by_field_id[field_id] = get_write_error_detail(exc)
-
-    queue_water_balance_refresh(background_tasks, created_field_ids)
 
     return IrrigationBulkResponse(
         created_event_ids=created_event_ids,
@@ -126,7 +119,6 @@ async def create_bulk_irrigation_events(
 
 @router.post("/api/irrigation/bulk/upsert", response_model=IrrigationBulkUpsertResponse, status_code=status.HTTP_200_OK)
 async def upsert_bulk_irrigation_events(
-    background_tasks: BackgroundTasks,
     irrigation_event: IrrigationBulkCreate,
 ):
     unique_field_ids = sorted(set(irrigation_event.field_ids))
@@ -135,7 +127,6 @@ async def upsert_bulk_irrigation_events(
     created_event_ids: list[int] = []
     updated_event_ids: list[int] = []
     unchanged_event_ids: list[int] = []
-    changed_field_ids: list[int] = []
     skipped_field_ids: list[int] = []
     errors_by_field_id: dict[int, str] = {}
 
@@ -153,7 +144,6 @@ async def upsert_bulk_irrigation_events(
                     amount=irrigation_event.amount,
                 )
                 created_event_ids.append(new_event.id)
-                changed_field_ids.append(field_id)
                 continue
 
             resolved_amount = runtime.db.irrigation_service.resolve_amount(
@@ -181,13 +171,10 @@ async def upsert_bulk_irrigation_events(
                 },
             )
             updated_event_ids.append(updated_event.id)
-            changed_field_ids.append(field_id)
         except Exception as exc:
             logger.exception("Upserting irrigation event for field with id %s failed: %s", field_id, exc)
             skipped_field_ids.append(field_id)
             errors_by_field_id[field_id] = get_write_error_detail(exc)
-
-    queue_water_balance_refresh(background_tasks, changed_field_ids)
 
     return IrrigationBulkUpsertResponse(
         created_event_ids=created_event_ids,
@@ -203,7 +190,6 @@ async def upsert_bulk_irrigation_events(
 
 @router.post("/api/irrigation/upsert", response_model=IrrigationRead, status_code=status.HTTP_200_OK)
 async def upsert_irrigation_event_by_field_name(
-    background_tasks: BackgroundTasks,
     irrigation_event: IrrigationFieldNameUpsert,
 ):
     try:
@@ -230,7 +216,6 @@ async def upsert_irrigation_event_by_field_name(
                 },
             )
 
-        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", field.id)
         return serialize_irrigation_event(event)
     except Exception as exc:
         logger.exception("Upserting irrigation event for field with name %s failed: %s", irrigation_event.field, exc)
@@ -239,17 +224,13 @@ async def upsert_irrigation_event_by_field_name(
 
 @router.put("/api/irrigation/{event_id}", response_model=IrrigationRead)
 async def update_irrigation_event(
-    background_tasks: BackgroundTasks,
     event_id: int,
     irrigation_event: IrrigationUpdate,
 ):
-    existing_event = get_irrigation_event(event_id)
+    get_irrigation_event(event_id)
     validate_field_id(irrigation_event.field_id)
     try:
         updated_event = runtime.db.irrigation_service.update(event_id=event_id, updates=irrigation_event.model_dump())
-        background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", updated_event.field_id)
-        if existing_event.field_id != updated_event.field_id:
-            background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", existing_event.field_id)
         return serialize_irrigation_event(updated_event)
     except Exception as exc:
         logger.exception("Updating irrigation event %s failed: %s", event_id, exc)
@@ -260,12 +241,11 @@ async def update_irrigation_event(
 
 
 @router.delete("/api/irrigation/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_irrigation_event(background_tasks: BackgroundTasks, event_id: int):
-    existing_event = get_irrigation_event(event_id)
+async def delete_irrigation_event(event_id: int):
+    get_irrigation_event(event_id)
     deleted, _ = runtime.db.irrigation_service.delete(event_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Could not find any irrigation event with id {event_id}")
-    background_tasks.add_task(runtime.run_workflow_for_field, "water_balance", existing_event.field_id)
 
 
 @router.delete("/api/fields/{field_id}/irrigation", status_code=status.HTTP_204_NO_CONTENT)
