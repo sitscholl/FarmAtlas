@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
 import { FiMoreVertical, FiX } from 'react-icons/fi'
-import { LuArrowDown, LuCalendarDays, LuRadioTower, LuTrees } from 'react-icons/lu'
+import { LuArrowDown, LuCalendarDays, LuClock, LuRadioTower, LuTrees } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
 import { FaArrowRight } from 'react-icons/fa'
 import { IoMdAdd } from 'react-icons/io'
@@ -58,6 +58,11 @@ type CropProtectionRuleChip = {
   dueCount: number
   soonCount: number
   affectedCount: number
+}
+
+type WeatherCacheState = {
+  label: string
+  isStale: boolean
 }
 
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
@@ -135,6 +140,36 @@ function buildSubtitle(field: FieldSummaryRead) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('de-DE').format(new Date(value))
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function getWeatherCacheState(summaries: CropProtectionFieldSummaryRead[]): WeatherCacheState {
+  const timestamps = summaries
+    .map((summary) => summary.weather_updated_at)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+
+  if (timestamps.length === 0) {
+    return { label: 'unbekannt', isStale: true }
+  }
+
+  const oldestTimestamp = timestamps.reduce((oldest, current) =>
+    current.getTime() < oldest.getTime() ? current : oldest,
+  )
+
+  return {
+    label: formatDateTime(oldestTimestamp.toISOString()),
+    isStale: Date.now() - oldestTimestamp.getTime() > 24 * 60 * 60 * 1000,
+  }
 }
 
 function buildPhenologyEventsByFieldId(fieldDetails: FieldDetailRead[]) {
@@ -461,6 +496,11 @@ export default function Home() {
       })
   }, [cropProtectionByFieldId, cropProtectionRules, fields])
 
+  const weatherCacheState = useMemo(
+    () => getWeatherCacheState(Object.values(cropProtectionByFieldId)),
+    [cropProtectionByFieldId],
+  )
+
   const selectedRuleName = useMemo(
     () => cropProtectionRules.find((rule) => rule.id === selectedRuleId)?.name ?? null,
     [cropProtectionRules, selectedRuleId],
@@ -613,7 +653,10 @@ export default function Home() {
                 stageTooltipContent={<FieldPhenologyTooltip events={phenologyEventsByFieldId[field.id]} />}
                 metrics={buildFieldMetrics(field)}
                 detailContent={
-                  <CropProtectionStatusLayer evaluations={cropProtectionByFieldId[field.id]?.evaluations ?? []} />
+                  <CropProtectionStatusLayer
+                    evaluations={cropProtectionByFieldId[field.id]?.evaluations ?? []}
+                    weatherUpdatedAt={cropProtectionByFieldId[field.id]?.weather_updated_at}
+                  />
                 }
                 titleAdornment={
                   field.herbicide_free === true ? (
@@ -676,6 +719,16 @@ export default function Home() {
           <h1 className="mt-3 text-3xl font-semibold text-slate-900 sm:mt-4 sm:text-5xl">
             Oberlenghof
           </h1>
+          <div
+            className={`mt-4 inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-semibold ${
+              weatherCacheState.isStale
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            }`}
+          >
+            <LuClock className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Wetterdaten: {weatherCacheState.label}</span>
+          </div>
         </div>
 
         {content}

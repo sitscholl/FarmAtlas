@@ -100,6 +100,18 @@ function formatDate(value: string | null | undefined) {
   }).format(new Date(value))
 }
 
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return 'unbekannt'
+  }
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
 function formatMetricValue(value: number | null | undefined) {
   if (value === null || value === undefined) {
     return '-'
@@ -218,8 +230,10 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
 
 export default function CropProtectionStatusLayer({
   evaluations,
+  weatherUpdatedAt,
 }: {
   evaluations: CropProtectionRuleEvaluationRead[]
+  weatherUpdatedAt?: string | null
 }) {
   if (evaluations.length === 0) {
     return (
@@ -236,6 +250,9 @@ export default function CropProtectionStatusLayer({
     <div>
       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
         Pflanzenschutz
+      </div>
+      <div className="mb-2 text-[11px] font-medium text-slate-500">
+        Wetterdaten: {formatDateTime(weatherUpdatedAt)}
       </div>
       <div className="flex flex-wrap gap-2">
         {ruleGroups.map((ruleGroup) => {

@@ -19,6 +19,7 @@ export type CropProtectionFieldSummaryRead = {
   status_counts: {
   [key: string]: number
 }
+  weather_updated_at?: string | null
   evaluations: Array<CropProtectionRuleEvaluationRead>
 }
 
@@ -52,6 +53,7 @@ export type CropProtectionRuleEvaluationRead = {
   status: string
   last_treatment_date?: string | null
   last_treatment_product?: string | null
+  weather_updated_at?: string | null
   metrics: Array<CropProtectionMetricEvaluationRead>
 }
 

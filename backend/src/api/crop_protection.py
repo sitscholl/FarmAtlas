@@ -133,6 +133,14 @@ async def summarize_crop_protection_by_field(
         for evaluation in sorted_evaluations:
             status_counts[evaluation.status] = status_counts.get(evaluation.status, 0) + 1
         worst_status = sorted_evaluations[0].status if sorted_evaluations else "missing"
+        weather_updated_at = min(
+            (
+                evaluation.weather_updated_at
+                for evaluation in sorted_evaluations
+                if evaluation.weather_updated_at is not None
+            ),
+            default=None,
+        )
 
         summaries.append(
             CropProtectionFieldSummaryRead(
@@ -141,6 +149,7 @@ async def summarize_crop_protection_by_field(
                 status=worst_status,
                 evaluation_count=len(sorted_evaluations),
                 status_counts=status_counts,
+                weather_updated_at=weather_updated_at,
                 evaluations=[
                     CropProtectionRuleEvaluationRead.model_validate(evaluation)
                     for evaluation in sorted_evaluations

@@ -1,4 +1,5 @@
 from datetime import date as DateType
+from datetime import datetime as DateTimeType
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -166,6 +167,7 @@ class CropProtectionRuleEvaluationRead(BaseModel):
     status: str
     last_treatment_date: DateType | None = None
     last_treatment_product: str | None = None
+    weather_updated_at: DateTimeType | None = None
     metrics: list[CropProtectionMetricEvaluationRead]
 
     model_config = {"from_attributes": True}
@@ -177,4 +179,5 @@ class CropProtectionFieldSummaryRead(BaseModel):
     status: str
     evaluation_count: int
     status_counts: dict[str, int]
+    weather_updated_at: DateTimeType | None = None
     evaluations: list[CropProtectionRuleEvaluationRead]
