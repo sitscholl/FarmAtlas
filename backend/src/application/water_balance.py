@@ -1,134 +1,17 @@
-from __future__ import annotations
-
-import logging
-from dataclasses import dataclass, field
-from typing import Any
-from zoneinfo import ZoneInfo
-
 import pandas as pd
 
-from .database.db import Database
-from .et.et_correction import ETCorrection
-from .field import FieldContext
-from .field_weather import FieldWeatherCacheService
-from .irrigation import FieldIrrigation
-from .schemas import WaterBalanceSummary
-from .water_content import estimate_available_water_storage_capacity
-from .weather_frame import WeatherFrame
-from .workflows.base import WorkflowError, WorkflowFieldResult, WorkflowWarning
+from dataclasses import dataclass
+import logging
+
+from ..database.db import Database
+from ..et.et_correction import ETCorrection
+from ..field import FieldContext
+from ..field_weather import FieldWeatherCacheService
+from ..irrigation import FieldIrrigation
+from ..calculation.soil_water import estimate_available_water_storage_capacity
+from ..weather_frame import WeatherFrame
 
 logger = logging.getLogger(__name__)
-
-
-def missing_soil_parameters(field: FieldContext) -> list[str]:
-    missing: list[str] = []
-    if field.soil_type is None:
-        missing.append("soil_type")
-    if field.humus_pct is None:
-        missing.append("humus_pct")
-    if field.effective_root_depth_cm is None:
-        missing.append("effective_root_depth_cm")
-    if field.p_allowable is None:
-        missing.append("p_allowable")
-    return missing
-
-
-@dataclass(slots=True)
-class WaterBalanceCalculator:
-    def calculate(
-        self,
-        field: FieldContext,
-        daily_weather: pd.DataFrame,
-        *,
-        field_irrigation: FieldIrrigation | None = None,
-        initial_storage: float | None = None,
-    ) -> pd.DataFrame:
-        if daily_weather is None or daily_weather.empty:
-            raise ValueError("Daily weather cannot be empty when calculating the water balance.")
-        if not isinstance(daily_weather.index, pd.DatetimeIndex):
-            raise TypeError("Daily weather index must be a pandas DatetimeIndex.")
-
-        missing_parameters = missing_soil_parameters(field)
-        if missing_parameters:
-            raise ValueError(
-                f"Field {field.name} is missing required soil parameters: {', '.join(missing_parameters)}"
-            )
-
-        data = daily_weather.sort_index().copy()
-        if "precipitation" not in data.columns:
-            raise KeyError("Daily weather must contain a 'precipitation' column.")
-
-        et_column = "et0_corrected" if "et0_corrected" in data.columns else "et0" if "et0" in data.columns else None
-        if et_column is None or data[et_column].isna().any():
-            raise KeyError("Daily weather must contain complete 'et0_corrected' or 'et0' values.")
-
-        precipitation = pd.to_numeric(data["precipitation"], errors="coerce").fillna(0.0)
-        evapotranspiration = pd.to_numeric(data[et_column], errors="coerce").fillna(0.0)
-        irrigation = (
-            pd.Series(0.0, index=data.index, dtype=float)
-            if field_irrigation is None
-            else field_irrigation.to_dataframe(data.index, fill_value=0.0)
-        )
-
-        incoming = precipitation + irrigation
-        net = incoming - evapotranspiration
-        soil_water_estimate = estimate_available_water_storage_capacity(
-            soil_type=field.soil_type,
-            soil_weight=field.soil_weight,
-            humus_pct=field.humus_pct,
-            effective_root_depth_cm=field.effective_root_depth_cm,
-        )
-        available_water_storage = soil_water_estimate.nfk_total_mm
-
-        soil_water_content: list[float] = []
-        current_water_content = (
-            available_water_storage
-            if initial_storage is None
-            else max(0.0, min(available_water_storage, initial_storage))
-        )
-        for delta in net:
-            current_water_content = max(0.0, min(available_water_storage, current_water_content + delta))
-            soil_water_content.append(current_water_content)
-
-        water_balance = pd.DataFrame(
-            {
-                "precipitation": precipitation,
-                "irrigation": irrigation,
-                "evapotranspiration": evapotranspiration,
-                "incoming": incoming,
-                "net": net,
-                "soil_water_content": soil_water_content,
-            },
-            index=data.index,
-        )
-        water_balance["available_water_storage"] = available_water_storage
-        water_balance["water_deficit"] = available_water_storage - water_balance["soil_water_content"]
-        water_balance["field_id"] = field.id
-        if "kc" in data.columns:
-            water_balance["kc"] = data["kc"]
-
-        readily_available_water = float(field.p_allowable) * available_water_storage
-        water_balance["readily_available_water"] = readily_available_water
-
-        trigger_level = available_water_storage - readily_available_water
-        water_balance["below_raw"] = water_balance["soil_water_content"] < trigger_level
-        water_balance["safe_ratio"] = (
-            water_balance["soil_water_content"] - trigger_level
-        ) / readily_available_water
-
-        for column in ("model", "station_id", "source_provider", "source_station"):
-            if column in data.columns:
-                water_balance[column] = data[column]
-
-        if "value_type" in data.columns:
-            water_balance["value_type"] = data["value_type"].fillna("observed")
-        elif "model" in data.columns:
-            water_balance["value_type"] = data["model"].eq("observation").map({True: "observed", False: "forecast"})
-        else:
-            water_balance["value_type"] = "observed"
-
-        return water_balance
-
 
 @dataclass
 class WaterBalanceService:
@@ -137,23 +20,8 @@ class WaterBalanceService:
     et_corrector: ETCorrection
     timezone: ZoneInfo
     forecast_provider: str = "open-meteo"
-    calculator: WaterBalanceCalculator = field(default_factory=WaterBalanceCalculator)
 
-    workflow_name: str = "water_balance"
-
-    def _empty_summary(self, field_id: int) -> WaterBalanceSummary:
-        return WaterBalanceSummary(
-            field_id=field_id,
-            as_of=None,
-            current_water_deficit=None,
-            current_soil_water_content=None,
-            available_water_storage=None,
-            readily_available_water=None,
-            below_raw=None,
-            safe_ratio=None,
-        )
-
-    def _field_result(
+    def _empty_result(
         self,
         field: FieldContext,
         *,
