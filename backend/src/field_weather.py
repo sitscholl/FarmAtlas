@@ -45,6 +45,7 @@ class FieldWeatherCacheService:
     min_sample_size: int = 1
     hourly_min_sample_size: int = 1
     default_max_age: datetime.timedelta = datetime.timedelta(hours=3)
+    freshness_grace: datetime.timedelta = datetime.timedelta(minutes=10)
     refresh_lookback: datetime.timedelta = datetime.timedelta(days=2)
 
     def _to_timestamp(self, value: datetime.datetime | datetime.date | str | pd.Timestamp) -> pd.Timestamp:
@@ -264,8 +265,12 @@ class FieldWeatherCacheService:
         if tail.empty:
             return tail_start
 
+        freshness_window = pd.Timedelta(max_age)
+        if max_age > datetime.timedelta(0):
+            freshness_window += pd.Timedelta(self.freshness_grace)
+
         newest_update = pd.to_datetime(tail["updated_at"], utc=True).max()
-        if newest_update < pd.Timestamp.now(tz="UTC") - pd.Timedelta(max_age):
+        if newest_update < pd.Timestamp.now(tz="UTC") - freshness_window:
             return tail_start
 
         return None

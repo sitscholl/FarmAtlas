@@ -100,6 +100,18 @@ function formatDate(value: string | null | undefined) {
   }).format(new Date(value))
 }
 
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return 'unbekannt'
+  }
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
 function formatMetricValue(value: number | null | undefined) {
   if (value === null || value === undefined) {
     return '-'
@@ -164,13 +176,13 @@ function MetricSummary({ metrics }: { metrics: CropProtectionMetricEvaluationRea
           >
             <div className="flex items-center gap-1.5">
               <MetricIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">
+              <span className="truncate text-tiny font-semibold uppercase tracking-[0.12em]">
                 {metricLabels[metric.metric_type] ?? metric.metric_type}
               </span>
             </div>
             <div className="mt-1 flex items-baseline gap-1">
               <span className="text-base font-semibold leading-none">{valueLabel}</span>
-              {unit ? <span className="text-[10px] font-semibold opacity-70">{unit}</span> : null}
+              {unit ? <span className="text-tiny font-semibold opacity-70">{unit}</span> : null}
             </div>
           </div>
         )
@@ -184,7 +196,7 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
 
   return (
     <div>
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <div className="mb-2 text-caption font-semibold uppercase tracking-[0.18em] text-slate-500">
         {ruleGroup.ruleName}
       </div>
       <div className="max-h-72 overflow-y-auto pr-1">
@@ -199,7 +211,7 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
                     <div key={`${evaluation.rule_id}-${evaluation.section_id}`} className="min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-slate-600">{evaluation.section_name}</span>
-                        <span className={`shrink-0 border px-1.5 py-0.5 text-[10px] font-semibold ${statusClasses[normalizeStatus(evaluation.status)]}`}>
+                        <span className={`shrink-0 border px-1.5 py-0.5 text-tiny font-semibold ${statusClasses[normalizeStatus(evaluation.status)]}`}>
                           {statusLabels[normalizeStatus(evaluation.status)]}
                         </span>
                       </div>
@@ -218,8 +230,10 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
 
 export default function CropProtectionStatusLayer({
   evaluations,
+  weatherUpdatedAt,
 }: {
   evaluations: CropProtectionRuleEvaluationRead[]
+  weatherUpdatedAt?: string | null
 }) {
   if (evaluations.length === 0) {
     return (
@@ -234,8 +248,11 @@ export default function CropProtectionStatusLayer({
 
   return (
     <div>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <div className="mb-2 text-xs text-caption font-medium uppercase tracking-[0.18em] text-slate-500">
         Pflanzenschutz
+      </div>
+      <div className="mb-2 text-xs text-caption font-medium text-slate-500">
+        Wetterdaten: {formatDateTime(weatherUpdatedAt)}
       </div>
       <div className="flex flex-wrap gap-2">
         {ruleGroups.map((ruleGroup) => {

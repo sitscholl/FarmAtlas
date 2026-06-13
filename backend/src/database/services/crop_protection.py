@@ -35,6 +35,7 @@ class CropProtectionRuleEvaluation:
     status: str
     last_treatment_date: datetime.date | None
     last_treatment_product: str | None
+    weather_updated_at: datetime.datetime | None
     metrics: list[CropProtectionMetricEvaluation]
 
 
@@ -131,7 +132,7 @@ class CropProtectionService:
                 FieldContext.from_model(field),
                 start=start,
                 end=end,
-                ensure=True,
+                ensure=False,
             )
 
         rows = self._field_weather.list_station_hourly(
@@ -155,6 +156,7 @@ class CropProtectionService:
                     "solar_radiation": row.solar_radiation,
                     "et0": row.et0,
                     "et0_corrected": row.et0_corrected,
+                    "updated_at": row.updated_at,
                 }
                 for row in rows
             ]
@@ -297,11 +299,15 @@ class CropProtectionService:
                 field_contexts_by_id[field.id] = FieldContext.from_model(field)
 
         if self._weather_cache_service is not None:
-            return self._weather_cache_service.ensure_fields_hourly_weather(
-                list(field_contexts_by_id.values()),
-                start=start_by_field_id,
-                end=end,
-            )
+            return {
+                field_id: self._weather_cache_service.get_field_hourly_weather(
+                    field_context,
+                    start=start_by_field_id[field_id],
+                    end=end,
+                    ensure=False,
+                )
+                for field_id, field_context in field_contexts_by_id.items()
+            }
 
         return {
             field_id: self._weather_frame(
@@ -375,6 +381,7 @@ class CropProtectionService:
                                     status="missing",
                                     last_treatment_date=None,
                                     last_treatment_product=None,
+                                    weather_updated_at=None,
                                     metrics=[],
                                 ),
                             )
@@ -434,6 +441,7 @@ class CropProtectionService:
                     case.rule,
                     [metric.status for metric in metric_evaluations],
                 )
+                weather_updated_at = weather.updated_at
                 ordered_evaluations.append(
                     (
                         case.order,
@@ -447,6 +455,7 @@ class CropProtectionService:
                             status=status,
                             last_treatment_date=last_treatment.date,
                             last_treatment_product=last_treatment.product_name,
+                            weather_updated_at=weather_updated_at,
                             metrics=metric_evaluations,
                         ),
                     )

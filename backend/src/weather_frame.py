@@ -18,3 +18,13 @@ class WeatherFrame:
     @property
     def empty(self) -> bool:
         return self.data.empty
+
+    @property
+    def updated_at(self) -> datetime.datetime | None:
+        if self.data.empty or "updated_at" not in self.data.columns:
+            return None
+
+        newest_update = pd.to_datetime(self.data["updated_at"], utc=True, errors="coerce").max()
+        if pd.isna(newest_update):
+            return None
+        return newest_update.to_pydatetime()

@@ -126,7 +126,7 @@ function MetricSection({
       <div className="mt-2 grid sm:grid-cols-2">
         {metrics.map((metric) => (
           <div key={metric.label} className="border border-transparent py-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <p className="text-caption font-semibold uppercase tracking-[0.2em] text-slate-400">
               {metric.label}
             </p>
             <p className="text-lg font-semibold text-slate-900">

@@ -178,7 +178,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 className={[
                   'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
                   syncDialog.status === 'failed'
-                    ? 'bg-red-50 text-red-700'
+                    ? 'bg-rose-50 text-rose-700'
                     : syncDialog.status === 'warning'
                       ? 'bg-amber-50 text-amber-700'
                       : 'bg-emerald-50 text-emerald-700',

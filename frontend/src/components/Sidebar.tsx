@@ -35,13 +35,13 @@ export default function Sidebar({ isDesktop, isOpen, onClose }: SidebarProps) {
       />
 
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-dvh w-[min(18rem,calc(100vw-1rem))] max-w-full flex-col border-r border-[color:var(--sidebar-border)] bg-[color:var(--sidebar)] px-4 py-6 shadow-[var(--shadow-soft)] transition-transform duration-300 ${
+        className={`fixed left-0 top-0 z-40 flex h-dvh w-[min(18rem,calc(100vw-1rem))] max-w-full flex-col border-r border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-6 shadow-md transition-transform duration-300 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } md:w-72`}
         aria-label="Seitenleiste"
       >
-        <div className="border-b border-[color:var(--border-soft)] px-2 pb-2">
-          <p className="mt-1 text-sm text-[color:var(--text-muted)]">Navigation</p>
+        <div className="border-b border-[color:var(--color-border)] px-2 pb-2">
+          <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">Navigation</p>
         </div>
 
         <nav className="mt-6 flex flex-col gap-1">
