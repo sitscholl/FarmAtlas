@@ -10,8 +10,8 @@ from .base import BaseWorkflow, WorkflowFieldResult, WorkflowWarning
 from ..database.db import Database
 from ..et.base import ET0Calculator
 from ..et.et_correction import ETCorrection
-from ..field import FieldContext
-from ..irrigation import FieldIrrigation
+from ..domain.field import FieldContext
+from ..domain.irrigation import FieldIrrigation
 from ..meteo.load import MeteoLoader
 from ..meteo.resample import MeteoResampler
 from ..meteo.station import Station

@@ -28,7 +28,7 @@ from ..schemas import (
     WorkflowErrorRead,
     WorkflowWarningRead,
 )
-from ..field import FieldContext
+from ..domain.field import FieldContext
 from ..workflows.base import WorkflowFieldResult
 
 logger = logging.getLogger(__name__)

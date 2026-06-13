@@ -1,8 +1,8 @@
 from datetime import date
 from dataclasses import dataclass
 
-from .database.models import Field
-from .domain.phenology import get_phenological_stage
+from .phenology import get_phenological_stage
+from ..database.models import Field
 
 
 def _unique_non_null(values: list[object]) -> list[object]:

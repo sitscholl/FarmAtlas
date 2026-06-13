@@ -10,7 +10,7 @@ from .database.db import Database
 from .database.settings import get_database_url
 from .et import ET0Calculator
 from .et.et_correction import ETCorrection
-from .field import FieldContext
+from .domain.field import FieldContext
 from .field_weather import FieldWeatherCacheService
 from .integrations.smartfarmer import SmartFarmerSettings
 from .meteo.load import MeteoLoader

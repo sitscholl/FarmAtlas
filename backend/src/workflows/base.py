@@ -7,7 +7,7 @@ import traceback as traceback_module
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar
 
 if TYPE_CHECKING:
-    from ..field import FieldContext
+    from ..domain.field import FieldContext
 
 
 WorkflowStatus = Literal["success", "warning", "skipped", "failed"]

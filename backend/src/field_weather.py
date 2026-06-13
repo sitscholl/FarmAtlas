@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from .database.db import Database
-from .field import FieldContext
+from .domain.field import FieldContext
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator

@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from ...field import FieldContext
+from ...domain.field import FieldContext
 from ...metrics import MetricAccumulatorService
 from ...weather_frame import WeatherFrame
 from .. import models

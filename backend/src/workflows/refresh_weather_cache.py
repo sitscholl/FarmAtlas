@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ..field import FieldContext
+from ..domain.field import FieldContext
 from ..field_weather import FieldWeatherCacheService
 
 logger = logging.getLogger(__name__)

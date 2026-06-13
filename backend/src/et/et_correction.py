@@ -8,7 +8,7 @@ import pandas as pd
 from ..domain.phenology import KC_PHASES_BY_NAME, PHENOLOGICAL_STAGES_BY_ANCHOR, get_phenological_stage
 
 if TYPE_CHECKING:
-    from ..field import FieldContext, SectionContext
+    from ..domain.field import FieldContext, SectionContext
 
 
 def _resolve_date_spec(value: datetime | date | str | None, anchor_year: int) -> pd.Timestamp | None:

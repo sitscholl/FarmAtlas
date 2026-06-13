@@ -12,7 +12,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from src.field import FieldContext
+from src.domain.field import FieldContext
 from src.database import models
 from src.runtime import RuntimeContext, load_config_file
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ from typing import Protocol
 
 
 class IrrigationSeries(Protocol):
-    def to_dataframe(self, index: pd.Index, *, fill_value: float = 0.0) -> pd.Series:
+    def to_dataframe(self, index: pd.DatetimeIndex, fill_value: float = 0.0) -> pd.Series:
         ...
 
 

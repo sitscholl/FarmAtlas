@@ -13,9 +13,9 @@ from ..calculation.soil_water import estimate_available_water_storage_capacity
 from ..calculation.water_balance import calculate_water_balance
 from ..database.db import Database
 from ..et.et_correction import ETCorrection
-from ..field import FieldContext
+from ..domain.field import FieldContext
+from ..domain.irrigation import FieldIrrigation
 from ..field_weather import FieldWeatherCacheService
-from ..irrigation import FieldIrrigation
 from ..results import FarmAtlasError, FarmAtlasWarning
 from ..weather_frame import WeatherFrame
 
