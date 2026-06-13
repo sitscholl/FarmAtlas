@@ -11,11 +11,11 @@
     --color-surface: rgba(246, 248, 250, 1);
     --color-surface-muted: rgba(248, 250, 252, 1);
     --color-field-card: rgba(255, 255, 255, 1);
-    --color-text: rgb(5, 7, 6);
-    --color-text-strong: rgba(15, 23, 42, 1);
+    --color-text: rgb(37, 37, 37);
+    --color-text-strong: rgb(0, 0, 0);
     --color-text-muted: rgba(100, 116, 139, 1);
     --color-text-faint: rgba(148, 163, 184, 1);
-    --color-border: rgba(226, 232, 240, 1);
+    --color-border: rgb(225, 224, 224);
     --color-border-strong: rgba(203, 213, 225, 1);
     --color-inverse: rgba(15, 23, 42, 1);
 
@@ -46,7 +46,7 @@
     --font-size-caption: 0.6875rem;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
-    --font-size-base: 1rem;
+    --font-size-base: 0.85rem;
     --font-size-lg: 1.125rem;
     --font-size-xl: 1.25rem;
     --font-size-2xl: 1.5rem;
@@ -67,7 +67,7 @@
     :root {
       --font-size-xs: 0.8125rem;
       --font-size-sm: 0.9375rem;
-      --font-size-base: 1.0625rem;
+      --font-size-base: 0.85rem;
       --font-size-lg: 1.1875rem;
       --font-size-xl: 1.3125rem;
       --font-size-2xl: 1.625rem;
@@ -134,5 +134,56 @@
   button:focus,
   button:focus-visible {
     outline: none;
+  }
+}
+
+@layer components {
+  .app-card {
+    background: var(--color-field-card);
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+
+  .app-heading {
+    color: var(--color-text-strong);
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-tight);
+    font-weight: 600;
+  }
+
+  .app-muted {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
+  }
+
+  .app-meta {
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
+    font-weight: 500;
+  }
+
+  .app-metric {
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-tight);
+    font-weight: 600;
+  }
+
+  .app-divider {
+    border-color: var(--color-border);
+  }
+
+  .app-icon-muted {
+    color: var(--color-text-faint);
+  }
+
+  .app-tooltip {
+    background: var(--color-inverse);
+    color: var(--color-surface);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-tight);
+    font-weight: 500;
   }
 }

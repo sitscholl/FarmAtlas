@@ -248,10 +248,10 @@ export default function CropProtectionStatusLayer({
 
   return (
     <div>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <div className="mb-2 text-xs text-caption font-medium uppercase tracking-[0.18em] text-slate-500">
         Pflanzenschutz
       </div>
-      <div className="mb-2 text-caption font-medium text-slate-500">
+      <div className="mb-2 text-xs text-caption font-medium text-slate-500">
         Wetterdaten: {formatDateTime(weatherUpdatedAt)}
       </div>
       <div className="flex flex-wrap gap-2">

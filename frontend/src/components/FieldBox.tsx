@@ -86,7 +86,7 @@ function FieldBoxContent({
     metric.value < metric.criticalBelow
 
   return (
-    <div className="group relative z-0 overflow-visible border border-slate-200/80 bg-[color:var(--color-field-card)] p-5 shadow-md backdrop-blur transition duration-300 hover:z-50 focus-within:z-50 sm:p-6">
+    <div className="app-card group relative z-0 overflow-visible border p-5 shadow-md backdrop-blur transition duration-300 hover:z-50 focus-within:z-50 sm:p-6">
       {to ? (
         <Link
           to={to}
@@ -103,7 +103,7 @@ function FieldBoxContent({
 
       <div className={`${contentClasses} flex items-start gap-4 pr-12`}>
         <div className="min-w-0 flex-1">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <h3 className="app-heading flex items-center gap-2">
             {titleAdornment}
             <span>{title}</span>
           </h3>
@@ -111,17 +111,17 @@ function FieldBoxContent({
       </div>
 
       {subtitle ? (
-        <p className={`${contentClasses} whitespace-pre-line text-sm text-slate-500`}>{subtitle}</p>
+        <p className={`${contentClasses} app-muted whitespace-pre-line`}>{subtitle}</p>
       ) : null}
 
       {stageLabel ? (
-        <div className={`${contentClasses} group/stage mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 pointer-events-auto`}>
+        <div className={`${contentClasses} app-meta group/stage pointer-events-auto mt-2 inline-flex items-center gap-1.5`}>
           {StageIcon ? <StageIcon className="h-4 w-4 text-emerald-600" aria-hidden="true" /> : null}
           <span>{stageLabel}</span>
           {stageTooltipContent ? (
             <>
               <div className="absolute left-0 top-full z-40 hidden h-2 w-80 max-w-[calc(100vw-3rem)] group-hover/stage:block" />
-              <div className="pointer-events-auto absolute left-0 top-full z-50 mt-2 hidden w-80 max-w-[calc(100vw-3rem)] border border-slate-200 bg-white p-3 text-left text-xs font-normal text-slate-700 opacity-0 shadow-xl transition duration-150 group-hover/stage:block group-hover/stage:opacity-100">
+              <div className="app-card app-muted pointer-events-auto absolute left-0 top-full z-50 mt-2 hidden w-80 max-w-[calc(100vw-3rem)] border p-3 text-left font-normal opacity-0 shadow-xl transition duration-150 group-hover/stage:block group-hover/stage:opacity-100">
                 {stageTooltipContent}
               </div>
             </>
@@ -130,7 +130,7 @@ function FieldBoxContent({
       ) : null}
 
       {metrics && metrics.length > 0 ? (
-        <div className={`${contentClasses} mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-1`}>
+        <div className={`${contentClasses} app-divider mt-1 flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-1`}>
           {metrics.map((metric) => {
             const MetricIcon = metric.icon
             const critical = isMetricCritical(metric)
@@ -141,15 +141,15 @@ function FieldBoxContent({
                 className="group/metric relative flex min-w-0 items-center gap-1.5 pointer-events-auto"
               >
                 {MetricIcon ? (
-                  <span className="inline-flex shrink-0 items-center justify-center text-slate-400">
+                  <span className="app-icon-muted inline-flex shrink-0 items-center justify-center">
                     <MetricIcon className="h-4 w-4" aria-hidden="true" />
                   </span>
                 ) : null}
-                <p className={`whitespace-nowrap text-base font-semibold ${critical ? 'text-rose-600' : 'text-slate-700'}`}>
+                <p className={`app-metric whitespace-nowrap ${critical ? 'text-rose-600' : ''}`}>
                   {formatMetricValue(metric)}
-                  {metric.unit ? <span className="ml-0.5 font-medium text-slate-500">{metric.unit}</span> : null}
+                  {metric.unit ? <span className="app-muted ml-0.5 font-medium">{metric.unit}</span> : null}
                 </p>
-                <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition duration-150 group-hover/metric:flex group-hover/metric:opacity-100">
+                <div className="app-tooltip pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden whitespace-nowrap rounded-lg px-2.5 py-1.5 opacity-0 shadow-lg transition duration-150 group-hover/metric:flex group-hover/metric:opacity-100">
                   {metric.tooltip ?? metric.label}
                 </div>
               </div>
@@ -159,7 +159,7 @@ function FieldBoxContent({
       ) : null}
 
       {detailContent ? (
-        <div className={`${contentClasses} mt-3 border-t border-slate-100 pt-3 pointer-events-auto`}>
+        <div className={`${contentClasses} app-divider pointer-events-auto mt-1 border-t py-3 border-b`}>
           {detailContent}
         </div>
       ) : null}
