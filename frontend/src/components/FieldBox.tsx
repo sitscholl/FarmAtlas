@@ -86,7 +86,7 @@ function FieldBoxContent({
     metric.value < metric.criticalBelow
 
   return (
-    <div className="group relative z-0 overflow-visible border border-slate-200/80 p-5 shadow-md backdrop-blur transition duration-300 hover:z-50 focus-within:z-50 sm:p-6">
+    <div className="group relative z-0 overflow-visible border border-slate-200/80 bg-[color:var(--color-field-card)] p-5 shadow-md backdrop-blur transition duration-300 hover:z-50 focus-within:z-50 sm:p-6">
       {to ? (
         <Link
           to={to}
@@ -145,7 +145,7 @@ function FieldBoxContent({
                     <MetricIcon className="h-4 w-4" aria-hidden="true" />
                   </span>
                 ) : null}
-                <p className={`whitespace-nowrap text-[15px] font-semibold ${critical ? 'text-rose-600' : 'text-slate-700'}`}>
+                <p className={`whitespace-nowrap text-base font-semibold ${critical ? 'text-rose-600' : 'text-slate-700'}`}>
                   {formatMetricValue(metric)}
                   {metric.unit ? <span className="ml-0.5 font-medium text-slate-500">{metric.unit}</span> : null}
                 </p>

@@ -210,7 +210,7 @@ function FieldPhenologyTooltip({ events }: { events: FieldPhenologyEvent[] | und
 
   return (
     <div>
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <div className="mb-2 text-caption font-semibold uppercase tracking-[0.18em] text-slate-500">
         Phänologie
       </div>
       <div className="max-h-64 overflow-y-auto pr-1">
@@ -625,7 +625,7 @@ export default function Home() {
                     title={chip.rule.name}
                   >
                     <span className="truncate">{chip.rule.name}</span>
-                    <span className="inline-flex min-w-6 justify-center border border-current/20 bg-white/70 px-1.5 py-0.5 text-[11px] leading-none">
+                    <span className="inline-flex min-w-6 justify-center border border-current/20 bg-white/70 px-1.5 py-0.5 text-caption leading-none">
                       {chip.affectedCount}
                     </span>
                   </button>

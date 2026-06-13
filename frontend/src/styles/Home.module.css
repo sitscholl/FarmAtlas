@@ -1,6 +1,6 @@
 .interactiveLink {
   display: block;
-  font-size: medium;
+  font-size: var(--font-size-base);
   width: 100%;
   border-radius: 0.5rem;
   background-color: transparent;
@@ -11,22 +11,22 @@
 }
 
 .interactiveLinkLabel {
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  color: var(--text-base);
+  color: var(--color-text);
   transition:
     color 300ms ease,
     font-weight 300ms ease;
 }
 
 .interactiveLink:hover {
-  background-color: var(--accent-soft);
+  background-color: var(--color-primary-soft);
   transform: translateX(2px);
 }
 
 .interactiveLink:hover .interactiveLinkLabel {
   font-weight: 700;
-  color: var(--text-strong);
+  color: var(--color-text-strong);
 }
 
 .sidebarItem {
@@ -34,28 +34,28 @@
   align-items: center;
   gap: 0.875rem;
   padding: 0.45rem 0.5rem;
-  color: var(--text-base);
+  color: var(--color-text);
 }
 
 .sidebarItemActive {
-  background-color: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--border-soft);
+  background-color: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
 .sidebarItemActive .interactiveLinkLabel {
-  color: var(--text-strong);
+  color: var(--color-text-strong);
   font-weight: 700;
 }
 
 .sidebarIcon {
   flex-shrink: 0;
   font-size: 1.1rem;
-  color: var(--text-base);
+  color: var(--color-text);
 }
 
 .sidebarIcon:hover {
   font-weight: 700;
-  color: var(--text-strong);
+  color: var(--color-text-strong);
 }
 
 .navbarButton {
@@ -63,6 +63,6 @@
 }
 
 .navbarButton:hover {
-  background-color: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--border-soft);
+  background-color: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }

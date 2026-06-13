@@ -42,7 +42,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-slate-50 text-slate-900">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[color:var(--color-page)] text-[color:var(--color-text)]">
       <Sidebar isDesktop={isDesktop} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       <div
