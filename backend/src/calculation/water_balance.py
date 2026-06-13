@@ -1,23 +1,31 @@
+from __future__ import annotations
+
 import pandas as pd
+from typing import Protocol
 
-import logging
 
-from ..irrigation import FieldIrrigation
+class IrrigationSeries(Protocol):
+    def to_dataframe(self, index: pd.Index, *, fill_value: float = 0.0) -> pd.Series:
+        ...
 
-logger = logging.getLogger(__name__)
 
 def calculate_water_balance(
-    self,
+    *,
     nfk_total_mm: float,
     daily_weather: pd.DataFrame,
-    p_allowable: float = 1,
-    field_irrigation: FieldIrrigation | None = None,
-    initial_storage: float | None = None
+    p_allowable: float,
+    field_irrigation: IrrigationSeries | None = None,
+    initial_storage: float | None = None,
+    field_id: int | None = None,
 ) -> pd.DataFrame:
     if daily_weather is None or daily_weather.empty:
         raise ValueError("Daily weather cannot be empty when calculating the water balance.")
     if not isinstance(daily_weather.index, pd.DatetimeIndex):
         raise TypeError("Daily weather index must be a pandas DatetimeIndex.")
+    if nfk_total_mm <= 0:
+        raise ValueError("nfk_total_mm must be greater than 0.")
+    if p_allowable <= 0:
+        raise ValueError("p_allowable must be greater than 0.")
 
     data = daily_weather.sort_index().copy()
     if "precipitation" not in data.columns:
@@ -37,7 +45,7 @@ def calculate_water_balance(
 
     incoming = precipitation + irrigation
     net = incoming - evapotranspiration
-    available_water_storage = nfk_total_mm
+    available_water_storage = float(nfk_total_mm)
 
     soil_water_content: list[float] = []
     current_water_content = (
@@ -62,6 +70,8 @@ def calculate_water_balance(
     )
     water_balance["available_water_storage"] = available_water_storage
     water_balance["water_deficit"] = available_water_storage - water_balance["soil_water_content"]
+    if field_id is not None:
+        water_balance["field_id"] = field_id
     if "kc" in data.columns:
         water_balance["kc"] = data["kc"]
 
@@ -86,5 +96,3 @@ def calculate_water_balance(
         water_balance["value_type"] = "observed"
 
     return water_balance
-
-

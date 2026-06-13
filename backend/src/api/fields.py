@@ -9,6 +9,7 @@ from .utils import (
     serialize_field,
     serialize_field_detail,
     serialize_field_summary,
+    serialize_water_balance_summary,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ async def list_field_summaries():
 
     field_contexts = runtime.get_fields_by_ids([field.id for field in fields])
     water_balance_summaries = {
-        summary.field_id: summary
+        summary.field_id: serialize_water_balance_summary(summary)
         for summary in runtime.water_balance_service.get_summaries(field_contexts)
     }
 

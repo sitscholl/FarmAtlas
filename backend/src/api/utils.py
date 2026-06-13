@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from ..app_config import get_app_config_path
+from ..application.types import ApplicationFieldResult
 from ..runtime import RuntimeContext
 from ..scheduler import WorkflowScheduler
 from ..schemas import (
@@ -236,6 +237,12 @@ def serialize_forecast_water_balance(dataframe: pd.DataFrame) -> list[WaterBalan
 def serialize_workflow_result_messages(
     result: WorkflowFieldResult,
 ) -> tuple[list[WorkflowWarningRead], list[WorkflowErrorRead]]:
+    return serialize_result_messages(result)
+
+
+def serialize_result_messages(
+    result,
+) -> tuple[list[WorkflowWarningRead], list[WorkflowErrorRead]]:
     warnings = [
         WorkflowWarningRead(
             message=warning.message,
@@ -257,14 +264,46 @@ def serialize_workflow_result_messages(
     return warnings, errors
 
 
+def serialize_water_balance_summary(summary) -> WaterBalanceSummary:
+    return WaterBalanceSummary(
+        field_id=summary.field_id,
+        as_of=summary.as_of,
+        current_water_deficit=summary.current_water_deficit,
+        current_soil_water_content=summary.current_soil_water_content,
+        available_water_storage=summary.available_water_storage,
+        readily_available_water=summary.readily_available_water,
+        below_raw=summary.below_raw,
+        safe_ratio=summary.safe_ratio,
+    )
+
+
 def serialize_water_balance_workflow_result(
     result: WorkflowFieldResult[pd.DataFrame],
 ) -> WaterBalanceSeriesResponse:
-    warnings, errors = serialize_workflow_result_messages(result)
+    warnings, errors = serialize_result_messages(result)
     dataframe = result.result
     data = [] if dataframe is None or dataframe.empty else serialize_forecast_water_balance(dataframe)
     return WaterBalanceSeriesResponse(
         workflow_name=result.workflow_name,
+        field_id=result.field_id,
+        field_name=result.field_name,
+        status=result.status or "skipped",
+        ok=result.ok,
+        warnings=warnings,
+        errors=errors,
+        metadata=result.metadata,
+        data=data,
+    )
+
+
+def serialize_water_balance_application_result(
+    result: ApplicationFieldResult[pd.DataFrame],
+) -> WaterBalanceSeriesResponse:
+    warnings, errors = serialize_result_messages(result)
+    dataframe = result.result
+    data = [] if dataframe is None or dataframe.empty else serialize_forecast_water_balance(dataframe)
+    return WaterBalanceSeriesResponse(
+        workflow_name=result.operation_name,
         field_id=result.field_id,
         field_name=result.field_name,
         status=result.status or "skipped",

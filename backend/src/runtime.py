@@ -16,7 +16,7 @@ from .integrations.smartfarmer import SmartFarmerSettings
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
-from .water_balance import WaterBalanceService
+from .application.water_balance import WaterBalanceService
 from .workflows.base import WorkflowFieldResult
 from .workflows.fetch_treatment_data import FetchTreatmentDataWorkflow
 from .workflows.refresh_weather_cache import WeatherRefreshWorkflow

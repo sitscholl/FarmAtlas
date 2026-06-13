@@ -1,17 +1,51 @@
-import pandas as pd
+from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 import logging
+from typing import Any
+from zoneinfo import ZoneInfo
 
+import pandas as pd
+
+from .types import ApplicationFieldResult
+from ..calculation.soil_water import estimate_available_water_storage_capacity
+from ..calculation.water_balance import calculate_water_balance
 from ..database.db import Database
 from ..et.et_correction import ETCorrection
 from ..field import FieldContext
 from ..field_weather import FieldWeatherCacheService
 from ..irrigation import FieldIrrigation
-from ..calculation.soil_water import estimate_available_water_storage_capacity
+from ..results import FarmAtlasError, FarmAtlasWarning
 from ..weather_frame import WeatherFrame
 
 logger = logging.getLogger(__name__)
+
+
+def missing_soil_parameters(field: FieldContext) -> list[str]:
+    missing: list[str] = []
+    if field.soil_type is None:
+        missing.append("soil_type")
+    if field.humus_pct is None:
+        missing.append("humus_pct")
+    if field.effective_root_depth_cm is None:
+        missing.append("effective_root_depth_cm")
+    if field.p_allowable is None:
+        missing.append("p_allowable")
+    return missing
+
+
+@dataclass(slots=True)
+class WaterBalanceSummary:
+    field_id: int
+    as_of: date | None
+    current_water_deficit: float | None
+    current_soil_water_content: float | None
+    available_water_storage: float | None
+    readily_available_water: float | None
+    below_raw: bool | None
+    safe_ratio: float | None
+
 
 @dataclass
 class WaterBalanceService:
@@ -21,18 +55,32 @@ class WaterBalanceService:
     timezone: ZoneInfo
     forecast_provider: str = "open-meteo"
 
-    def _empty_result(
+    operation_name: str = "water_balance"
+
+    def _empty_summary(self, field_id: int) -> WaterBalanceSummary:
+        return WaterBalanceSummary(
+            field_id=field_id,
+            as_of=None,
+            current_water_deficit=None,
+            current_soil_water_content=None,
+            available_water_storage=None,
+            readily_available_water=None,
+            below_raw=None,
+            safe_ratio=None,
+        )
+
+    def _field_result(
         self,
         field: FieldContext,
         *,
         result: pd.DataFrame | None = None,
-        warnings: list[WorkflowWarning] | WorkflowWarning | None = None,
-        errors: list[WorkflowError] | WorkflowError | None = None,
+        warnings: list[FarmAtlasWarning] | FarmAtlasWarning | None = None,
+        errors: list[FarmAtlasError] | FarmAtlasError | None = None,
         status: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> WorkflowFieldResult[pd.DataFrame]:
-        return WorkflowFieldResult(
-            workflow_name=self.workflow_name,
+    ) -> ApplicationFieldResult[pd.DataFrame]:
+        return ApplicationFieldResult(
+            operation_name=self.operation_name,
             field_id=field.id,
             field_name=field.name,
             result=result,
@@ -42,7 +90,12 @@ class WaterBalanceService:
             metadata=metadata or {},
         )
 
-    def _period_end(self, *, forecast_days: int = 0, as_of: pd.Timestamp | None = None) -> tuple[pd.Timestamp, pd.Timestamp]:
+    def _period_end(
+        self,
+        *,
+        forecast_days: int = 0,
+        as_of: pd.Timestamp | None = None,
+    ) -> tuple[pd.Timestamp, pd.Timestamp]:
         observe_end = (
             pd.Timestamp.now(tz=self.timezone).floor("D")
             if as_of is None
@@ -105,8 +158,7 @@ class WaterBalanceService:
         if "datetime" in daily.columns:
             daily["datetime"] = pd.to_datetime(daily["datetime"])
             daily = daily.set_index("datetime")
-        daily = daily.sort_index()
-        return daily
+        return daily.sort_index()
 
     def _prepare_daily_weather_for_field(
         self,
@@ -134,19 +186,33 @@ class WaterBalanceService:
         *,
         year: int | None = None,
         forecast_days: int = 0,
-    ) -> WorkflowFieldResult[pd.DataFrame]:
+    ) -> ApplicationFieldResult[pd.DataFrame]:
         year = year or pd.Timestamp.now(tz=self.timezone).year
         observe_end, period_end = self._period_end(forecast_days=forecast_days)
-        if period_end <= observe_end:
-            period_end = observe_end
 
         try:
+            missing_parameters = missing_soil_parameters(field)
+            if missing_parameters:
+                return self._field_result(
+                    field,
+                    warnings=FarmAtlasWarning(
+                        message=(
+                            f"Field {field.name} is missing required soil parameters: "
+                            f"{', '.join(missing_parameters)}."
+                        ),
+                        code="MISSING_SOIL_PARAMETERS",
+                        details={"missing_parameters": missing_parameters},
+                    ),
+                    status="skipped",
+                    metadata={"source": "computed_from_weather_cache"},
+                )
+
             with self.db.session_scope() as session:
                 first_irrigation = self.db.irrigation.get_first_for_year(session, field_id=field.id, year=year)
                 if first_irrigation is None:
                     return self._field_result(
                         field,
-                        warnings=WorkflowWarning(
+                        warnings=FarmAtlasWarning(
                             message=f"No irrigation events found for field {field.name} in {year}.",
                             code="NO_IRRIGATION",
                             details={"year": year},
@@ -171,7 +237,7 @@ class WaterBalanceService:
             if daily_weather.empty:
                 return self._field_result(
                     field,
-                    warnings=WorkflowWarning(
+                    warnings=FarmAtlasWarning(
                         message=f"No cached weather data found for field {field.name}.",
                         code="NO_CACHED_WEATHER",
                     ),
@@ -179,12 +245,20 @@ class WaterBalanceService:
                     metadata={"source": "computed_from_weather_cache"},
                 )
 
+            soil_water_estimate = estimate_available_water_storage_capacity(
+                soil_type=field.soil_type,
+                soil_weight=field.soil_weight,
+                humus_pct=field.humus_pct,
+                effective_root_depth_cm=field.effective_root_depth_cm,
+            )
             daily_weather = self._prepare_daily_weather_for_field(field, daily_weather)
             field_irrigation = FieldIrrigation.from_list(irrigation_events)
-            water_balance = self.calculator.calculate(
-                field,
-                daily_weather,
+            water_balance = calculate_water_balance(
+                nfk_total_mm=soil_water_estimate.nfk_total_mm,
+                daily_weather=daily_weather,
+                p_allowable=float(field.p_allowable),
                 field_irrigation=field_irrigation,
+                field_id=field.id,
             )
             return self._field_result(
                 field,
@@ -198,7 +272,7 @@ class WaterBalanceService:
             logger.exception("Water balance calculation failed for field %s", field.name)
             return self._field_result(
                 field,
-                errors=WorkflowError.from_exception(
+                errors=FarmAtlasError.from_exception(
                     exc,
                     code="WATER_BALANCE_FAILED",
                     details={"year": year, "forecast_days": int(forecast_days)},
@@ -212,18 +286,18 @@ class WaterBalanceService:
         *,
         year: int | None = None,
         forecast_days: int = 0,
-    ) -> list[WorkflowFieldResult[pd.DataFrame]]:
+    ) -> list[ApplicationFieldResult[pd.DataFrame]]:
         return [
             self.calculate_field(field, year=year, forecast_days=forecast_days)
             for field in fields
         ]
 
-    def summary_from_result(self, result: WorkflowFieldResult[pd.DataFrame]) -> WaterBalanceSummary:
+    def summary_from_result(self, result: ApplicationFieldResult[pd.DataFrame]) -> WaterBalanceSummary:
         if result.result is None or result.result.empty:
             return self._empty_summary(result.field_id)
 
         frame = result.result.sort_index()
-        observed = frame[frame.get("value_type", "observed") != "forecast"] if "value_type" in frame.columns else frame
+        observed = frame[frame["value_type"] != "forecast"] if "value_type" in frame.columns else frame
         source = observed if not observed.empty else frame
         latest = source.iloc[-1]
         as_of = pd.Timestamp(source.index[-1]).date()

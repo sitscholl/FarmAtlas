@@ -16,7 +16,7 @@ from ..meteo.load import MeteoLoader
 from ..meteo.resample import MeteoResampler
 from ..meteo.station import Station
 from ..meteo.validate import MeteoValidator
-from ..water_content import estimate_available_water_storage_capacity
+from ..calculation.soil_water import estimate_available_water_storage_capacity
 
 logger = logging.getLogger(__name__)
 
