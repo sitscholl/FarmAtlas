@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { HiOutlineBars3 } from 'react-icons/hi2'
 import { IoMdAdd } from 'react-icons/io'
+import { LuCloudSun, LuTractor } from 'react-icons/lu'
 
 import api from '../api'
 import { createActions } from '../config/createActions'
@@ -66,6 +67,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
             <WorkflowSyncButton<TreatmentSmartFarmerSyncResponse, TreatmentSmartFarmerSyncResult>
               ariaLabel="Smartfarmer Spritzungen synchronisieren"
               title="Smartfarmer Spritzungen synchronisieren"
+              icon={LuTractor}
               loadingTitle="Smartfarmer Sync"
               loadingMessage="Spritzungen werden synchronisiert."
               successTitle="Smartfarmer Sync abgeschlossen"
@@ -94,6 +96,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
             <WorkflowSyncButton<WeatherCacheRefreshResponse, WeatherCacheRefreshStationResult>
               ariaLabel="Wettercache aktualisieren"
               title="Wettercache aktualisieren"
+              icon={LuCloudSun}
               loadingTitle="Wettercache Refresh"
               loadingMessage="Wetterdaten werden aktualisiert."
               successTitle="Wettercache aktualisiert"

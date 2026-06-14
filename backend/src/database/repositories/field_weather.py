@@ -5,6 +5,7 @@ import pandas as pd
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 
 from .. import models
 from .fields import FieldRepository
@@ -120,6 +121,10 @@ class FieldWeatherRepository:
                     for col in self.HOURLY_COLUMNS
                     if col not in {"source_provider", "source_station", "timestamp"}
                 }
+                update_cols["et0"] = func.coalesce(
+                    stmt.excluded.et0,
+                    models.StationWeatherHourly.et0,
+                )
                 stmt = stmt.on_conflict_do_update(
                     index_elements=[
                         models.StationWeatherHourly.source_provider,

@@ -13,6 +13,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 class PenmanDailyCalculator(ET0Calculator):
+    required_columns = (
+        "tair_2m",
+        "tair_2m_max",
+        "tair_2m_min",
+        "wind_speed",
+        "solar_radiation",
+        "relative_humidity",
+    )
+    min_rows = 3
 
     def __init__(self, corrector: "ETCorrection | None" = None, **kwargs):
         self.corrector = corrector
@@ -28,13 +37,14 @@ class PenmanDailyCalculator(ET0Calculator):
             )
 
         freq = None
-        try:
-            freq = pd.infer_freq(data.index)
-        except Exception as e:
-            logger.warning(
-                "Failed to determine input datetime frequency for PenmanDailyCalculator "
-                f"validation with error: {e}"
-            )
+        if len(data.index) >= 3:
+            try:
+                freq = pd.infer_freq(data.index)
+            except Exception as e:
+                logger.warning(
+                    "Failed to determine input datetime frequency for PenmanDailyCalculator "
+                    f"validation with error: {e}"
+                )
 
         if freq is not None and freq != "D":
             raise ValueError(f"Index of input data has to at daily frequency. Got {freq}")
@@ -47,8 +57,7 @@ class PenmanDailyCalculator(ET0Calculator):
         meteo_data = station.data
         self._validate_data(meteo_data)
 
-        required_cols = ['tair_2m', 'tair_2m_max', 'tair_2m_min', 'wind_speed', 'solar_radiation', 'relative_humidity']
-        missing_cols = [i for i in required_cols if i not in meteo_data.columns]
+        missing_cols = [i for i in self.required_columns if i not in meteo_data.columns]
         if missing_cols:
             raise ValueError(f"The following parameters required for the PenmanDaily calculation are missing in the meteo data: {missing_cols}")
 
@@ -73,3 +82,13 @@ class PenmanDailyCalculator(ET0Calculator):
             et = self.corrector.apply_to(et, "et0")
 
         return et
+
+    def can_calculate(self, data: pd.DataFrame) -> bool:
+        if not super().can_calculate(data):
+            return False
+
+        relative_humidity = pd.to_numeric(data["relative_humidity"], errors="coerce").dropna()
+        if relative_humidity.empty or float(relative_humidity.max()) < 1.0:
+            return False
+
+        return True

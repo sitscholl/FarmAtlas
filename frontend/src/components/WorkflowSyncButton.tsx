@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
-import { LuRefreshCw } from 'react-icons/lu'
+import type { IconType } from 'react-icons'
 
 import { getApiErrorMessage } from '../lib/apiErrors'
 import styles from '../styles/Home.module.css'
@@ -18,6 +19,7 @@ type WorkflowDialogState<TDetail> = {
 type WorkflowSyncButtonProps<TResponse, TDetail> = {
   ariaLabel: string
   title: string
+  icon: IconType
   loadingTitle: string
   loadingMessage: string
   successTitle: string
@@ -55,6 +57,7 @@ function titleForStatus(
 export default function WorkflowSyncButton<TResponse, TDetail>({
   ariaLabel,
   title,
+  icon: Icon,
   loadingTitle,
   loadingMessage,
   fallbackErrorMessage,
@@ -113,10 +116,10 @@ export default function WorkflowSyncButton<TResponse, TDetail>({
         aria-label={ariaLabel}
         title={title}
       >
-        <LuRefreshCw className={isRunning ? 'animate-spin' : ''} />
+        <Icon className={isRunning ? 'animate-pulse' : ''} />
       </button>
 
-      {dialog ? (
+      {dialog ? createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4">
           <div className="w-full max-w-md border border-slate-200 bg-white p-5 shadow-xl">
             <div className="flex items-start gap-3">
@@ -130,7 +133,7 @@ export default function WorkflowSyncButton<TResponse, TDetail>({
                       : 'bg-emerald-50 text-emerald-700',
                 ].join(' ')}
               >
-                <LuRefreshCw className={dialog.status === 'loading' ? 'animate-spin' : ''} />
+                <Icon className={dialog.status === 'loading' ? 'animate-pulse' : ''} />
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold text-slate-900">{dialog.title}</h2>
@@ -160,7 +163,8 @@ export default function WorkflowSyncButton<TResponse, TDetail>({
               </div>
             ) : null}
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   )

@@ -30,7 +30,6 @@ STATION_HOURLY_VALUE_COLUMNS = [
     "et0",
 ]
 
-
 @dataclass(frozen=True)
 class WeatherRefreshResult:
     source_provider: str
@@ -182,6 +181,12 @@ class FieldWeatherCacheService:
                 if daily.empty:
                     continue
                 daily = daily.set_index("datetime").sort_index()
+                if not self.et_calculator.can_calculate(daily):
+                    logger.info(
+                        "Skipping et0 calculation for station %s because daily weather inputs are incomplete.",
+                        station.id,
+                    )
+                    continue
                 et0 = self.et_calculator.calculate(
                     Station(
                         id=station.id,
