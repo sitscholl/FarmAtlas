@@ -155,9 +155,12 @@ class WaterBalanceService:
         if daily.empty:
             return daily
 
-        if "datetime" in daily.columns:
-            daily["datetime"] = pd.to_datetime(daily["datetime"])
-            daily = daily.set_index("datetime")
+        datetime_column = "datetime" if "datetime" in daily.columns else "timestamp" if "timestamp" in daily.columns else None
+        if datetime_column is not None:
+            daily[datetime_column] = pd.to_datetime(daily[datetime_column])
+            daily = daily.set_index(datetime_column)
+        elif not isinstance(daily.index, pd.DatetimeIndex):
+            raise TypeError("Daily cached weather must contain a datetime or timestamp column.")
         return daily.sort_index()
 
     def _prepare_daily_weather_for_field(

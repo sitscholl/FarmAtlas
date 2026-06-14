@@ -10,7 +10,13 @@ from .crop_protection import (
     CropProtectionRuleUpdate,
 )
 from .field import CadastralParcelRead, FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, FieldUpdate
-from .field_weather import FieldWeatherBulkRefreshResponse, FieldWeatherRefreshResponse, StationWeatherHourlyRead
+from .field_weather import (
+    FieldWeatherBulkRefreshResponse,
+    FieldWeatherRefreshResponse,
+    StationWeatherHourlyRead,
+    WeatherCacheRefreshResponse,
+    WeatherCacheRefreshStationResult,
+)
 from .irrigation import (
     IrrigationBulkCreate,
     IrrigationBulkResponse,
@@ -63,6 +69,8 @@ __all__ = [
     "FieldWeatherBulkRefreshResponse",
     "FieldWeatherRefreshResponse",
     "StationWeatherHourlyRead",
+    "WeatherCacheRefreshResponse",
+    "WeatherCacheRefreshStationResult",
     "IrrigationBulkCreate",
     "IrrigationBulkResponse",
     "IrrigationBulkUpsertResponse",

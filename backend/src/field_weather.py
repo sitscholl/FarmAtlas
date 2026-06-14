@@ -1,4 +1,5 @@
 import datetime
+import logging
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
@@ -6,10 +7,15 @@ import pandas as pd
 
 from .database.db import Database
 from .domain.field import FieldContext
+from .et.base import ET0Calculator
 from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
+from .meteo.station import Station
 from .meteo.validate import MeteoValidator
 from .weather_frame import WeatherFrame
+
+
+logger = logging.getLogger(__name__)
 
 
 STATION_HOURLY_VALUE_COLUMNS = [
@@ -22,7 +28,6 @@ STATION_HOURLY_VALUE_COLUMNS = [
     "sun_duration",
     "solar_radiation",
     "et0",
-    "et0_corrected",
 ]
 
 
@@ -42,6 +47,7 @@ class FieldWeatherCacheService:
     meteo_validator: MeteoValidator
     meteo_resampler: MeteoResampler
     timezone: ZoneInfo
+    et_calculator: ET0Calculator | None = None
     min_sample_size: int = 1
     hourly_min_sample_size: int = 1
     default_max_age: datetime.timedelta = datetime.timedelta(hours=3)
@@ -83,7 +89,6 @@ class FieldWeatherCacheService:
                     "sun_duration": row.sun_duration,
                     "solar_radiation": row.solar_radiation,
                     "et0": row.et0,
-                    "et0_corrected": row.et0_corrected,
                     "source_provider": row.source_provider,
                     "source_station": row.source_station,
                     "value_type": row.value_type,
@@ -98,6 +103,8 @@ class FieldWeatherCacheService:
         else:
             frame["timestamp"] = frame["timestamp"].dt.tz_convert(self.timezone)
         frame["updated_at"] = pd.to_datetime(frame["updated_at"], utc=True)
+        for column in STATION_HOURLY_VALUE_COLUMNS:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
         return frame.set_index("timestamp").sort_index()
 
     def _read_station_hourly(
@@ -127,6 +134,12 @@ class FieldWeatherCacheService:
             frame = frame.rename(columns={"index": "datetime"})
 
         groupby_cols = [column for column in ("station_id", "model") if column in frame.columns]
+        keep_cols = [
+            column
+            for column in ["datetime", *groupby_cols, *STATION_HOURLY_VALUE_COLUMNS]
+            if column in frame.columns
+        ]
+        frame = frame[keep_cols]
         hourly = self.meteo_resampler.apply_resampling(
             frame,
             freq="1h",
@@ -134,6 +147,67 @@ class FieldWeatherCacheService:
             min_sample_size=self.hourly_min_sample_size,
         )
         return hourly.set_index("datetime").sort_index()
+
+    def _add_hourly_et0(self, station: Station, hourly: pd.DataFrame) -> pd.DataFrame:
+        if self.et_calculator is None or hourly.empty:
+            return hourly
+
+        prepared = hourly.copy()
+        if "et0" in prepared.columns:
+            prepared["et0"] = pd.to_numeric(prepared["et0"], errors="coerce")
+            if prepared["et0"].notna().any():
+                return prepared
+        else:
+            prepared["et0"] = pd.NA
+
+        frame = prepared.reset_index()
+        if "datetime" not in frame.columns:
+            frame = frame.rename(columns={frame.columns[0]: "datetime"})
+        frame["datetime"] = pd.to_datetime(frame["datetime"])
+
+        groupby_cols = [column for column in ("station_id", "model") if column in frame.columns]
+        if groupby_cols:
+            grouped = frame.groupby(groupby_cols, dropna=False)
+        else:
+            grouped = [(None, frame)]
+
+        for _, group in grouped:
+            daily_input = group.drop(columns=groupby_cols + ["et0"], errors="ignore")
+            try:
+                daily = self.meteo_resampler.apply_resampling(
+                    daily_input,
+                    freq="1D",
+                    min_sample_size=self.min_sample_size,
+                )
+                if daily.empty:
+                    continue
+                daily = daily.set_index("datetime").sort_index()
+                et0 = self.et_calculator.calculate(
+                    Station(
+                        id=station.id,
+                        x=station.x,
+                        y=station.y,
+                        crs=station.crs,
+                        elevation=station.elevation,
+                        data=daily,
+                    ),
+                    correct=False,
+                )
+            except Exception as exc:
+                logger.warning("Could not calculate et0 for station %s: %s", station.id, exc)
+                continue
+
+            if "et0" not in et0.columns:
+                continue
+
+            group_dates = group["datetime"].dt.floor("D")
+            for day, value in pd.to_numeric(et0["et0"], errors="coerce").dropna().items():
+                matching_rows = group.index[group_dates == pd.Timestamp(day).floor("D")]
+                if len(matching_rows) < self.min_sample_size:
+                    continue
+                frame.loc[matching_rows, "et0"] = float(value) / len(matching_rows)
+
+        return frame.set_index("datetime").sort_index()
 
     def _build_station_hourly_cache_frame(
         self,
@@ -192,6 +266,8 @@ class FieldWeatherCacheService:
             raise ValueError(f"No meteo station data available for station {station}")
 
         hourly = self._prepare_hourly_weather(station_data.data)
+        # ET0 is calculated daily and distributed over hourly cache rows so daily aggregation preserves the total.
+        hourly = self._add_hourly_et0(station_data, hourly)
         cache_frame = self._build_station_hourly_cache_frame(
             provider=provider,
             station=station,

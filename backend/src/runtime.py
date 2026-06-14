@@ -125,6 +125,7 @@ class RuntimeContext:
             meteo_validator=self.meteo_validator,
             meteo_resampler=self.meteo_resampler,
             timezone=self.timezone,
+            et_calculator=self.et_calculator,
             min_sample_size=int(self.min_sample_size),
         )
 

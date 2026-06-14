@@ -1,6 +1,7 @@
 from datetime import datetime as DateTimeType
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .base import ORMModel
 
@@ -18,7 +19,6 @@ class StationWeatherHourlyRead(ORMModel):
     sun_duration: float | None = None
     solar_radiation: float | None = None
     et0: float | None = None
-    et0_corrected: float | None = None
     value_type: str
     updated_at: DateTimeType
 
@@ -39,3 +39,30 @@ class FieldWeatherBulkRefreshResponse(BaseModel):
     failed_field_ids: list[int]
     errors_by_field_id: dict[int, str]
     total_upserted_count: int
+
+
+class WeatherCacheRefreshStationResult(BaseModel):
+    workflow_name: str
+    source_provider: str
+    source_station: str
+    cache_kind: str
+    status: str
+    start: DateTimeType
+    end: DateTimeType
+    field_ids: list[int]
+    row_count: int = 0
+    refreshed: bool = False
+    error: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class WeatherCacheRefreshResponse(BaseModel):
+    status: str
+    message: str
+    workflow_name: str
+    station_count: int
+    field_count: int
+    start: DateTimeType
+    end: DateTimeType
+    cleaned_row_count: int = 0
+    results: list[WeatherCacheRefreshStationResult]

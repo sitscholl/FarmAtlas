@@ -462,7 +462,6 @@ export type StationWeatherHourlyRead = {
   sun_duration?: number | null
   solar_radiation?: number | null
   et0?: number | null
-  et0_corrected?: number | null
   value_type: string
   updated_at: string
 }
@@ -615,6 +614,35 @@ export type WaterBalanceSummary = {
   readily_available_water: number | null
   below_raw: boolean | null
   safe_ratio: number | null
+}
+
+export type WeatherCacheRefreshResponse = {
+  status: string
+  message: string
+  workflow_name: string
+  station_count: number
+  field_count: number
+  start: string
+  end: string
+  cleaned_row_count?: number
+  results: Array<WeatherCacheRefreshStationResult>
+}
+
+export type WeatherCacheRefreshStationResult = {
+  workflow_name: string
+  source_provider: string
+  source_station: string
+  cache_kind: string
+  status: string
+  start: string
+  end: string
+  field_ids: Array<number>
+  row_count?: number
+  refreshed?: boolean
+  error?: string | null
+  metadata?: {
+  [key: string]: unknown
+}
 }
 
 export type WorkflowErrorRead = {

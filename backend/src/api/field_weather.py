@@ -1,10 +1,17 @@
+import asyncio
 import logging
 from datetime import datetime
 
 import pandas as pd
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from ..schemas import FieldWeatherBulkRefreshResponse, FieldWeatherRefreshResponse, StationWeatherHourlyRead
+from ..schemas import (
+    FieldWeatherBulkRefreshResponse,
+    FieldWeatherRefreshResponse,
+    StationWeatherHourlyRead,
+    WeatherCacheRefreshResponse,
+    WeatherCacheRefreshStationResult,
+)
 from .utils import get_write_error_detail, raise_write_http_error, runtime, validate_field_id
 
 logger = logging.getLogger(__name__)
@@ -41,7 +48,6 @@ async def list_field_weather_hourly(
                     sun_duration=_optional_float(row["sun_duration"]),
                     solar_radiation=_optional_float(row["solar_radiation"]),
                     et0=_optional_float(row["et0"]),
-                    et0_corrected=_optional_float(row["et0_corrected"]),
                     value_type=str(row["value_type"]),
                     updated_at=row["updated_at"].to_pydatetime(),
                 )
@@ -128,4 +134,67 @@ async def refresh_all_field_weather_hourly(
         failed_field_ids=failed_field_ids,
         errors_by_field_id=errors_by_field_id,
         total_upserted_count=sum(item.upserted_count for item in refreshed),
+    )
+
+
+@router.post("/api/weather/cache/refresh", response_model=WeatherCacheRefreshResponse)
+async def refresh_weather_cache_workflow(force: bool = True):
+    workflow_config = runtime.config.get("workflows", {}).get("refresh_weather_cache", {})
+    run_kwargs = dict(workflow_config.get("run") or {})
+    run_kwargs["force"] = force
+    try:
+        result = await asyncio.to_thread(
+            runtime.run_workflow,
+            "refresh_weather_cache",
+            **run_kwargs,
+        )
+    except Exception as exc:
+        logger.exception("Weather cache refresh workflow failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc) or "Weather cache refresh failed.") from exc
+
+    station_results = [
+        WeatherCacheRefreshStationResult(
+            workflow_name=item.workflow_name,
+            source_provider=item.source_provider,
+            source_station=item.source_station,
+            cache_kind=item.cache_kind,
+            status=item.status,
+            start=item.start,
+            end=item.end,
+            field_ids=item.field_ids,
+            row_count=item.row_count,
+            refreshed=item.refreshed,
+            error=item.error,
+            metadata=item.metadata,
+        )
+        for item in result.station_results
+    ]
+    failed = [item for item in station_results if item.status == "failed"]
+    warnings = [item for item in station_results if item.status == "warning"]
+
+    if failed:
+        message = "Weather cache refresh failed: " + " | ".join(
+            item.error or f"{item.source_provider}/{item.source_station} failed"
+            for item in failed
+        )
+        status_text = "failed"
+    elif warnings or result.status == "warning":
+        message = "Weather cache refresh completed with warnings."
+        status_text = "warning"
+    else:
+        refreshed_count = sum(1 for item in station_results if item.refreshed)
+        row_count = sum(item.row_count for item in station_results)
+        message = f"Weather cache refresh completed. Refreshed {refreshed_count} cache segment(s), checked {row_count} row(s)."
+        status_text = "success"
+
+    return WeatherCacheRefreshResponse(
+        status=status_text,
+        message=message,
+        workflow_name=result.workflow_name,
+        station_count=result.station_count,
+        field_count=result.field_count,
+        start=result.start,
+        end=result.end,
+        cleaned_row_count=result.cleaned_row_count,
+        results=station_results,
     )

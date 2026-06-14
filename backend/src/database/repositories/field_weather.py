@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class FieldWeatherRepository:
+    SQLITE_MAX_VARIABLES = 999
+
     HOURLY_COLUMNS = [
         "source_provider",
         "source_station",
@@ -26,7 +28,6 @@ class FieldWeatherRepository:
         "sun_duration",
         "solar_radiation",
         "et0",
-        "et0_corrected",
         "value_type",
         "updated_at",
     ]
@@ -90,7 +91,6 @@ class FieldWeatherRepository:
             "sun_duration",
             "solar_radiation",
             "et0",
-            "et0_corrected",
         ]
         for column in optional_cols:
             if column not in df.columns:
@@ -101,6 +101,8 @@ class FieldWeatherRepository:
         df["updated_at"] = pd.Timestamp(updated_at).to_pydatetime()
         df["timestamp"] = pd.to_datetime(df["timestamp"]).map(lambda value: pd.Timestamp(value).to_pydatetime())
         df["precipitation"] = pd.to_numeric(df["precipitation"], errors="coerce").fillna(0.0)
+        for column in optional_cols:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
 
         df = df[self.HOURLY_COLUMNS]
         records = df.to_dict(orient="records")
@@ -108,22 +110,27 @@ class FieldWeatherRepository:
             return 0
 
         if engine.dialect.name == "sqlite":
-            stmt = sqlite_insert(models.StationWeatherHourly).values(records)
-            update_cols = {
-                col: getattr(stmt.excluded, col)
-                for col in self.HOURLY_COLUMNS
-                if col not in {"source_provider", "source_station", "timestamp"}
-            }
-            stmt = stmt.on_conflict_do_update(
-                index_elements=[
-                    models.StationWeatherHourly.source_provider,
-                    models.StationWeatherHourly.source_station,
-                    models.StationWeatherHourly.timestamp,
-                ],
-                set_=update_cols,
-            )
-            result = session.execute(stmt)
-            return result.rowcount or 0
+            chunk_size = max(1, self.SQLITE_MAX_VARIABLES // len(self.HOURLY_COLUMNS))
+            row_count = 0
+            for start_idx in range(0, len(records), chunk_size):
+                chunk = records[start_idx : start_idx + chunk_size]
+                stmt = sqlite_insert(models.StationWeatherHourly).values(chunk)
+                update_cols = {
+                    col: getattr(stmt.excluded, col)
+                    for col in self.HOURLY_COLUMNS
+                    if col not in {"source_provider", "source_station", "timestamp"}
+                }
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=[
+                        models.StationWeatherHourly.source_provider,
+                        models.StationWeatherHourly.source_station,
+                        models.StationWeatherHourly.timestamp,
+                    ],
+                    set_=update_cols,
+                )
+                result = session.execute(stmt)
+                row_count += result.rowcount or 0
+            return row_count
 
         for record in records:
             session.merge(models.StationWeatherHourly(**record))

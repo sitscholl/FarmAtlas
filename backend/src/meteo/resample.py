@@ -5,6 +5,10 @@ from typing import Callable, Any, Iterable
 
 logger = logging.getLogger(__name__)
 
+
+IGNORED_RESAMPLE_VALUE_COLUMNS = {"updated_at"}
+
+
 def get_mode(column: pd.Series):
     non_null = column.dropna()
     if non_null.empty:
@@ -15,6 +19,11 @@ def get_mode(column: pd.Series):
         return pd.NA
 
     return mode.iloc[0]
+
+
+def sum_min_count(column: pd.Series):
+    return column.sum(min_count=1)
+
 
 DEFAULT_RESAMPLE_COLMAP = {
     "tair_2m": ["mean", "min", "max"],  
@@ -44,7 +53,7 @@ class MeteoResampler:
 
     _AGG_STR_TO_FUNC: dict[str, str | Callable[[pd.Series], Any]] = {
         "mean": "mean",
-        "sum": "sum",
+        "sum": sum_min_count,
         "max": "max",
         "min": "min",
         "median": "median",
@@ -152,14 +161,32 @@ class MeteoResampler:
         # 3. Build Named Aggregations
         value_cols = [c for c in df.columns if c not in required_cols]
         if numeric_only:
-            non_numeric_cols = [c for c in value_cols if not pd.api.types.is_numeric_dtype(df[c])]
+            ignored_cols = [c for c in value_cols if c in IGNORED_RESAMPLE_VALUE_COLUMNS]
+            for col in value_cols:
+                if col in ignored_cols or pd.api.types.is_numeric_dtype(df[col]):
+                    continue
+                if col not in self.resample_colmap:
+                    continue
+
+                converted = pd.to_numeric(df[col], errors="coerce")
+                if df[col].notna().any() and converted.notna().sum() == 0:
+                    continue
+                df[col] = converted
+
+            non_numeric_cols = [
+                c
+                for c in value_cols
+                if c not in ignored_cols and not pd.api.types.is_numeric_dtype(df[c])
+            ]
             if non_numeric_cols:
                 logger.warning(
                     "Found non-numeric value columns. They will be dropped when resampling: %s",
                     non_numeric_cols,
                 )
-                df = df.drop(columns=non_numeric_cols)
-                value_cols = [c for c in value_cols if c not in non_numeric_cols]
+            drop_cols = ignored_cols + non_numeric_cols
+            if drop_cols:
+                df = df.drop(columns=drop_cols)
+                value_cols = [c for c in value_cols if c not in drop_cols]
 
         named_aggs = self._prepare_named_aggs(value_cols, self.default_aggfunc)
 

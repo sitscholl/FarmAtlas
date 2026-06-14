@@ -350,7 +350,6 @@ class StationWeatherHourly(Base):
     sun_duration = Column(Float, nullable=True)
     solar_radiation = Column(Float, nullable=True)
     et0 = Column(Float, nullable=True)
-    et0_corrected = Column(Float, nullable=True)
     value_type = Column(String, nullable=False, default="observed")
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
 
