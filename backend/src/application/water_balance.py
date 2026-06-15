@@ -12,10 +12,12 @@ from .types import ApplicationFieldResult
 from ..calculation.soil_water import estimate_available_water_storage_capacity
 from ..calculation.water_balance import calculate_water_balance
 from ..database.db import Database
+from ..et.base import ET0Calculator
 from ..et.et_correction import ETCorrection
 from ..domain.field import FieldContext
 from ..domain.irrigation import FieldIrrigation
 from ..field_weather import FieldWeatherCacheService
+from ..meteo.station import Station
 from ..results import FarmAtlasError, FarmAtlasWarning
 from ..weather_frame import WeatherFrame
 
@@ -51,6 +53,7 @@ class WaterBalanceSummary:
 class WaterBalanceService:
     db: Database
     weather_cache: FieldWeatherCacheService
+    et_calculator: ET0Calculator
     et_corrector: ETCorrection
     timezone: ZoneInfo
     forecast_provider: str = "open-meteo"
@@ -163,25 +166,105 @@ class WaterBalanceService:
             raise TypeError("Daily cached weather must contain a datetime or timestamp column.")
         return daily.sort_index()
 
+    def _station_for_daily_weather(
+        self,
+        field: FieldContext,
+        *,
+        provider: str,
+        station: str,
+        daily_weather: pd.DataFrame,
+    ) -> Station:
+        with self.db.session_scope() as session:
+            metadata = self.db.field_weather.get_station_metadata(
+                session,
+                provider=provider,
+                station=station,
+            )
+            if metadata is None:
+                raise KeyError(
+                    f"No cached station metadata found for {provider}/{station}. "
+                    "Refresh the weather cache once before calculating water balance."
+                )
+            longitude = metadata.longitude
+            latitude = metadata.latitude
+            crs = metadata.crs
+            elevation = metadata.elevation
+
+        return Station(
+            id=station,
+            x=float(longitude),
+            y=float(latitude),
+            crs=int(crs),
+            elevation=field.elevation if elevation is None else float(elevation),
+            data=daily_weather,
+        )
+
+    def _calculate_et0_for_daily_weather(
+        self,
+        field: FieldContext,
+        prepared: pd.DataFrame,
+    ) -> pd.DataFrame:
+        if not isinstance(prepared.index, pd.DatetimeIndex):
+            raise TypeError("Daily cached weather must use a pandas DatetimeIndex before ET0 calculation.")
+
+        frame = prepared.drop(columns=["et0", "et0_corrected", "kc"], errors="ignore").copy()
+        group_columns = [
+            column
+            for column in ("source_provider", "source_station")
+            if column in frame.columns
+        ]
+        if len(group_columns) == 2:
+            groups = frame.groupby(group_columns, dropna=False, sort=False)
+        else:
+            groups = [((field.reference_provider, field.reference_station), frame)]
+
+        calculated_groups: list[pd.DataFrame] = []
+        for key, group in groups:
+            if len(group_columns) == 2:
+                provider, station = key
+            else:
+                provider, station = field.reference_provider, field.reference_station
+
+            provider = str(provider)
+            station = str(station)
+            group = group.copy()
+            if not self.et_calculator.can_calculate(group):
+                raise KeyError(
+                    f"Cached weather for {provider}/{station} does not contain complete inputs "
+                    "for ET0 calculation."
+                )
+
+            station_weather = self._station_for_daily_weather(
+                field,
+                provider=provider,
+                station=station,
+                daily_weather=group,
+            )
+            et0 = self.et_calculator.calculate(station_weather, correct=False)
+            if "et0" not in et0.columns:
+                raise KeyError("ET0 calculator did not return an 'et0' column.")
+
+            values = pd.to_numeric(et0["et0"], errors="coerce")
+            if len(values.index) != len(group.index):
+                values = values.reindex(group.index)
+            group["et0"] = values.to_numpy()
+            calculated_groups.append(group)
+
+        calculated = pd.concat(calculated_groups).sort_index()
+        if calculated["et0"].isna().any():
+            raise KeyError("Calculated ET0 contains gaps for cached weather.")
+        return calculated
+
     def _prepare_daily_weather_for_field(
         self,
         field: FieldContext,
         daily_weather: pd.DataFrame,
     ) -> pd.DataFrame:
-        prepared = daily_weather.copy()
-        if "et0" in prepared.columns and prepared["et0"].notna().any():
-            prepared = self.et_corrector.apply_to_field(prepared, "et0", field)
-            if prepared["et0_corrected"].isna().any():
-                raise KeyError("Cached weather has gaps in et0 values.")
-            return prepared
-
-        if "et0_corrected" in prepared.columns and prepared["et0_corrected"].notna().any():
-            prepared["kc"] = self.et_corrector.to_field_series(prepared.index, field)
-            if prepared["et0_corrected"].isna().any():
-                raise KeyError("Cached weather has gaps in et0_corrected values.")
-            return prepared
-
-        raise KeyError("Cached weather does not contain complete et0 or et0_corrected values.")
+        prepared = self._calculate_et0_for_daily_weather(field, daily_weather)
+        prepared = self.et_corrector.apply_to_field(prepared, "et0", field)
+        if prepared["et0_corrected"].isna().any():
+            raise KeyError("Calculated field-specific ET0 contains gaps.")
+        return prepared
 
     def calculate_field(
         self,

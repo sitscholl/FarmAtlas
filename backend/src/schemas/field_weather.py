@@ -18,7 +18,6 @@ class StationWeatherHourlyRead(ORMModel):
     air_pressure: float | None = None
     sun_duration: float | None = None
     solar_radiation: float | None = None
-    et0: float | None = None
     value_type: str
     updated_at: DateTimeType
 

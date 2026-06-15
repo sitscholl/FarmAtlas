@@ -154,7 +154,6 @@ class CropProtectionService:
                     "air_pressure": row.air_pressure,
                     "sun_duration": row.sun_duration,
                     "solar_radiation": row.solar_radiation,
-                    "et0": row.et0,
                     "updated_at": row.updated_at,
                 }
                 for row in rows

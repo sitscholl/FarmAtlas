@@ -31,7 +31,6 @@ def upgrade() -> None:
         sa.Column("air_pressure", sa.Float(), nullable=True),
         sa.Column("sun_duration", sa.Float(), nullable=True),
         sa.Column("solar_radiation", sa.Float(), nullable=True),
-        sa.Column("et0", sa.Float(), nullable=True),
         sa.Column("value_type", sa.String(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("source_provider", "source_station", "timestamp"),

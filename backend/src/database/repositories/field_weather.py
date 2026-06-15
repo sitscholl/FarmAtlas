@@ -5,7 +5,6 @@ import pandas as pd
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import func
 
 from .. import models
 from .fields import FieldRepository
@@ -28,7 +27,6 @@ class FieldWeatherRepository:
         "air_pressure",
         "sun_duration",
         "solar_radiation",
-        "et0",
         "value_type",
         "updated_at",
     ]
@@ -91,7 +89,6 @@ class FieldWeatherRepository:
             "air_pressure",
             "sun_duration",
             "solar_radiation",
-            "et0",
         ]
         for column in optional_cols:
             if column not in df.columns:
@@ -121,10 +118,6 @@ class FieldWeatherRepository:
                     for col in self.HOURLY_COLUMNS
                     if col not in {"source_provider", "source_station", "timestamp"}
                 }
-                update_cols["et0"] = func.coalesce(
-                    stmt.excluded.et0,
-                    models.StationWeatherHourly.et0,
-                )
                 stmt = stmt.on_conflict_do_update(
                     index_elements=[
                         models.StationWeatherHourly.source_provider,
@@ -140,6 +133,71 @@ class FieldWeatherRepository:
         for record in records:
             session.merge(models.StationWeatherHourly(**record))
         return len(records)
+
+    def upsert_station_metadata(
+        self,
+        session: Session,
+        engine: Engine,
+        *,
+        provider: str,
+        station: str,
+        longitude: float,
+        latitude: float,
+        crs: int = 4326,
+        elevation: float | None = None,
+        updated_at: datetime.datetime | None = None,
+    ) -> models.StationWeatherMetadata:
+        if updated_at is None:
+            updated_at = datetime.datetime.now(datetime.UTC)
+        record = {
+            "source_provider": provider,
+            "source_station": station,
+            "longitude": float(longitude),
+            "latitude": float(latitude),
+            "crs": int(crs),
+            "elevation": None if elevation is None else float(elevation),
+            "updated_at": pd.Timestamp(updated_at).to_pydatetime(),
+        }
+
+        if engine.dialect.name == "sqlite":
+            stmt = sqlite_insert(models.StationWeatherMetadata).values(record)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[
+                    models.StationWeatherMetadata.source_provider,
+                    models.StationWeatherMetadata.source_station,
+                ],
+                set_={
+                    "longitude": stmt.excluded.longitude,
+                    "latitude": stmt.excluded.latitude,
+                    "crs": stmt.excluded.crs,
+                    "elevation": stmt.excluded.elevation,
+                    "updated_at": stmt.excluded.updated_at,
+                },
+            )
+            session.execute(stmt)
+            metadata = self.get_station_metadata(session, provider=provider, station=station)
+            if metadata is None:
+                raise RuntimeError(f"Failed to persist station metadata for {provider}/{station}")
+            return metadata
+
+        metadata = session.merge(models.StationWeatherMetadata(**record))
+        return metadata
+
+    def get_station_metadata(
+        self,
+        session: Session,
+        *,
+        provider: str,
+        station: str,
+    ) -> models.StationWeatherMetadata | None:
+        return (
+            session.query(models.StationWeatherMetadata)
+            .filter(
+                models.StationWeatherMetadata.source_provider == provider,
+                models.StationWeatherMetadata.source_station == station,
+            )
+            .one_or_none()
+        )
 
     def clear_station_hourly(
         self,

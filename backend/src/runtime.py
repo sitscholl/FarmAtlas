@@ -125,7 +125,6 @@ class RuntimeContext:
             meteo_validator=self.meteo_validator,
             meteo_resampler=self.meteo_resampler,
             timezone=self.timezone,
-            et_calculator=self.et_calculator,
             min_sample_size=int(self.min_sample_size),
         )
 
@@ -155,6 +154,7 @@ class RuntimeContext:
         self.water_balance_service = WaterBalanceService(
             db=self.db,
             weather_cache=self.field_weather_service,
+            et_calculator=self.et_calculator,
             et_corrector=self.et_corrector,
             timezone=self.timezone,
             forecast_provider=weather_refresh_run_config.get("forecast_provider", "open-meteo"),

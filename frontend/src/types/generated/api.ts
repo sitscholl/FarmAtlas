@@ -461,7 +461,6 @@ export type StationWeatherHourlyRead = {
   air_pressure?: number | null
   sun_duration?: number | null
   solar_radiation?: number | null
-  et0?: number | null
   value_type: string
   updated_at: string
 }

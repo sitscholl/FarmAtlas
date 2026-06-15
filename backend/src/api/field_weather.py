@@ -47,7 +47,6 @@ async def list_field_weather_hourly(
                     air_pressure=_optional_float(row["air_pressure"]),
                     sun_duration=_optional_float(row["sun_duration"]),
                     solar_radiation=_optional_float(row["solar_radiation"]),
-                    et0=_optional_float(row["et0"]),
                     value_type=str(row["value_type"]),
                     updated_at=row["updated_at"].to_pydatetime(),
                 )

@@ -349,8 +349,19 @@ class StationWeatherHourly(Base):
     air_pressure = Column(Float, nullable=True)
     sun_duration = Column(Float, nullable=True)
     solar_radiation = Column(Float, nullable=True)
-    et0 = Column(Float, nullable=True)
     value_type = Column(String, nullable=False, default="observed")
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
+
+
+class StationWeatherMetadata(Base):
+    __tablename__ = "station_weather_metadata"
+
+    source_provider = Column(String, primary_key=True)
+    source_station = Column(String, primary_key=True)
+    longitude = Column(Float, nullable=False)
+    latitude = Column(Float, nullable=False)
+    crs = Column(Integer, nullable=False, default=4326)
+    elevation = Column(Float, nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
 
 

@@ -211,7 +211,13 @@ def get_irrigation_event(event_id: int):
 
 
 def serialize_forecast_water_balance(dataframe: pd.DataFrame) -> list[WaterBalanceSeriesPoint]:
-    series = dataframe.reset_index().rename(columns={"index": "date"})
+    series = dataframe.reset_index()
+    if "date" not in series.columns:
+        index_column = dataframe.index.name or "index"
+        if index_column in series.columns:
+            series = series.rename(columns={index_column: "date"})
+        else:
+            series = series.rename(columns={series.columns[0]: "date"})
     return [
         WaterBalanceSeriesPoint(
             date=pd.Timestamp(row["date"]).date(),
