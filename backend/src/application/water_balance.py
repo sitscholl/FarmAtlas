@@ -49,6 +49,12 @@ class WaterBalanceSummary:
     safe_ratio: float | None
 
 
+@dataclass(slots=True)
+class DailyWeatherResult:
+    data: pd.DataFrame
+    warnings: list[FarmAtlasWarning]
+
+
 @dataclass
 class WaterBalanceService:
     db: Database
@@ -114,8 +120,9 @@ class WaterBalanceService:
         start: pd.Timestamp,
         observe_end: pd.Timestamp,
         period_end: pd.Timestamp,
-    ) -> pd.DataFrame:
+    ) -> DailyWeatherResult:
         hourly_frames: list[pd.DataFrame] = []
+        warnings: list[FarmAtlasWarning] = []
 
         if start < observe_end:
             observed = self.weather_cache.get_field_hourly_weather(
@@ -136,14 +143,30 @@ class WaterBalanceService:
             )
             if not forecast.empty:
                 hourly_frames.append(forecast.data)
+            else:
+                warnings.append(
+                    FarmAtlasWarning(
+                        message=(
+                            "Forecast weather cache is missing. Refresh the weather cache "
+                            "to show the forecast part of the water-balance chart."
+                        ),
+                        code="FORECAST_CACHE_MISSING",
+                        details={
+                            "provider": self.forecast_provider,
+                            "station": field.reference_station,
+                            "start": observe_end.isoformat(),
+                            "end": period_end.isoformat(),
+                        },
+                    )
+                )
 
         if not hourly_frames:
-            return pd.DataFrame()
+            return DailyWeatherResult(data=pd.DataFrame(), warnings=warnings)
 
         hourly = pd.concat(hourly_frames).sort_index()
         hourly = hourly.loc[(hourly.index >= start) & (hourly.index < period_end)]
         if hourly.empty:
-            return pd.DataFrame()
+            return DailyWeatherResult(data=pd.DataFrame(), warnings=warnings)
 
         daily = self.weather_cache.aggregate_daily(
             WeatherFrame(
@@ -156,7 +179,7 @@ class WaterBalanceService:
             )
         ).data
         if daily.empty:
-            return daily
+            return DailyWeatherResult(data=daily, warnings=warnings)
 
         datetime_column = "datetime" if "datetime" in daily.columns else "timestamp" if "timestamp" in daily.columns else None
         if datetime_column is not None:
@@ -164,7 +187,7 @@ class WaterBalanceService:
             daily = daily.set_index(datetime_column)
         elif not isinstance(daily.index, pd.DatetimeIndex):
             raise TypeError("Daily cached weather must contain a datetime or timestamp column.")
-        return daily.sort_index()
+        return DailyWeatherResult(data=daily.sort_index(), warnings=warnings)
 
     def _station_for_daily_weather(
         self,
@@ -314,19 +337,23 @@ class WaterBalanceService:
                 )
 
             start = pd.Timestamp(first_irrigation.date, tz=self.timezone)
-            daily_weather = self._daily_weather(
+            daily_weather_result = self._daily_weather(
                 field,
                 start=start,
                 observe_end=observe_end,
                 period_end=period_end,
             )
+            daily_weather = daily_weather_result.data
             if daily_weather.empty:
                 return self._field_result(
                     field,
-                    warnings=FarmAtlasWarning(
-                        message=f"No cached weather data found for field {field.name}.",
-                        code="NO_CACHED_WEATHER",
-                    ),
+                    warnings=[
+                        *daily_weather_result.warnings,
+                        FarmAtlasWarning(
+                            message=f"No cached weather data found for field {field.name}.",
+                            code="NO_CACHED_WEATHER",
+                        ),
+                    ],
                     status="skipped",
                     metadata={"source": "computed_from_weather_cache"},
                 )
@@ -349,6 +376,7 @@ class WaterBalanceService:
             return self._field_result(
                 field,
                 result=water_balance,
+                warnings=daily_weather_result.warnings,
                 metadata={
                     "source": "computed_from_weather_cache",
                     "forecast_days": int(forecast_days),

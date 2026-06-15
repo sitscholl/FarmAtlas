@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
-import { FiMoreVertical, FiX } from 'react-icons/fi'
+import { FiAlertTriangle, FiMoreVertical, FiX } from 'react-icons/fi'
 import { LuArrowDown, LuCalendarDays, LuClock, LuRadioTower, LuTrees } from 'react-icons/lu'
 import { MdWaterDrop } from 'react-icons/md'
 import { FaArrowRight } from 'react-icons/fa'
@@ -22,6 +22,8 @@ import {
   type FieldSummaryRead,
   type WaterBalanceSeriesPoint,
   type WaterBalanceSeriesResponse,
+  type WorkflowErrorRead,
+  type WorkflowWarningRead,
 } from '../types/generated/api'
 
 const FORECAST_DAYS = 5
@@ -40,9 +42,35 @@ type FieldMetricDefinition = {
 type WaterBalanceModalState = {
   field: FieldSummaryRead
   data: WaterBalanceSeriesPoint[]
-  workflowMessages: string[]
+  workflowMessages: WorkflowMessage[]
   isLoading: boolean
   errorMessage: string | null
+}
+
+type WorkflowMessage = {
+  kind: 'warning' | 'error'
+  message: string
+}
+
+function formatWorkflowWarning(warning: WorkflowWarningRead): WorkflowMessage {
+  if (warning.code === 'FORECAST_CACHE_MISSING') {
+    return {
+      kind: 'warning',
+      message: 'Die Wettervorhersage fehlt im Cache. Aktualisiere den Wetter-Cache, um den Prognosebereich der Wasserbilanz anzuzeigen.',
+    }
+  }
+
+  return {
+    kind: 'warning',
+    message: warning.message,
+  }
+}
+
+function formatWorkflowError(error: WorkflowErrorRead): WorkflowMessage {
+  return {
+    kind: 'error',
+    message: error.message,
+  }
 }
 
 type FieldPhenologyEvent = {
@@ -344,9 +372,19 @@ function WaterBalanceModal({
           ) : (
             <div className="space-y-3">
               {state.workflowMessages.length > 0 ? (
-                <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div className="space-y-2">
                   {state.workflowMessages.map((message) => (
-                    <div key={message}>{message}</div>
+                    <div
+                      key={`${message.kind}-${message.message}`}
+                      className={
+                        message.kind === 'error'
+                          ? 'flex items-start gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800'
+                          : 'flex items-start gap-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'
+                      }
+                    >
+                      <FiAlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span>{message.message}</span>
+                    </div>
                   ))}
                 </div>
               ) : null}
@@ -528,8 +566,8 @@ export default function Home() {
         },
       )
       const workflowMessages = [
-        ...(response.data.warnings ?? []).map((warning) => warning.message),
-        ...(response.data.errors ?? []).map((error) => error.message),
+        ...(response.data.warnings ?? []).map(formatWorkflowWarning),
+        ...(response.data.errors ?? []).map(formatWorkflowError),
       ]
       const data = response.data.data ?? []
       setWaterBalanceModal({
