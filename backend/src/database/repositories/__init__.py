@@ -8,7 +8,6 @@ from .plantings import PlantingRepository
 from .sections import SectionRepository
 from .treatments import TreatmentRepository
 from .varieties import VarietyRepository
-from .water_balance import WaterBalanceRepository
 
 __all__ = [
     "FieldRepository",
@@ -21,5 +20,4 @@ __all__ = [
     "SectionRepository",
     "TreatmentRepository",
     "VarietyRepository",
-    "WaterBalanceRepository",
 ]

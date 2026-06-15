@@ -73,11 +73,3 @@ workflows:
       forecast_provider: open-meteo
       forecast_days: 7
       cleanup_older_than_days: 400
-
-  water_balance:
-    enabled: false
-    schedule:
-      freq: D  # examples: D, W-MON, 6H, MS
-      time: "05:00"
-    run:
-      #year: 2025

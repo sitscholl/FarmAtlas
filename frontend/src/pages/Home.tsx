@@ -232,11 +232,9 @@ function FieldPhenologyTooltip({ events }: { events: FieldPhenologyEvent[] | und
 
 function FieldActionsMenu({
   field,
-  onRefresh,
   onClearIrrigation,
 }: {
   field: FieldSummaryRead
-  onRefresh: (field: FieldSummaryRead) => Promise<void>
   onClearIrrigation: (field: FieldSummaryRead) => Promise<void>
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -277,18 +275,6 @@ function FieldActionsMenu({
 
       {isOpen ? (
         <div className="absolute right-0 top-full z-30 mt-2 min-w-56 border border-slate-200 bg-white p-2 shadow-xl">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              setIsOpen(false)
-              void onRefresh(field)
-            }}
-            className="flex w-full px-4 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
-          >
-            Wasserbilanz aktualisieren
-          </button>
           <button
             type="button"
             onClick={(event) => {
@@ -510,16 +496,6 @@ export default function Home() {
     setSelectedRuleId((currentRuleId) => currentRuleId === ruleId ? null : ruleId)
   }
 
-  const handleRefreshField = async (field: FieldSummaryRead) => {
-    try {
-      await api.post(`/fields/${field.id}/water-balance`)
-      notifyDataChanged()
-    } catch (error) {
-      console.error(`Error refreshing field ${field.id}`, error)
-      setErrorMessage('Die Wasserbilanz konnte nicht aktualisiert werden.')
-    }
-  }
-
   const handleClearIrrigation = async (field: FieldSummaryRead) => {
     const confirmed = window.confirm(`Sollen alle Bewaesserungseintraege fuer "${field.name}" wirklich geloescht werden?`)
     if (!confirmed) {
@@ -669,7 +645,6 @@ export default function Home() {
                 actions={
                   <FieldActionsMenu
                     field={field}
-                    onRefresh={handleRefreshField}
                     onClearIrrigation={handleClearIrrigation}
                   />
                 }

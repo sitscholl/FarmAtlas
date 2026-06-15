@@ -1,17 +1,12 @@
-import logging
-
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query
 
 from ..schemas import WaterBalanceSeriesResponse, WaterBalanceSummary
 from .utils import (
-    raise_write_http_error,
     runtime,
     serialize_water_balance_application_result,
     serialize_water_balance_summary,
     validate_field_id,
 )
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["water-balance"])
 
@@ -42,12 +37,3 @@ async def get_field_water_balance_series(
     )
     return serialize_water_balance_application_result(calculation_result)
 
-
-@router.post("/api/fields/{field_id}/water-balance", response_model=WaterBalanceSummary, status_code=status.HTTP_200_OK)
-async def trigger_water_balance_calculation(field_id: int):
-    field_context = validate_field_id(field_id)
-    try:
-        return serialize_water_balance_summary(runtime.water_balance_service.get_summary_for_field(field_context))
-    except Exception as exc:
-        logger.exception("Calculating water balance for field with id %s failed: %s", field_id, exc)
-        raise_write_http_error(exc, not_found_prefixes=("Unknown field id", "No field with id"))

@@ -134,20 +134,18 @@ def main() -> None:
             fields = seed_fields(runtime, provider=provider, station_id=station_id, year=year)
 
             logger.info(
-                "Running water-balance workflow for provider=%s station_id=%s year=%s",
+                "Running on-demand water-balance calculation for provider=%s station_id=%s year=%s",
                 provider,
                 station_id,
                 year,
             )
-            workflow_results = runtime.run_workflow_for_fields(
-                workflow_name="water_balance",
-                field_ids=[field.id for field in fields],
+            calculation_results = runtime.water_balance_service.calculate_fields(
+                fields,
                 year=year,
-                persist=True,
-                forecast_days=forecast_days
+                forecast_days=int(forecast_days),
             )
 
-            for result in workflow_results:
+            for result in calculation_results:
                 print(f"\n=== {result.field_name} ===")
                 if result.warnings:
                     print("Warnings:", [warning.message for warning in result.warnings])

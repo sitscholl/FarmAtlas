@@ -10,7 +10,6 @@ from .repositories import (
     SectionRepository,
     TreatmentRepository,
     VarietyRepository,
-    WaterBalanceRepository,
 )
 from .services import (
     FieldService,
@@ -45,7 +44,6 @@ class Database:
         self.phenology_events = PhenologyEventRepository(self.sections)
         self.varieties = VarietyRepository()
         self.nutrients = NutrientRequirementRepository(self.varieties)
-        self.water_balance = WaterBalanceRepository(self.fields)
         self.field_weather = FieldWeatherRepository(self.fields)
         self.irrigation = IrrigationRepository(self.fields)
         self.treatments = TreatmentRepository(self.sections)

@@ -72,11 +72,6 @@ class Field(Base):
         back_populates="field",
         cascade="all, delete-orphan",
     )
-    water_balance = relationship(
-        "WaterBalance",
-        back_populates="field",
-        cascade="all, delete-orphan",
-    )
     @property
     def sections(self) -> list["Section"]:
         return [section for planting in self.plantings for section in planting.sections]
@@ -302,29 +297,6 @@ class Irrigation(Base):
 
     def __repr__(self) -> str:
         return f"Irrigation(id={self.id!r}, field_id={self.field_id!r}, date={self.date!r})"
-
-
-class WaterBalance(Base):
-    __tablename__ = "water_balance"
-    __table_args__ = (
-        UniqueConstraint("field_id", "date", name="uq_waterbalance_field_date"),
-    )
-
-    date = Column(Date, primary_key=True)
-    field_id = Column(Integer, ForeignKey("fields.id"), primary_key=True)
-    precipitation = Column(Float, nullable=False)
-    irrigation = Column(Float, nullable=False)
-    evapotranspiration = Column(Float, nullable=False)
-    incoming = Column(Float, nullable=False)
-    net = Column(Float, nullable=False)
-    soil_water_content = Column(Float, nullable=False)
-    available_water_storage = Column(Float, nullable=False)
-    water_deficit = Column(Float, nullable=False)
-    readily_available_water = Column(Float, nullable=True)
-    safe_ratio = Column(Float, nullable=True)
-    below_raw = Column(Boolean, nullable=True)
-
-    field = relationship("Field", back_populates="water_balance")
 
 
 class StationWeatherHourly(Base):

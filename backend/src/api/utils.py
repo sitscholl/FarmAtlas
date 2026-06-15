@@ -29,7 +29,6 @@ from ..schemas import (
     WorkflowWarningRead,
 )
 from ..domain.field import FieldContext
-from ..workflows.base import WorkflowFieldResult
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +145,6 @@ _INTEGRITY_ERROR_MESSAGES = {
         "A nutrient requirement for this nutrient code and variety already exists."
     ),
     "irrigation_events.field_id, irrigation_events.date": "An irrigation event for this field and date already exists.",
-    "water_balance.field_id, water_balance.date": "A water balance entry for this field and date already exists.",
     "section_phenology_events.section_id, section_phenology_events.date": (
         "A phenology event for this section and date already exists."
     ),
@@ -240,12 +238,6 @@ def serialize_forecast_water_balance(dataframe: pd.DataFrame) -> list[WaterBalan
     ]
 
 
-def serialize_workflow_result_messages(
-    result: WorkflowFieldResult,
-) -> tuple[list[WorkflowWarningRead], list[WorkflowErrorRead]]:
-    return serialize_result_messages(result)
-
-
 def serialize_result_messages(
     result,
 ) -> tuple[list[WorkflowWarningRead], list[WorkflowErrorRead]]:
@@ -280,25 +272,6 @@ def serialize_water_balance_summary(summary) -> WaterBalanceSummary:
         readily_available_water=summary.readily_available_water,
         below_raw=summary.below_raw,
         safe_ratio=summary.safe_ratio,
-    )
-
-
-def serialize_water_balance_workflow_result(
-    result: WorkflowFieldResult[pd.DataFrame],
-) -> WaterBalanceSeriesResponse:
-    warnings, errors = serialize_result_messages(result)
-    dataframe = result.result
-    data = [] if dataframe is None or dataframe.empty else serialize_forecast_water_balance(dataframe)
-    return WaterBalanceSeriesResponse(
-        workflow_name=result.workflow_name,
-        field_id=result.field_id,
-        field_name=result.field_name,
-        status=result.status or "skipped",
-        ok=result.ok,
-        warnings=warnings,
-        errors=errors,
-        metadata=result.metadata,
-        data=data,
     )
 
 

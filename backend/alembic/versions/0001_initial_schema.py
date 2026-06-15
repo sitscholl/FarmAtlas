@@ -155,29 +155,8 @@ def upgrade() -> None:
         unique=True,
     )
 
-    op.create_table(
-        "water_balance",
-        sa.Column("date", sa.Date(), nullable=False),
-        sa.Column("field_id", sa.Integer(), nullable=False),
-        sa.Column("precipitation", sa.Float(), nullable=False),
-        sa.Column("irrigation", sa.Float(), nullable=False),
-        sa.Column("evapotranspiration", sa.Float(), nullable=False),
-        sa.Column("incoming", sa.Float(), nullable=False),
-        sa.Column("net", sa.Float(), nullable=False),
-        sa.Column("soil_water_content", sa.Float(), nullable=False),
-        sa.Column("available_water_storage", sa.Float(), nullable=False),
-        sa.Column("water_deficit", sa.Float(), nullable=False),
-        sa.Column("readily_available_water", sa.Float(), nullable=True),
-        sa.Column("safe_ratio", sa.Float(), nullable=True),
-        sa.Column("below_raw", sa.Boolean(), nullable=True),
-        sa.ForeignKeyConstraint(["field_id"], ["fields.id"]),
-        sa.PrimaryKeyConstraint("date", "field_id"),
-        sa.UniqueConstraint("field_id", "date", name="uq_waterbalance_field_date"),
-    )
-
 
 def downgrade() -> None:
-    op.drop_table("water_balance")
     op.drop_index("uq_sections_planting_valid_from", table_name="sections")
     op.drop_table("sections")
     op.drop_index("uq_nutrients_variety_override", table_name="nutrients")

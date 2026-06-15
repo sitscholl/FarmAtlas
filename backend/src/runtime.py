@@ -20,7 +20,6 @@ from .application.water_balance import WaterBalanceService
 from .workflows.base import WorkflowFieldResult
 from .workflows.fetch_treatment_data import FetchTreatmentDataWorkflow
 from .workflows.refresh_weather_cache import WeatherRefreshWorkflow
-from .workflows.water_balance import WaterBalanceWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,6 @@ def load_config_file(config_file: str | Path) -> dict:
 
 @dataclass
 class WorkflowCollection:
-    water_balance: WaterBalanceWorkflow
     fetch_treatment_data: FetchTreatmentDataWorkflow
     refresh_weather_cache: WeatherRefreshWorkflow
 
@@ -129,16 +127,6 @@ class RuntimeContext:
         )
 
         self.workflows = WorkflowCollection(
-            water_balance=WaterBalanceWorkflow(
-                db=self.db,
-                meteo_loader=self.meteo_loader,
-                meteo_validator=self.meteo_validator,
-                et_calculator=self.et_calculator,
-                et_corrector=self.et_corrector,
-                timezone=self.timezone,
-                meteo_resampler=self.meteo_resampler,
-                min_sample_size=int(self.min_sample_size),
-            ),
             fetch_treatment_data=FetchTreatmentDataWorkflow(
                 db=self.db,
                 settings=smartfarmer_settings,
