@@ -74,6 +74,10 @@ class Station:
         if metadata.elevation is None and resolve_elevation:
             try:
                 logger.debug("Resolving elevation for station %s", metadata.id)
+
+                if metadata.x is None or metadata.y is None:
+                    raise ValueError(f"Cannot fetch elevation with missing station coordinates. Got x={metadata.x}, y={metadata.y}")
+
                 elevation = cls.fetch_elevation(metadata.x, metadata.y, client=client)
             except Exception as exc:
                 logger.warning("Fetching elevation for station %s failed with error: %s", metadata.id, exc)
