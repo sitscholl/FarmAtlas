@@ -3,6 +3,7 @@ from .repositories import (
     FieldRepository,
     CropProtectionRepository,
     FieldWeatherRepository,
+    FruitCountRepository,
     IrrigationRepository,
     NutrientRequirementRepository,
     PhenologyEventRepository,
@@ -10,16 +11,19 @@ from .repositories import (
     SectionRepository,
     TreatmentRepository,
     VarietyRepository,
+    YearlyStatsRepository,
 )
 from .services import (
     FieldService,
     CropProtectionService,
+    FruitCountService,
     IrrigationService,
     NutrientRequirementService,
     PhenologyEventService,
     PlantingService,
     SectionService,
     TreatmentImportService,
+    YearlyStatsService,
 )
 
 
@@ -45,9 +49,11 @@ class Database:
         self.varieties = VarietyRepository()
         self.nutrients = NutrientRequirementRepository(self.varieties)
         self.field_weather = FieldWeatherRepository(self.fields)
+        self.fruit_counts = FruitCountRepository()
         self.irrigation = IrrigationRepository(self.fields)
         self.treatments = TreatmentRepository(self.sections)
         self.crop_protection = CropProtectionRepository()
+        self.yearly_stats = YearlyStatsRepository()
 
         self.field_service = FieldService(
             self.core,
@@ -57,6 +63,10 @@ class Database:
             self.core,
             self.fields,
             self.irrigation,
+        )
+        self.fruit_count_service = FruitCountService(
+            self.core,
+            self.fruit_counts,
         )
         self.planting_service = PlantingService(
             self.core,
@@ -82,6 +92,10 @@ class Database:
             self.core,
             self.crop_protection,
             self.field_weather,
+        )
+        self.yearly_stats_service = YearlyStatsService(
+            self.core,
+            self.yearly_stats,
         )
 
     def session_scope(self):

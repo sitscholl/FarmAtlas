@@ -8,15 +8,18 @@ from .crop_protection import router as crop_protection_router
 from .fields import router as fields_router
 from .field_weather import router as field_weather_router
 from .frontend import router as frontend_router
+from .fruit_counts import router as fruit_counts_router
 from .irrigation import router as irrigation_router
 from .nutrients import router as nutrients_router
 from .phenology import router as phenology_router
 from .plantings import router as plantings_router
+from .production import router as production_router
 from .sections import router as sections_router
 from .treatments import router as treatments_router
 from .utils import frontend_assets_dir, lifespan, runtime
 from .varieties import router as varieties_router
 from .water_balance import router as water_balance_router
+from .yearly_stats import router as yearly_stats_router
 
 app = FastAPI(
     title="Farm Explorer Backend API",
@@ -61,9 +64,12 @@ app.include_router(phenology_router)
 app.include_router(crop_protection_router)
 app.include_router(fields_router)
 app.include_router(field_weather_router)
+app.include_router(fruit_counts_router)
 app.include_router(plantings_router)
+app.include_router(production_router)
 app.include_router(sections_router)
 app.include_router(irrigation_router)
 app.include_router(treatments_router)
 app.include_router(water_balance_router)
+app.include_router(yearly_stats_router)
 app.include_router(frontend_router)

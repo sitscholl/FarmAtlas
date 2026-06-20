@@ -72,6 +72,17 @@ class Field(Base):
         back_populates="field",
         cascade="all, delete-orphan",
     )
+    fruit_count_surveys = relationship(
+        "FruitCountSurvey",
+        back_populates="field",
+        cascade="all, delete-orphan",
+    )
+    yearly_stats = relationship(
+        "YearlyStats",
+        back_populates="field",
+        cascade="all, delete-orphan",
+    )
+
     @property
     def sections(self) -> list["Section"]:
         return [section for planting in self.plantings for section in planting.sections]
@@ -118,6 +129,16 @@ class Planting(Base, ValidityRangeMixin):
         back_populates="planting",
         cascade="all, delete-orphan",
         order_by="Section.valid_from",
+    )
+    fruit_count_surveys = relationship(
+        "FruitCountSurvey",
+        back_populates="planting",
+        cascade="all, delete-orphan",
+    )
+    yearly_stats = relationship(
+        "YearlyStats",
+        back_populates="planting",
+        cascade="all, delete-orphan",
     )
 
     @property
@@ -183,6 +204,16 @@ class Section(Base, ValidityRangeMixin):
     crop_protection_scopes = relationship(
         "CropProtectionRuleScope",
         back_populates="section",
+    )
+    fruit_count_surveys = relationship(
+        "FruitCountSurvey",
+        back_populates="section",
+        cascade="all, delete-orphan",
+    )
+    yearly_stats = relationship(
+        "YearlyStats",
+        back_populates="section",
+        cascade="all, delete-orphan",
     )
 
     @property
@@ -504,3 +535,116 @@ class SectionPhenologyEvent(Base):
     year = Column(Integer, nullable=False)
 
     section = relationship("Section", back_populates="phenology_events")
+
+
+class FruitCountSurvey(Base):
+    __tablename__ = "fruit_count_surveys"
+    __table_args__ = (
+        CheckConstraint(
+            "(field_id IS NOT NULL) + (planting_id IS NOT NULL) + (section_id IS NOT NULL) = 1",
+            name="ck_fruit_count_surveys_one_scope",
+        ),
+        CheckConstraint("season_year >= 1900", name="ck_fruit_count_surveys_season_year"),
+        Index("ix_fruit_count_surveys_field_year_timing", "field_id", "season_year", "timing_code"),
+        Index("ix_fruit_count_surveys_planting_year_timing", "planting_id", "season_year", "timing_code"),
+        Index("ix_fruit_count_surveys_section_year_timing", "section_id", "season_year", "timing_code"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    season_year = Column(Integer, nullable=False)
+    date = Column(Date, nullable=False)
+    timing_code = Column(String, nullable=False)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=True)
+    planting_id = Column(Integer, ForeignKey("plantings.id"), nullable=True)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
+    method = Column(String, nullable=True)
+    observer = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    include_in_aggregation = Column(Boolean, nullable=False, default=True)
+    quality_flag = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
+
+    field = relationship("Field", back_populates="fruit_count_surveys")
+    planting = relationship("Planting", back_populates="fruit_count_surveys")
+    section = relationship("Section", back_populates="fruit_count_surveys")
+    samples = relationship(
+        "FruitCountSample",
+        back_populates="survey",
+        cascade="all, delete-orphan",
+        order_by="FruitCountSample.id",
+    )
+
+
+class FruitCountSample(Base):
+    __tablename__ = "fruit_count_samples"
+    __table_args__ = (
+        CheckConstraint("apple_count >= 0", name="ck_fruit_count_samples_apple_count_non_negative"),
+        Index("ix_fruit_count_samples_survey_id", "survey_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    survey_id = Column(Integer, ForeignKey("fruit_count_surveys.id"), nullable=False)
+    tree_label = Column(String, nullable=True)
+    apple_count = Column(Integer, nullable=False)
+    notes = Column(String, nullable=True)
+
+    survey = relationship("FruitCountSurvey", back_populates="samples")
+
+
+class YearlyStats(Base):
+    __tablename__ = "yearly_stats"
+    __table_args__ = (
+        CheckConstraint(
+            "(field_id IS NOT NULL) + (planting_id IS NOT NULL) + (section_id IS NOT NULL) = 1",
+            name="ck_yearly_stats_one_scope",
+        ),
+        CheckConstraint("season_year >= 1900", name="ck_yearly_stats_season_year"),
+        CheckConstraint("thinning_hours IS NULL OR thinning_hours >= 0", name="ck_yearly_stats_thinning_hours"),
+        CheckConstraint("harvest_hours IS NULL OR harvest_hours >= 0", name="ck_yearly_stats_harvest_hours"),
+        CheckConstraint("filled_boxes IS NULL OR filled_boxes >= 0", name="ck_yearly_stats_filled_boxes"),
+        CheckConstraint("yield_kg IS NULL OR yield_kg >= 0", name="ck_yearly_stats_yield_kg"),
+        Index(
+            "uq_yearly_stats_field_year",
+            "field_id",
+            "season_year",
+            unique=True,
+            sqlite_where=text("field_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_yearly_stats_planting_year",
+            "planting_id",
+            "season_year",
+            unique=True,
+            sqlite_where=text("planting_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_yearly_stats_section_year",
+            "section_id",
+            "season_year",
+            unique=True,
+            sqlite_where=text("section_id IS NOT NULL"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    season_year = Column(Integer, nullable=False)
+    field_id = Column(Integer, ForeignKey("fields.id"), nullable=True)
+    planting_id = Column(Integer, ForeignKey("plantings.id"), nullable=True)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
+    thinning_hours = Column(Float, nullable=True)
+    harvest_hours = Column(Float, nullable=True)
+    filled_boxes = Column(Float, nullable=True)
+    yield_kg = Column(Float, nullable=True)
+    revenue = Column(Float, nullable=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.datetime.now)
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
+    )
+
+    field = relationship("Field", back_populates="yearly_stats")
+    planting = relationship("Planting", back_populates="yearly_stats")
+    section = relationship("Section", back_populates="yearly_stats")

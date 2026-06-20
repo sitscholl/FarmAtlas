@@ -17,6 +17,13 @@ from .field_weather import (
     WeatherCacheRefreshResponse,
     WeatherCacheRefreshStationResult,
 )
+from .fruit_count import (
+    FruitCountSampleCreate,
+    FruitCountSampleRead,
+    FruitCountSurveyCreate,
+    FruitCountSurveyRead,
+    FruitCountSurveyUpdate,
+)
 from .irrigation import (
     IrrigationBulkCreate,
     IrrigationBulkResponse,
@@ -35,6 +42,7 @@ from .phenology import (
     PhenologyEventUpdate,
 )
 from .planting import PlantingCreate, PlantingDetailRead, PlantingRead, PlantingUpdate
+from .production import PlantingYearComparisonResponse
 from .section import SectionCreate, SectionRead, SectionUpdate
 from .treatment import (
     TreatmentCsvImportResponse,
@@ -49,6 +57,7 @@ from .treatment import (
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
 from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSeriesResponse, WaterBalanceSummary
 from .workflow import WorkflowErrorRead, WorkflowFieldResponseBase, WorkflowWarningRead
+from .yearly_stats import YearlyStatsCreate, YearlyStatsRead, YearlyStatsUpdate
 
 __all__ = [
     "CadastralParcelRead",
@@ -68,6 +77,11 @@ __all__ = [
     "FieldUpdate",
     "FieldWeatherBulkRefreshResponse",
     "FieldWeatherRefreshResponse",
+    "FruitCountSampleCreate",
+    "FruitCountSampleRead",
+    "FruitCountSurveyCreate",
+    "FruitCountSurveyRead",
+    "FruitCountSurveyUpdate",
     "StationWeatherHourlyRead",
     "WeatherCacheRefreshResponse",
     "WeatherCacheRefreshStationResult",
@@ -86,6 +100,7 @@ __all__ = [
     "PhenologyEventCreate",
     "PhenologyEventRead",
     "PhenologyEventUpdate",
+    "PlantingYearComparisonResponse",
     "PlantingCreate",
     "PlantingDetailRead",
     "PlantingRead",
@@ -110,4 +125,7 @@ __all__ = [
     "WorkflowErrorRead",
     "WorkflowFieldResponseBase",
     "WorkflowWarningRead",
+    "YearlyStatsCreate",
+    "YearlyStatsRead",
+    "YearlyStatsUpdate",
 ]

@@ -17,6 +17,7 @@ from .meteo.load import MeteoLoader
 from .meteo.resample import MeteoResampler
 from .meteo.validate import MeteoValidator
 from .application.water_balance import WaterBalanceService
+from .application.production import ProductionSummaryService
 from .workflows.base import WorkflowFieldResult
 from .workflows.fetch_treatment_data import FetchTreatmentDataWorkflow
 from .workflows.refresh_weather_cache import WeatherRefreshWorkflow
@@ -147,6 +148,7 @@ class RuntimeContext:
             timezone=self.timezone,
             forecast_provider=weather_refresh_run_config.get("forecast_provider", "open-meteo"),
         )
+        self.production_summary_service = ProductionSummaryService(db=self.db)
 
     def update_runtime(self, config_file: str | Path):
         self.config_file = Path(config_file)

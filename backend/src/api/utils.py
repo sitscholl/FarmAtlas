@@ -154,6 +154,15 @@ _INTEGRITY_ERROR_MESSAGES = {
     "ck_plantings_valid_range": "valid_to must be greater than or equal to valid_from",
     "ck_sections_valid_range": "valid_to must be greater than or equal to valid_from",
     "ck_field_cadastral_parcels_area_non_negative": "area must be greater than or equal to 0",
+    "ck_fruit_count_surveys_one_scope": "Exactly one of field_id, planting_id, or section_id is required.",
+    "ck_fruit_count_surveys_season_year": "season_year must be greater than or equal to 1900.",
+    "ck_fruit_count_samples_apple_count_non_negative": "apple_count must be greater than or equal to 0.",
+    "ck_yearly_stats_one_scope": "Exactly one of field_id, planting_id, or section_id is required.",
+    "ck_yearly_stats_season_year": "season_year must be greater than or equal to 1900.",
+    "ck_yearly_stats_thinning_hours": "thinning_hours must be greater than or equal to 0.",
+    "ck_yearly_stats_harvest_hours": "harvest_hours must be greater than or equal to 0.",
+    "ck_yearly_stats_filled_boxes": "filled_boxes must be greater than or equal to 0.",
+    "ck_yearly_stats_yield_kg": "yield_kg must be greater than or equal to 0.",
 }
 
 
