@@ -344,7 +344,7 @@ class StationWeatherHourly(Base):
     source_provider = Column(String, primary_key=True)
     source_station = Column(String, primary_key=True)
     timestamp = Column(DateTime(timezone=True), primary_key=True)
-    precipitation = Column(Float, nullable=False, default=0.0)
+    precipitation = Column(Float, nullable=True)
     tair_2m = Column(Float, nullable=True)
     relative_humidity = Column(Float, nullable=True)
     wind_speed = Column(Float, nullable=True)

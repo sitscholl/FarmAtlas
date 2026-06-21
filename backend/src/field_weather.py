@@ -160,9 +160,9 @@ class FieldWeatherCacheService:
         for column in STATION_HOURLY_VALUE_COLUMNS:
             if column == "precipitation":
                 frame[column] = (
-                    pd.to_numeric(hourly[column], errors="coerce").fillna(0.0)
+                    pd.to_numeric(hourly[column], errors="coerce")
                     if column in hourly.columns
-                    else 0.0
+                    else None
                 )
                 continue
             frame[column] = pd.to_numeric(hourly[column], errors="coerce") if column in hourly.columns else None

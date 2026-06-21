@@ -91,6 +91,104 @@ class MeteoResamplerCacheTests(unittest.TestCase):
         finally:
             db.close()
 
+    def test_station_hourly_preserves_missing_precipitation(self) -> None:
+        db = Database("sqlite:///:memory:", initialize_schema=True)
+        try:
+            timestamp = pd.Timestamp("2026-06-01T00:00:00Z")
+            weather = pd.DataFrame(
+                {
+                    "timestamp": [timestamp],
+                    "source_provider": ["demo"],
+                    "source_station": ["station"],
+                    "precipitation": [None],
+                    "tair_2m": [20.0],
+                    "value_type": ["observed"],
+                }
+            )
+
+            with db.session_scope() as session:
+                db.field_weather.add_station_hourly(session, db.engine, weather)
+                rows = db.field_weather.list_station_hourly(
+                    session,
+                    provider="demo",
+                    station="station",
+                    start=timestamp.to_pydatetime(),
+                    end=(timestamp + pd.Timedelta(hours=1)).to_pydatetime(),
+                )
+
+            self.assertEqual(len(rows), 1)
+            self.assertIsNone(rows[0].precipitation)
+        finally:
+            db.close()
+
+    def test_station_hourly_upsert_does_not_overwrite_known_values_with_null(self) -> None:
+        db = Database("sqlite:///:memory:", initialize_schema=True)
+        try:
+            timestamp = pd.Timestamp("2026-06-01T00:00:00Z")
+            original = pd.DataFrame(
+                {
+                    "timestamp": [timestamp],
+                    "source_provider": ["demo"],
+                    "source_station": ["station"],
+                    "precipitation": [3.5],
+                    "tair_2m": [20.0],
+                    "value_type": ["observed"],
+                }
+            )
+            partial = original.copy()
+            partial["precipitation"] = [None]
+            partial["tair_2m"] = [None]
+
+            with db.session_scope() as session:
+                db.field_weather.add_station_hourly(session, db.engine, original)
+                db.field_weather.add_station_hourly(session, db.engine, partial)
+                rows = db.field_weather.list_station_hourly(
+                    session,
+                    provider="demo",
+                    station="station",
+                    start=timestamp.to_pydatetime(),
+                    end=(timestamp + pd.Timedelta(hours=1)).to_pydatetime(),
+                )
+
+            self.assertEqual(rows[0].precipitation, 3.5)
+            self.assertEqual(rows[0].tair_2m, 20.0)
+        finally:
+            db.close()
+
+    def test_station_hourly_upsert_fills_existing_null_values(self) -> None:
+        db = Database("sqlite:///:memory:", initialize_schema=True)
+        try:
+            timestamp = pd.Timestamp("2026-06-01T00:00:00Z")
+            missing = pd.DataFrame(
+                {
+                    "timestamp": [timestamp],
+                    "source_provider": ["demo"],
+                    "source_station": ["station"],
+                    "precipitation": [None],
+                    "tair_2m": [None],
+                    "value_type": ["observed"],
+                }
+            )
+            resolved = missing.copy()
+            resolved["precipitation"] = [1.25]
+            resolved["tair_2m"] = [18.0]
+
+            with db.session_scope() as session:
+                db.field_weather.add_station_hourly(session, db.engine, missing)
+                db.field_weather.add_station_hourly(session, db.engine, resolved)
+                rows = db.field_weather.list_station_hourly(
+                    session,
+                    provider="demo",
+                    station="station",
+                    start=timestamp.to_pydatetime(),
+                    end=(timestamp + pd.Timedelta(hours=1)).to_pydatetime(),
+                )
+
+            self.assertEqual(rows[0].precipitation, 1.25)
+            self.assertEqual(rows[0].tair_2m, 18.0)
+        finally:
+            db.close()
+
     def test_station_metadata_upsert_updates_existing_row(self) -> None:
         db = Database("sqlite:///:memory:", initialize_schema=True)
         try:

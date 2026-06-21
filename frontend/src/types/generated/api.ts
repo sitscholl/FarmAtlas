@@ -229,6 +229,67 @@ export type FieldWeatherRefreshResponse = {
   upserted_count: number
 }
 
+export type FruitCountSampleCreate = {
+  tree_label?: string | null
+  apple_count: number
+  notes?: string | null
+}
+
+export type FruitCountSampleRead = {
+  id: number
+  survey_id: number
+  tree_label?: string | null
+  apple_count: number
+  notes?: string | null
+}
+
+export type FruitCountSurveyCreate = {
+  season_year: number
+  date: string
+  timing_code: string
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  method?: string | null
+  observer?: string | null
+  notes?: string | null
+  include_in_aggregation?: boolean
+  quality_flag?: string | null
+  samples: Array<FruitCountSampleCreate>
+}
+
+export type FruitCountSurveyRead = {
+  id: number
+  season_year: number
+  date: string
+  timing_code: string
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  method?: string | null
+  observer?: string | null
+  notes?: string | null
+  include_in_aggregation: boolean
+  quality_flag?: string | null
+  created_at: string
+  samples?: Array<FruitCountSampleRead>
+}
+
+export type FruitCountSurveyUpdate = {
+  season_year?: number | null
+  date?: string | null
+  timing_code?: string | null
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  method?: string | null
+  observer?: string | null
+  notes?: string | null
+  include_in_aggregation?: boolean | null
+  quality_flag?: string | null
+  samples?: Array<FruitCountSampleCreate> | null
+}
+
 export type HTTPValidationError = {
   detail?: Array<ValidationError>
 }
@@ -399,6 +460,58 @@ export type PlantingUpdate = {
   variety: string
   valid_from: string
   valid_to?: string | null
+}
+
+export type PlantingYearComparisonResponse = {
+  season_year: number
+  previous_year: number
+  history_years: Array<number>
+  metrics?: Array<ProductionMetricDefinition>
+  rows?: Array<PlantingYearComparisonRow>
+}
+
+export type PlantingYearComparisonRow = {
+  field_id: number
+  field_group: string
+  field_name: string
+  planting_id: number
+  variety: string
+  valid_from: string
+  valid_to?: string | null
+  active: boolean
+  section_count: number
+  area: number
+  tree_count?: number | null
+  metrics?: Array<ProductionComparisonMetric>
+}
+
+export type ProductionComparisonMetric = {
+  metric_code: string
+  label: string
+  unit?: string | null
+  current_value?: number | null
+  previous_value?: number | null
+  percent_change?: number | null
+  current_source_scope?: string | null
+  current_source_mix?: {
+  [key: string]: number
+}
+  history?: Array<ProductionYearValue>
+}
+
+export type ProductionMetricDefinition = {
+  metric_code: string
+  label: string
+  unit?: string | null
+}
+
+export type ProductionYearValue = {
+  season_year: number
+  value?: number | null
+  source_scope?: string | null
+  source_mix?: {
+  [key: string]: number
+}
 }
 
 export type SectionCreate = {
@@ -660,4 +773,46 @@ export type WorkflowWarningRead = {
   details?: {
   [key: string]: unknown
 }
+}
+
+export type YearlyStatsCreate = {
+  season_year: number
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  thinning_hours?: number | null
+  harvest_hours?: number | null
+  filled_boxes?: number | null
+  yield_kg?: number | null
+  revenue?: number | null
+  notes?: string | null
+}
+
+export type YearlyStatsRead = {
+  id: number
+  season_year: number
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  thinning_hours?: number | null
+  harvest_hours?: number | null
+  filled_boxes?: number | null
+  yield_kg?: number | null
+  revenue?: number | null
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type YearlyStatsUpdate = {
+  season_year?: number | null
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  thinning_hours?: number | null
+  harvest_hours?: number | null
+  filled_boxes?: number | null
+  yield_kg?: number | null
+  revenue?: number | null
+  notes?: string | null
 }

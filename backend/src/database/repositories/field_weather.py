@@ -2,6 +2,7 @@ import datetime
 import logging
 
 import pandas as pd
+from sqlalchemy import case, func, or_
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -29,6 +30,17 @@ class FieldWeatherRepository:
         "solar_radiation",
         "value_type",
         "updated_at",
+    ]
+
+    HOURLY_VALUE_COLUMNS = [
+        "precipitation",
+        "tair_2m",
+        "relative_humidity",
+        "wind_speed",
+        "wind_gust",
+        "air_pressure",
+        "sun_duration",
+        "solar_radiation",
     ]
 
     def __init__(self, field_repository: FieldRepository | None = None) -> None:
@@ -81,15 +93,7 @@ class FieldWeatherRepository:
         if missing_required:
             raise ValueError(f"Missing required station weather columns: {', '.join(missing_required)}")
 
-        optional_cols = [
-            "tair_2m",
-            "relative_humidity",
-            "wind_speed",
-            "wind_gust",
-            "air_pressure",
-            "sun_duration",
-            "solar_radiation",
-        ]
+        optional_cols = [column for column in self.HOURLY_VALUE_COLUMNS if column != "precipitation"]
         for column in optional_cols:
             if column not in df.columns:
                 df[column] = None
@@ -98,12 +102,15 @@ class FieldWeatherRepository:
             updated_at = datetime.datetime.now(datetime.UTC)
         df["updated_at"] = pd.Timestamp(updated_at).to_pydatetime()
         df["timestamp"] = pd.to_datetime(df["timestamp"]).map(lambda value: pd.Timestamp(value).to_pydatetime())
-        df["precipitation"] = pd.to_numeric(df["precipitation"], errors="coerce").fillna(0.0)
+        df["precipitation"] = pd.to_numeric(df["precipitation"], errors="coerce")
         for column in optional_cols:
             df[column] = pd.to_numeric(df[column], errors="coerce")
 
         df = df[self.HOURLY_COLUMNS]
-        records = df.to_dict(orient="records")
+        records = [
+            {column: self._database_value(value) for column, value in record.items()}
+            for record in df.to_dict(orient="records")
+        ]
         if not records:
             return 0
 
@@ -113,11 +120,24 @@ class FieldWeatherRepository:
             for start_idx in range(0, len(records), chunk_size):
                 chunk = records[start_idx : start_idx + chunk_size]
                 stmt = sqlite_insert(models.StationWeatherHourly).values(chunk)
+                has_incoming_weather_value = or_(
+                    *[
+                        getattr(stmt.excluded, column).is_not(None)
+                        for column in self.HOURLY_VALUE_COLUMNS
+                    ]
+                )
                 update_cols = {
-                    col: getattr(stmt.excluded, col)
-                    for col in self.HOURLY_COLUMNS
-                    if col not in {"source_provider", "source_station", "timestamp"}
+                    column: func.coalesce(
+                        getattr(stmt.excluded, column),
+                        getattr(models.StationWeatherHourly, column),
+                    )
+                    for column in self.HOURLY_VALUE_COLUMNS
                 }
+                update_cols["value_type"] = stmt.excluded.value_type
+                update_cols["updated_at"] = case(
+                    (has_incoming_weather_value, stmt.excluded.updated_at),
+                    else_=models.StationWeatherHourly.updated_at,
+                )
                 stmt = stmt.on_conflict_do_update(
                     index_elements=[
                         models.StationWeatherHourly.source_provider,
@@ -131,8 +151,31 @@ class FieldWeatherRepository:
             return row_count
 
         for record in records:
-            session.merge(models.StationWeatherHourly(**record))
+            pk = {
+                "source_provider": record["source_provider"],
+                "source_station": record["source_station"],
+                "timestamp": record["timestamp"],
+            }
+            existing = session.get(models.StationWeatherHourly, pk)
+            if existing is None:
+                session.add(models.StationWeatherHourly(**record))
+                continue
+
+            has_weather_value = False
+            for column in self.HOURLY_VALUE_COLUMNS:
+                value = record[column]
+                if value is not None:
+                    setattr(existing, column, value)
+                    has_weather_value = True
+            existing.value_type = record["value_type"]
+            if has_weather_value:
+                existing.updated_at = record["updated_at"]
         return len(records)
+
+    def _database_value(self, value):
+        if pd.isna(value):
+            return None
+        return value
 
     def upsert_station_metadata(
         self,
