@@ -1,6 +1,8 @@
 import { LuCalendarDays, LuCircleHelp, LuCloudRain, LuShieldAlert, LuShieldCheck, LuShieldX, LuThermometerSun } from 'react-icons/lu'
+import { FiAlertTriangle } from 'react-icons/fi'
 
-import type { CropProtectionMetricEvaluationRead, CropProtectionRuleEvaluationRead } from '../types/generated/api'
+import type { CropProtectionMetricEvaluationRead, CropProtectionRuleEvaluationRead, WorkflowWarningRead } from '../types/generated/api'
+import { formatWorkflowWarningText, workflowWarningKey } from '../lib/workflowWarnings'
 
 type CropProtectionStatus = 'due' | 'soon' | 'ok' | 'missing'
 
@@ -119,6 +121,10 @@ function formatMetricValue(value: number | null | undefined) {
   return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 }).format(value)
 }
 
+function evaluationWarnings(evaluation: CropProtectionRuleEvaluationRead): WorkflowWarningRead[] {
+  return evaluation.warnings ?? []
+}
+
 function groupEvaluationsByRule(evaluations: CropProtectionRuleEvaluationRead[]): RuleGroup[] {
   const groupsByRuleId = evaluations.reduce<Record<number, CropProtectionRuleEvaluationRead[]>>(
     (groups, evaluation) => {
@@ -216,6 +222,16 @@ function RuleTooltip({ ruleGroup }: { ruleGroup: RuleGroup }) {
                         </span>
                       </div>
                       <MetricSummary metrics={evaluation.metrics} />
+                      {evaluationWarnings(evaluation).length > 0 ? (
+                        <div className="mt-1.5 space-y-1 border border-amber-200 bg-amber-50 px-2 py-1.5 text-tiny font-medium text-amber-900">
+                          {evaluationWarnings(evaluation).map((warning) => (
+                            <div key={workflowWarningKey(warning)} className="flex gap-1.5">
+                              <FiAlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                              <span>{formatWorkflowWarningText(warning)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>

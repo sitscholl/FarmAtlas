@@ -121,6 +121,35 @@ class MeteoResamplerCacheTests(unittest.TestCase):
         finally:
             db.close()
 
+    def test_station_hourly_value_columns_are_optional(self) -> None:
+        db = Database("sqlite:///:memory:", initialize_schema=True)
+        try:
+            timestamp = pd.Timestamp("2026-06-01T00:00:00Z")
+            weather = pd.DataFrame(
+                {
+                    "timestamp": [timestamp],
+                    "source_provider": ["demo"],
+                    "source_station": ["station"],
+                    "value_type": ["observed"],
+                }
+            )
+
+            with db.session_scope() as session:
+                db.field_weather.add_station_hourly(session, db.engine, weather)
+                rows = db.field_weather.list_station_hourly(
+                    session,
+                    provider="demo",
+                    station="station",
+                    start=timestamp.to_pydatetime(),
+                    end=(timestamp + pd.Timedelta(hours=1)).to_pydatetime(),
+                )
+
+            self.assertEqual(len(rows), 1)
+            self.assertIsNone(rows[0].precipitation)
+            self.assertIsNone(rows[0].tair_2m)
+        finally:
+            db.close()
+
     def test_station_hourly_upsert_does_not_overwrite_known_values_with_null(self) -> None:
         db = Database("sqlite:///:memory:", initialize_schema=True)
         try:

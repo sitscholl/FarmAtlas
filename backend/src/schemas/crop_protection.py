@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .workflow import WorkflowWarningRead
+
 
 MetricType = Literal["days_since", "rain_since", "gdd_since"]
 ScopeType = Literal["field", "planting", "section"]
@@ -153,6 +155,7 @@ class CropProtectionMetricEvaluationRead(BaseModel):
     threshold: float
     warning_threshold: float | None = None
     status: str
+    warnings: list[WorkflowWarningRead] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -169,6 +172,7 @@ class CropProtectionRuleEvaluationRead(BaseModel):
     last_treatment_product: str | None = None
     weather_updated_at: DateTimeType | None = None
     metrics: list[CropProtectionMetricEvaluationRead]
+    warnings: list[WorkflowWarningRead] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -180,4 +184,5 @@ class CropProtectionFieldSummaryRead(BaseModel):
     evaluation_count: int
     status_counts: dict[str, int]
     weather_updated_at: DateTimeType | None = None
+    warnings: list[WorkflowWarningRead] = Field(default_factory=list)
     evaluations: list[CropProtectionRuleEvaluationRead]

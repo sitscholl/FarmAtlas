@@ -242,6 +242,12 @@ def serialize_forecast_water_balance(dataframe: pd.DataFrame) -> list[WaterBalan
             below_raw=None if pd.isna(row.get("below_raw")) else bool(row["below_raw"]),
             value_type=None if pd.isna(row.get("value_type")) else str(row["value_type"]),
             model=None if pd.isna(row.get("model")) else str(row["model"]),
+            precipitation_missing=None
+            if pd.isna(row.get("precipitation_missing"))
+            else bool(row["precipitation_missing"]),
+            evapotranspiration_missing=None
+            if pd.isna(row.get("evapotranspiration_missing"))
+            else bool(row["evapotranspiration_missing"]),
         )
         for _, row in series.iterrows()
     ]

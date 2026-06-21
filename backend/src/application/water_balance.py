@@ -20,6 +20,7 @@ from ..field_weather import FieldWeatherCacheService
 from ..meteo.station import Station
 from ..results import FarmAtlasError, FarmAtlasWarning
 from ..weather_frame import WeatherFrame
+from ..weather_quality import build_missing_weather_warning
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,14 @@ class WaterBalanceSummary:
 class DailyWeatherResult:
     data: pd.DataFrame
     warnings: list[FarmAtlasWarning]
+    metadata: dict[str, Any] | None = None
+
+
+@dataclass(slots=True)
+class PreparedDailyWeatherResult:
+    data: pd.DataFrame
+    warnings: list[FarmAtlasWarning]
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -123,6 +132,7 @@ class WaterBalanceService:
     ) -> DailyWeatherResult:
         hourly_frames: list[pd.DataFrame] = []
         warnings: list[FarmAtlasWarning] = []
+        metadata: dict[str, Any] = {}
 
         if start < observe_end:
             observed = self.weather_cache.get_field_hourly_weather(
@@ -161,12 +171,33 @@ class WaterBalanceService:
                 )
 
         if not hourly_frames:
-            return DailyWeatherResult(data=pd.DataFrame(), warnings=warnings)
+            return DailyWeatherResult(data=pd.DataFrame(), warnings=warnings, metadata=metadata)
 
         hourly = pd.concat(hourly_frames).sort_index()
         hourly = hourly.loc[(hourly.index >= start) & (hourly.index < period_end)]
         if hourly.empty:
-            return DailyWeatherResult(data=pd.DataFrame(), warnings=warnings)
+            return DailyWeatherResult(data=pd.DataFrame(), warnings=warnings, metadata=metadata)
+
+        hourly_completeness = WeatherFrame(
+            data=hourly,
+            resolution="1h",
+            start=start,
+            end=period_end,
+            source_provider=field.reference_provider,
+            source_station=field.reference_station,
+        ).completeness(["precipitation"])
+        metadata["hourly_weather_completeness"] = hourly_completeness.to_dict()
+        precipitation_warning = build_missing_weather_warning(
+            hourly_completeness,
+            columns=["precipitation"],
+            code="WATER_BALANCE_PRECIPITATION_INCOMPLETE",
+            calculation="water_balance",
+            subject="precipitation",
+            assumption="missing_precipitation_treated_as_zero",
+            impact="Missing precipitation is treated as 0.0 mm.",
+        )
+        if precipitation_warning is not None:
+            warnings.append(precipitation_warning)
 
         daily = self.weather_cache.aggregate_daily(
             WeatherFrame(
@@ -179,7 +210,7 @@ class WaterBalanceService:
             )
         ).data
         if daily.empty:
-            return DailyWeatherResult(data=daily, warnings=warnings)
+            return DailyWeatherResult(data=daily, warnings=warnings, metadata=metadata)
 
         datetime_column = "datetime" if "datetime" in daily.columns else "timestamp" if "timestamp" in daily.columns else None
         if datetime_column is not None:
@@ -187,7 +218,17 @@ class WaterBalanceService:
             daily = daily.set_index(datetime_column)
         elif not isinstance(daily.index, pd.DatetimeIndex):
             raise TypeError("Daily cached weather must contain a datetime or timestamp column.")
-        return DailyWeatherResult(data=daily.sort_index(), warnings=warnings)
+        daily = daily.sort_index()
+        daily_completeness = WeatherFrame(
+            data=daily,
+            resolution="1D",
+            start=start.floor("D"),
+            end=period_end,
+            source_provider=field.reference_provider,
+            source_station=field.reference_station,
+        ).completeness(["precipitation"])
+        metadata["daily_weather_completeness"] = daily_completeness.to_dict()
+        return DailyWeatherResult(data=daily, warnings=warnings, metadata=metadata)
 
     def _station_for_daily_weather(
         self,
@@ -226,11 +267,13 @@ class WaterBalanceService:
         self,
         field: FieldContext,
         prepared: pd.DataFrame,
-    ) -> pd.DataFrame:
+    ) -> PreparedDailyWeatherResult:
         if not isinstance(prepared.index, pd.DatetimeIndex):
             raise TypeError("Daily cached weather must use a pandas DatetimeIndex before ET0 calculation.")
 
         frame = prepared.drop(columns=["et0", "et0_corrected", "kc"], errors="ignore").copy()
+        warnings: list[FarmAtlasWarning] = []
+        metadata: dict[str, Any] = {}
         group_columns = [
             column
             for column in ("source_provider", "source_station")
@@ -251,43 +294,129 @@ class WaterBalanceService:
             provider = str(provider)
             station = str(station)
             group = group.copy()
-            if not self.et_calculator.can_calculate(group):
-                raise KeyError(
-                    f"Cached weather for {provider}/{station} does not contain complete inputs "
-                    "for ET0 calculation."
+            completeness = WeatherFrame(
+                data=group,
+                resolution="1D",
+                start=pd.Timestamp(group.index.min()).normalize(),
+                end=pd.Timestamp(group.index.max()).normalize() + pd.Timedelta(days=1),
+                source_provider=provider,
+                source_station=station,
+            ).completeness(list(self.et_calculator.required_columns))
+            metadata.setdefault("et_input_completeness", {})[f"{provider}/{station}"] = completeness.to_dict()
+            missing_columns = [
+                column
+                for column, column_completeness in completeness.columns.items()
+                if column_completeness.missing_count > 0
+            ]
+            if missing_columns:
+                warning = build_missing_weather_warning(
+                    completeness,
+                    columns=missing_columns,
+                    code="WATER_BALANCE_ET_INPUTS_INCOMPLETE",
+                    calculation="water_balance",
+                    subject="ET input",
+                    assumption="missing_evapotranspiration_treated_as_zero",
+                    impact="Affected evapotranspiration rows are treated as 0.0 mm.",
                 )
+                if warning is not None:
+                    warning.details["provider"] = provider
+                    warning.details["station"] = station
+                    warnings.append(warning)
 
-            station_weather = self._station_for_daily_weather(
-                field,
-                provider=provider,
-                station=station,
-                daily_weather=group,
-            )
-            et0 = self.et_calculator.calculate(station_weather, correct=False)
-            if "et0" not in et0.columns:
-                raise KeyError("ET0 calculator did not return an 'et0' column.")
+            if not self.et_calculator.can_calculate(group):
+                group["et0"] = pd.NA
+                warnings.append(
+                    FarmAtlasWarning(
+                        message=(
+                            f"ET0 could not be calculated for {provider}/{station} because the cached weather "
+                            "does not contain enough complete ET input rows. Affected rows are treated as 0.0 mm."
+                        ),
+                        code="WATER_BALANCE_ET0_UNAVAILABLE",
+                        details={
+                            "provider": provider,
+                            "station": station,
+                            "row_count": int(len(group.index)),
+                            "assumption": "missing_evapotranspiration_treated_as_zero",
+                        },
+                    )
+                )
+            else:
+                station_weather = self._station_for_daily_weather(
+                    field,
+                    provider=provider,
+                    station=station,
+                    daily_weather=group,
+                )
+                et0 = self.et_calculator.calculate(station_weather, correct=False)
+                if "et0" not in et0.columns:
+                    raise KeyError("ET0 calculator did not return an 'et0' column.")
 
-            values = pd.to_numeric(et0["et0"], errors="coerce")
-            if len(values.index) != len(group.index):
-                values = values.reindex(group.index)
-            group["et0"] = values.to_numpy()
+                values = pd.to_numeric(et0["et0"], errors="coerce")
+                if len(values.index) != len(group.index):
+                    values = values.reindex(group.index)
+                group["et0"] = values.to_numpy()
+
+            missing_et0_count = int(pd.to_numeric(group["et0"], errors="coerce").isna().sum())
+            if missing_et0_count > 0:
+                et0_completeness = WeatherFrame(
+                    data=group,
+                    resolution="1D",
+                    start=pd.Timestamp(group.index.min()).normalize(),
+                    end=pd.Timestamp(group.index.max()).normalize() + pd.Timedelta(days=1),
+                    source_provider=provider,
+                    source_station=station,
+                ).completeness(["et0"])
+                warning = build_missing_weather_warning(
+                    et0_completeness,
+                    columns=["et0"],
+                    code="WATER_BALANCE_ET0_INCOMPLETE",
+                    calculation="water_balance",
+                    subject="ET0",
+                    assumption="missing_evapotranspiration_treated_as_zero",
+                    impact="Affected evapotranspiration rows are treated as 0.0 mm.",
+                )
+                if warning is not None:
+                    warning.details["provider"] = provider
+                    warning.details["station"] = station
+                    warnings.append(warning)
             calculated_groups.append(group)
 
         calculated = pd.concat(calculated_groups).sort_index()
-        if calculated["et0"].isna().any():
-            raise KeyError("Calculated ET0 contains gaps for cached weather.")
-        return calculated
+        return PreparedDailyWeatherResult(data=calculated, warnings=warnings, metadata=metadata)
 
     def _prepare_daily_weather_for_field(
         self,
         field: FieldContext,
         daily_weather: pd.DataFrame,
-    ) -> pd.DataFrame:
-        prepared = self._calculate_et0_for_daily_weather(field, daily_weather)
-        prepared = self.et_corrector.apply_to_field(prepared, "et0", field)
-        if prepared["et0_corrected"].isna().any():
-            raise KeyError("Calculated field-specific ET0 contains gaps.")
-        return prepared
+    ) -> PreparedDailyWeatherResult:
+        et_result = self._calculate_et0_for_daily_weather(field, daily_weather)
+        prepared = self.et_corrector.apply_to_field(et_result.data, "et0", field)
+        warnings = list(et_result.warnings)
+        metadata = dict(et_result.metadata or {})
+        missing_corrected_count = int(pd.to_numeric(prepared["et0_corrected"], errors="coerce").isna().sum())
+        if missing_corrected_count > 0:
+            completeness = WeatherFrame(
+                data=prepared,
+                resolution="1D",
+                start=pd.Timestamp(prepared.index.min()).normalize(),
+                end=pd.Timestamp(prepared.index.max()).normalize() + pd.Timedelta(days=1),
+                source_provider=field.reference_provider,
+                source_station=field.reference_station,
+            ).completeness(["et0_corrected"])
+            warning = build_missing_weather_warning(
+                completeness,
+                columns=["et0_corrected"],
+                code="WATER_BALANCE_ET_CORRECTED_INCOMPLETE",
+                calculation="water_balance",
+                subject="field-specific evapotranspiration",
+                assumption="missing_evapotranspiration_treated_as_zero",
+                impact="Affected evapotranspiration rows are treated as 0.0 mm.",
+            )
+            if warning is not None:
+                warnings.append(warning)
+        metadata["et0_missing_count"] = int(pd.to_numeric(prepared["et0"], errors="coerce").isna().sum())
+        metadata["et0_corrected_missing_count"] = missing_corrected_count
+        return PreparedDailyWeatherResult(data=prepared, warnings=warnings, metadata=metadata)
 
     def calculate_field(
         self,
@@ -364,7 +493,8 @@ class WaterBalanceService:
                 humus_pct=field.humus_pct,
                 effective_root_depth_cm=field.effective_root_depth_cm,
             )
-            daily_weather = self._prepare_daily_weather_for_field(field, daily_weather)
+            prepared_weather_result = self._prepare_daily_weather_for_field(field, daily_weather)
+            daily_weather = prepared_weather_result.data
             field_irrigation = FieldIrrigation.from_list(irrigation_events)
             water_balance = calculate_water_balance(
                 nfk_total_mm=soil_water_estimate.nfk_total_mm,
@@ -376,10 +506,15 @@ class WaterBalanceService:
             return self._field_result(
                 field,
                 result=water_balance,
-                warnings=daily_weather_result.warnings,
+                warnings=[
+                    *daily_weather_result.warnings,
+                    *prepared_weather_result.warnings,
+                ],
                 metadata={
                     "source": "computed_from_weather_cache",
                     "forecast_days": int(forecast_days),
+                    "weather_quality": daily_weather_result.metadata or {},
+                    "et_quality": prepared_weather_result.metadata or {},
                 },
             )
         except Exception as exc:

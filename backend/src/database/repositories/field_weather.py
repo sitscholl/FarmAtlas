@@ -88,12 +88,12 @@ class FieldWeatherRepository:
                 raise ValueError("Station weather dataframe must have a timestamp column or DatetimeIndex.")
             df = df.rename_axis("timestamp").reset_index()
 
-        required_cols = ["source_provider", "source_station", "timestamp", "precipitation", "value_type"]
+        required_cols = ["source_provider", "source_station", "timestamp", "value_type"]
         missing_required = [column for column in required_cols if column not in df.columns]
         if missing_required:
             raise ValueError(f"Missing required station weather columns: {', '.join(missing_required)}")
 
-        optional_cols = [column for column in self.HOURLY_VALUE_COLUMNS if column != "precipitation"]
+        optional_cols = list(self.HOURLY_VALUE_COLUMNS)
         for column in optional_cols:
             if column not in df.columns:
                 df[column] = None
@@ -102,7 +102,6 @@ class FieldWeatherRepository:
             updated_at = datetime.datetime.now(datetime.UTC)
         df["updated_at"] = pd.Timestamp(updated_at).to_pydatetime()
         df["timestamp"] = pd.to_datetime(df["timestamp"]).map(lambda value: pd.Timestamp(value).to_pydatetime())
-        df["precipitation"] = pd.to_numeric(df["precipitation"], errors="coerce")
         for column in optional_cols:
             df[column] = pd.to_numeric(df[column], errors="coerce")
 

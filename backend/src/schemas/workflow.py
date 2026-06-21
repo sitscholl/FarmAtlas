@@ -8,6 +8,8 @@ class WorkflowWarningRead(BaseModel):
     code: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
+    model_config = {"from_attributes": True}
+
 
 class WorkflowErrorRead(BaseModel):
     message: str
@@ -15,6 +17,8 @@ class WorkflowErrorRead(BaseModel):
     exception_type: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
     fatal: bool = True
+
+    model_config = {"from_attributes": True}
 
 
 class WorkflowFieldResponseBase(BaseModel):

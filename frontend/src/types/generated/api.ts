@@ -20,6 +20,7 @@ export type CropProtectionFieldSummaryRead = {
   [key: string]: number
 }
   weather_updated_at?: string | null
+  warnings?: Array<WorkflowWarningRead>
   evaluations: Array<CropProtectionRuleEvaluationRead>
 }
 
@@ -29,6 +30,7 @@ export type CropProtectionMetricEvaluationRead = {
   threshold: number
   warning_threshold?: number | null
   status: string
+  warnings?: Array<WorkflowWarningRead>
 }
 
 export type CropProtectionRuleCreate = {
@@ -55,6 +57,7 @@ export type CropProtectionRuleEvaluationRead = {
   last_treatment_product?: string | null
   weather_updated_at?: string | null
   metrics: Array<CropProtectionMetricEvaluationRead>
+  warnings?: Array<WorkflowWarningRead>
 }
 
 export type CropProtectionRuleMetricBase = {
@@ -566,7 +569,7 @@ export type StationWeatherHourlyRead = {
   source_provider: string
   source_station: string
   timestamp: string
-  precipitation: number
+  precipitation?: number | null
   tair_2m?: number | null
   relative_humidity?: number | null
   wind_speed?: number | null
@@ -701,6 +704,8 @@ export type WaterBalanceSeriesPoint = {
   below_raw: boolean | null
   value_type: string | null
   model: string | null
+  precipitation_missing?: boolean | null
+  evapotranspiration_missing?: boolean | null
 }
 
 export type WaterBalanceSeriesResponse = {

@@ -32,11 +32,15 @@ def calculate_water_balance(
         raise KeyError("Daily weather must contain a 'precipitation' column.")
 
     et_column = "et0_corrected" if "et0_corrected" in data.columns else "et0" if "et0" in data.columns else None
-    if et_column is None or data[et_column].isna().any():
-        raise KeyError("Daily weather must contain complete 'et0_corrected' or 'et0' values.")
+    if et_column is None:
+        raise KeyError("Daily weather must contain 'et0_corrected' or 'et0' values.")
 
-    precipitation = pd.to_numeric(data["precipitation"], errors="coerce").fillna(0.0)
-    evapotranspiration = pd.to_numeric(data[et_column], errors="coerce").fillna(0.0)
+    raw_precipitation = pd.to_numeric(data["precipitation"], errors="coerce")
+    raw_evapotranspiration = pd.to_numeric(data[et_column], errors="coerce")
+    precipitation_missing = raw_precipitation.isna()
+    evapotranspiration_missing = raw_evapotranspiration.isna()
+    precipitation = raw_precipitation.fillna(0.0)
+    evapotranspiration = raw_evapotranspiration.fillna(0.0)
     irrigation = (
         pd.Series(0.0, index=data.index, dtype=float)
         if field_irrigation is None
@@ -74,6 +78,8 @@ def calculate_water_balance(
         water_balance["field_id"] = field_id
     if "kc" in data.columns:
         water_balance["kc"] = data["kc"]
+    water_balance["precipitation_missing"] = precipitation_missing
+    water_balance["evapotranspiration_missing"] = evapotranspiration_missing
 
     readily_available_water = float(p_allowable) * available_water_storage
     water_balance["readily_available_water"] = readily_available_water

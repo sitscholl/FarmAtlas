@@ -10,7 +10,7 @@ class StationWeatherHourlyRead(ORMModel):
     source_provider: str
     source_station: str
     timestamp: DateTimeType
-    precipitation: float
+    precipitation: float | None = None
     tair_2m: float | None = None
     relative_humidity: float | None = None
     wind_speed: float | None = None

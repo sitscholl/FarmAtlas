@@ -141,6 +141,11 @@ async def summarize_crop_protection_by_field(
             ),
             default=None,
         )
+        warnings = [
+            warning
+            for evaluation in sorted_evaluations
+            for warning in evaluation.warnings
+        ]
 
         summaries.append(
             CropProtectionFieldSummaryRead(
@@ -150,6 +155,7 @@ async def summarize_crop_protection_by_field(
                 evaluation_count=len(sorted_evaluations),
                 status_counts=status_counts,
                 weather_updated_at=weather_updated_at,
+                warnings=warnings,
                 evaluations=[
                     CropProtectionRuleEvaluationRead.model_validate(evaluation)
                     for evaluation in sorted_evaluations

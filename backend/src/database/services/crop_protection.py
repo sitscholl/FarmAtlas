@@ -1,12 +1,14 @@
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
 
 from ...domain.field import FieldContext
 from ...metrics import MetricAccumulatorService
+from ...results import FarmAtlasWarning
 from ...weather_frame import WeatherFrame
+from ...weather_quality import build_missing_weather_warning
 from .. import models
 from ..core import DatabaseCore
 from ..repositories import CropProtectionRepository, FieldWeatherRepository
@@ -22,6 +24,7 @@ class CropProtectionMetricEvaluation:
     threshold: float
     warning_threshold: float | None
     status: str
+    warnings: list[FarmAtlasWarning] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,7 @@ class CropProtectionRuleEvaluation:
     last_treatment_product: str | None
     weather_updated_at: datetime.datetime | None
     metrics: list[CropProtectionMetricEvaluation]
+    warnings: list[FarmAtlasWarning] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -196,6 +200,12 @@ class CropProtectionService:
     ) -> CropProtectionMetricEvaluation:
         metric_type = metric.metric_type
         value: float | int | None
+        warnings = self._metric_weather_warnings(
+            metric_type,
+            accumulator.daily_weather,
+            start_date=start_date,
+            as_of=as_of,
+        )
         if metric_type == "days_since":
             value = accumulator.days_since(start_date, as_of)
         elif metric_type == "rain_since":
@@ -227,7 +237,92 @@ class CropProtectionService:
             threshold=float(metric.threshold),
             warning_threshold=None if metric.warning_threshold is None else float(metric.warning_threshold),
             status=status,
+            warnings=warnings,
         )
+
+    def _metric_weather_warnings(
+        self,
+        metric_type: str,
+        weather: WeatherFrame,
+        *,
+        start_date: datetime.date,
+        as_of: datetime.date | datetime.datetime,
+    ) -> list[FarmAtlasWarning]:
+        if metric_type == "rain_since":
+            columns = ["precipitation"]
+            code = "CROP_PROTECTION_PRECIPITATION_INCOMPLETE"
+            missing_label = "precipitation"
+            assumption = "missing_precipitation_treated_as_zero"
+        elif metric_type == "gdd_since":
+            columns = ["tair_2m"]
+            code = "CROP_PROTECTION_TEMPERATURE_INCOMPLETE"
+            missing_label = "temperature"
+            assumption = "missing_temperature_treated_as_zero_gdd"
+        else:
+            return []
+
+        completeness = self._metric_weather_completeness(
+            weather,
+            start_date=start_date,
+            as_of=as_of,
+            columns=columns,
+        )
+        warning = build_missing_weather_warning(
+            completeness,
+            columns=columns,
+            code=code,
+            calculation="crop_protection",
+            subject=missing_label,
+            assumption=assumption,
+            impact="The metric is still calculated with the configured missing-value assumption.",
+        )
+        if warning is None:
+            return []
+        warning.details["metric_type"] = metric_type
+        return [warning]
+
+    def _metric_weather_completeness(
+        self,
+        weather: WeatherFrame,
+        *,
+        start_date: datetime.date,
+        as_of: datetime.date | datetime.datetime,
+        columns: list[str],
+    ):
+        try:
+            resolution_delta = pd.Timedelta(weather.resolution)
+        except ValueError:
+            resolution_delta = pd.Timedelta(hours=1)
+
+        start_ts = pd.Timestamp(start_date)
+        end_ts = pd.Timestamp(as_of)
+        timestamps = weather._timestamps()
+        tz = timestamps.tz
+        if tz is not None:
+            start_ts = start_ts.tz_localize(tz) if start_ts.tz is None else start_ts.tz_convert(tz)
+            end_ts = end_ts.tz_localize(tz) if end_ts.tz is None else end_ts.tz_convert(tz)
+
+        start_exclusive = start_ts + pd.Timedelta(days=1)
+        if isinstance(as_of, datetime.date) and not isinstance(as_of, datetime.datetime):
+            end_exclusive = end_ts + pd.Timedelta(days=1)
+        else:
+            end_exclusive = end_ts + resolution_delta
+
+        if weather.data.empty:
+            data = weather.data.copy()
+        else:
+            indexed = weather.data.copy()
+            indexed.index = timestamps
+            data = indexed.loc[(indexed.index >= start_exclusive) & (indexed.index < end_exclusive)].copy()
+
+        return WeatherFrame(
+            data=data,
+            resolution=weather.resolution,
+            start=start_exclusive,
+            end=end_exclusive,
+            source_provider=weather.source_provider,
+            source_station=weather.source_station,
+        ).completeness(columns)
 
     def _combine_metric_statuses(self, rule: models.CropProtectionRule, metric_statuses: list[str]) -> str:
         if not metric_statuses:
@@ -435,6 +530,11 @@ class CropProtectionService:
                     )
                     for metric in case.enabled_metrics
                 ]
+                warnings = [
+                    warning
+                    for metric_evaluation in metric_evaluations
+                    for warning in metric_evaluation.warnings
+                ]
                 status = self._combine_metric_statuses(
                     case.rule,
                     [metric.status for metric in metric_evaluations],
@@ -455,6 +555,7 @@ class CropProtectionService:
                             last_treatment_product=last_treatment.product_name,
                             weather_updated_at=weather_updated_at,
                             metrics=metric_evaluations,
+                            warnings=warnings,
                         ),
                     )
                 )

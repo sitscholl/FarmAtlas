@@ -15,6 +15,7 @@ import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
 import WaterBalanceChart from '../components/WaterBalanceChart'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
+import { formatWorkflowWarning, type WorkflowMessage } from '../lib/workflowWarnings'
 import {
   type CropProtectionFieldSummaryRead,
   type CropProtectionRuleRead,
@@ -23,7 +24,6 @@ import {
   type WaterBalanceSeriesPoint,
   type WaterBalanceSeriesResponse,
   type WorkflowErrorRead,
-  type WorkflowWarningRead,
 } from '../types/generated/api'
 
 const FORECAST_DAYS = 5
@@ -45,25 +45,6 @@ type WaterBalanceModalState = {
   workflowMessages: WorkflowMessage[]
   isLoading: boolean
   errorMessage: string | null
-}
-
-type WorkflowMessage = {
-  kind: 'warning' | 'error'
-  message: string
-}
-
-function formatWorkflowWarning(warning: WorkflowWarningRead): WorkflowMessage {
-  if (warning.code === 'FORECAST_CACHE_MISSING') {
-    return {
-      kind: 'warning',
-      message: 'Die Wettervorhersage fehlt im Cache. Aktualisiere den Wetter-Cache, um den Prognosebereich der Wasserbilanz anzuzeigen.',
-    }
-  }
-
-  return {
-    kind: 'warning',
-    message: warning.message,
-  }
 }
 
 function formatWorkflowError(error: WorkflowErrorRead): WorkflowMessage {

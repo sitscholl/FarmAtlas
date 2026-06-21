@@ -32,6 +32,8 @@ class WaterBalanceSeriesPoint(BaseModel):
     below_raw: bool | None
     value_type: str | None
     model: str | None
+    precipitation_missing: bool | None = None
+    evapotranspiration_missing: bool | None = None
 
 
 class WaterBalanceSeriesResponse(WorkflowFieldResponseBase):
