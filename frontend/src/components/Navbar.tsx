@@ -16,6 +16,7 @@ import type {
   WeatherCacheRefreshStationResult,
 } from '../types/generated/api'
 import CreateEntityModal from './CreateEntityModal'
+import FruitCountSurveyModal from './FruitCountSurveyModal'
 import WorkflowSyncButton from './WorkflowSyncButton'
 
 import styles from '../styles/Home.module.css'
@@ -31,6 +32,7 @@ function normalizeWorkflowStatus(status: string): 'success' | 'warning' | 'faile
 export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [activeAction, setActiveAction] = useState<CreateActionConfig | null>(null)
+  const [isFruitCountOpen, setIsFruitCountOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -147,6 +149,16 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                       {action.label}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFruitCountOpen(true)
+                      setIsMenuOpen(false)
+                    }}
+                    className={[styles.interactiveLink, styles.sidebarItem].join(' ')}
+                  >
+                    Fruchtzaehlung eintragen
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -158,6 +170,10 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
         action={activeAction}
         isOpen={activeAction !== null}
         onClose={() => setActiveAction(null)}
+      />
+      <FruitCountSurveyModal
+        isOpen={isFruitCountOpen}
+        onClose={() => setIsFruitCountOpen(false)}
       />
     </>
   )

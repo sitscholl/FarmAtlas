@@ -20,7 +20,9 @@ from .field_weather import (
 from .fruit_count import (
     FruitCountSampleCreate,
     FruitCountSampleRead,
+    FruitCountSampleUpdate,
     FruitCountSurveyCreate,
+    FruitCountSurveyDraftCreate,
     FruitCountSurveyRead,
     FruitCountSurveyUpdate,
 )
@@ -79,7 +81,9 @@ __all__ = [
     "FieldWeatherRefreshResponse",
     "FruitCountSampleCreate",
     "FruitCountSampleRead",
+    "FruitCountSampleUpdate",
     "FruitCountSurveyCreate",
+    "FruitCountSurveyDraftCreate",
     "FruitCountSurveyRead",
     "FruitCountSurveyUpdate",
     "StationWeatherHourlyRead",

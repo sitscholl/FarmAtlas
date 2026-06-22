@@ -6,6 +6,8 @@ import { IoMdAdd } from 'react-icons/io'
 
 import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
+import FruitCountSurveyModal from '../components/FruitCountSurveyModal'
+import type { FruitCountScope } from '../components/FruitCountScopePicker'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
@@ -23,6 +25,7 @@ import {
 } from '../types/createActions'
 import {
   type FieldDetailRead,
+  type FruitCountSurveyRead,
   type PlantingDetailRead,
   type SectionRead,
   type WaterBalanceSummary,
@@ -103,6 +106,40 @@ function buildWaterMetrics(summary: WaterBalanceSummary): DetailMetric[] {
     { label: 'Safe Ratio', value: summary.safe_ratio === null ? 'n/a' : `${formatNumber(summary.safe_ratio * 100, 0)} %` },
     { label: 'Letzte Aktualisierung', value: formatDate(summary.as_of) },
   ]
+}
+
+function describeFruitCountScope(survey: FruitCountSurveyRead, fieldDetail: FieldDetailRead) {
+  if (survey.field_id !== null && survey.field_id !== undefined) {
+    return `Anlage: ${fieldDetail.field.name}`
+  }
+
+  if (survey.planting_id !== null && survey.planting_id !== undefined) {
+    const planting = fieldDetail.plantings.find((candidate) => candidate.id === survey.planting_id)
+    return `Pflanzung: ${planting?.variety ?? survey.planting_id}`
+  }
+
+  if (survey.section_id !== null && survey.section_id !== undefined) {
+    for (const planting of fieldDetail.plantings) {
+      const section = planting.sections.find((candidate) => candidate.id === survey.section_id)
+      if (section !== undefined) {
+        return `Abschnitt: ${planting.variety} | ${section.name}`
+      }
+    }
+    return `Abschnitt: ${survey.section_id}`
+  }
+
+  return 'n/a'
+}
+
+function summarizeFruitCountSurvey(survey: FruitCountSurveyRead) {
+  const counts = (survey.samples ?? []).map((sample) => sample.apple_count)
+  const total = counts.reduce((sum, count) => sum + count, 0)
+  const mean = counts.length === 0 ? null : total / counts.length
+  return {
+    count: counts.length,
+    total,
+    mean,
+  }
 }
 
 function MetricSection({
@@ -273,12 +310,15 @@ export default function FieldDetail() {
   const { fieldId } = useParams()
   const [fieldDetail, setFieldDetail] = useState<FieldDetailRead | null>(null)
   const [waterSummary, setWaterSummary] = useState<WaterBalanceSummary | null>(null)
+  const [fruitCountSurveys, setFruitCountSurveys] = useState<FruitCountSurveyRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [activeAction, setActiveAction] = useState<CreateActionConfig | null>(null)
   const [activeInitialValues, setActiveInitialValues] = useState<Record<string, string> | undefined>(undefined)
   const [irrigationInitialValues, setIrrigationInitialValues] = useState<Record<string, string> | undefined>(undefined)
   const [isIrrigationOpen, setIsIrrigationOpen] = useState(false)
+  const [fruitCountInitialScope, setFruitCountInitialScope] = useState<FruitCountScope | null>(null)
+  const [isFruitCountOpen, setIsFruitCountOpen] = useState(false)
 
   useEffect(() => {
     let isActive = true
@@ -291,9 +331,10 @@ export default function FieldDetail() {
       }
 
       try {
-        const [detailResponse, summaryResponse] = await Promise.all([
+        const [detailResponse, summaryResponse, fruitCountResponse] = await Promise.all([
           api.get<FieldDetailRead>(`/fields/${fieldId}`),
           api.get<WaterBalanceSummary>(`/fields/${fieldId}/water-balance/summary`),
+          api.get<FruitCountSurveyRead[]>(`/fruit-counts/fields/${fieldId}/surveys`),
         ])
         if (!isActive) {
           return
@@ -301,6 +342,7 @@ export default function FieldDetail() {
 
         setFieldDetail(detailResponse.data)
         setWaterSummary(summaryResponse.data)
+        setFruitCountSurveys(fruitCountResponse.data)
         setErrorMessage(null)
         setIsLoading(false)
       } catch (error) {
@@ -409,6 +451,25 @@ export default function FieldDetail() {
     }
   }
 
+  const handleDeleteFruitCountSurvey = async (survey: FruitCountSurveyRead) => {
+    const confirmed = window.confirm(
+      `Soll die Fruchtzaehlung vom ${formatDate(survey.date)} wirklich geloescht werden?`,
+    )
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await api.delete(`/fruit-counts/surveys/${survey.id}`)
+      setFruitCountSurveys((currentSurveys) =>
+        currentSurveys.filter((currentSurvey) => currentSurvey.id !== survey.id),
+      )
+    } catch (error) {
+      console.error(`Error deleting fruit count survey ${survey.id}`, error)
+      setErrorMessage('Die Fruchtzaehlung konnte nicht geloescht werden.')
+    }
+  }
+
   return (
     <section className="w-full max-w-6xl">
       <div className="px-3 py-4 sm:px-6 sm:py-6 lg:p-8">
@@ -456,6 +517,17 @@ export default function FieldDetail() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                setFruitCountInitialScope({ type: 'field', field_id: field.id })
+                setIsFruitCountOpen(true)
+              }}
+              className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+            >
+              <IoMdAdd />
+              Fruchtzaehlung
+            </button>
+            <button
+              type="button"
               onClick={handleDeleteField}
               className="inline-flex items-center gap-2 border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
             >
@@ -473,6 +545,78 @@ export default function FieldDetail() {
           <MetricSection title="Bewaesserung" metrics={irrigationMetrics} />
           <MetricSection title="Wasserhaushalt" metrics={waterMetrics} />
         </div>
+
+        <section className="mt-10 border border-slate-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Fruchtzaehlungen
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+                Zaehlungen
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setFruitCountInitialScope({ type: 'field', field_id: field.id })
+                setIsFruitCountOpen(true)
+              }}
+              className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+            >
+              <IoMdAdd />
+              Zaehlung
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {fruitCountSurveys.length === 0 ? (
+              <div className="border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-500">
+                Keine Fruchtzaehlungen vorhanden.
+              </div>
+            ) : (
+              fruitCountSurveys.map((survey) => {
+                const summary = summarizeFruitCountSurvey(survey)
+
+                return (
+                  <div key={survey.id} className="border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {formatDate(survey.date)} | {survey.timing_code}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                          {describeFruitCountScope(survey, fieldDetail)}
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-right text-sm">
+                          <div className="font-semibold text-slate-900">
+                            {summary.count} Proben
+                          </div>
+                          <div className="text-slate-500">
+                            Mittel {summary.mean === null ? 'n/a' : formatNumber(summary.mean, 1)} | Summe {summary.total}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFruitCountSurvey(survey)}
+                          className="inline-flex h-9 w-9 items-center justify-center border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100"
+                          aria-label={`Fruchtzaehlung vom ${formatDate(survey.date)} loeschen`}
+                        >
+                          <PiTrashBold />
+                        </button>
+                      </div>
+                    </div>
+                    {survey.notes ? (
+                      <div className="mt-3 text-sm text-slate-600">{survey.notes}</div>
+                    ) : null}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
 
         <section className="mt-10 border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -572,6 +716,15 @@ export default function FieldDetail() {
         onClose={() => {
           setIsIrrigationOpen(false)
           setIrrigationInitialValues(undefined)
+        }}
+      />
+      <FruitCountSurveyModal
+        isOpen={isFruitCountOpen}
+        initialScope={fruitCountInitialScope}
+        fieldDetails={[fieldDetail]}
+        onClose={() => {
+          setIsFruitCountOpen(false)
+          setFruitCountInitialScope(null)
         }}
       />
     </section>

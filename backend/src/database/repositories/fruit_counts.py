@@ -82,13 +82,19 @@ class FruitCountRepository:
         if not samples:
             raise ValueError("At least one fruit count sample is required")
         return [
-            models.FruitCountSample(
-                tree_label=self._normalize_optional_text(sample.get("tree_label")),
-                apple_count=int(sample["apple_count"]),
-                notes=self._normalize_optional_text(sample.get("notes")),
-            )
+            self._build_sample(sample)
             for sample in samples
         ]
+
+    def _build_sample(self, sample: dict[str, Any]) -> models.FruitCountSample:
+        apple_count = int(sample["apple_count"])
+        if apple_count < 0:
+            raise ValueError("apple_count must be greater than or equal to 0")
+        return models.FruitCountSample(
+            tree_label=self._normalize_optional_text(sample.get("tree_label")),
+            apple_count=apple_count,
+            notes=self._normalize_optional_text(sample.get("notes")),
+        )
 
     def get_by_id(self, session: Session, survey_id: int) -> models.FruitCountSurvey | None:
         return self._query(session).filter(models.FruitCountSurvey.id == survey_id).one_or_none()
@@ -207,6 +213,47 @@ class FruitCountRepository:
         session.flush()
         return self.get_by_id(session, survey.id) or survey
 
+    def create_draft(
+        self,
+        session: Session,
+        *,
+        season_year: int,
+        date: datetime.date,
+        timing_code: str,
+        field_id: int | None = None,
+        planting_id: int | None = None,
+        section_id: int | None = None,
+        method: str | None = None,
+        observer: str | None = None,
+        notes: str | None = None,
+        include_in_aggregation: bool = True,
+        quality_flag: str | None = None,
+    ) -> models.FruitCountSurvey:
+        field_id, planting_id, section_id = self._validate_scope(
+            session,
+            field_id=field_id,
+            planting_id=planting_id,
+            section_id=section_id,
+        )
+        survey = models.FruitCountSurvey(
+            season_year=int(season_year),
+            date=self._normalize_date(date, field_name="date"),
+            timing_code=self._normalize_required_text(timing_code, field_name="timing_code"),
+            field_id=field_id,
+            planting_id=planting_id,
+            section_id=section_id,
+            method=self._normalize_optional_text(method),
+            observer=self._normalize_optional_text(observer),
+            notes=self._normalize_optional_text(notes),
+            include_in_aggregation=bool(include_in_aggregation),
+            quality_flag=self._normalize_optional_text(quality_flag),
+            created_at=datetime.datetime.now(),
+            samples=[],
+        )
+        session.add(survey)
+        session.flush()
+        return self.get_by_id(session, survey.id) or survey
+
     def update(self, session: Session, survey_id: int, updates: dict[str, Any]) -> models.FruitCountSurvey:
         survey = self.get_by_id(session, survey_id)
         if survey is None:
@@ -244,6 +291,56 @@ class FruitCountRepository:
             survey.samples = self._build_samples(samples)
         session.flush()
         return self.get_by_id(session, survey_id) or survey
+
+    def add_sample(
+        self,
+        session: Session,
+        *,
+        survey_id: int,
+        sample: dict[str, Any],
+    ) -> models.FruitCountSample:
+        survey = self.get_by_id(session, survey_id)
+        if survey is None:
+            raise ValueError(f"Could not find any fruit count survey with id {survey_id}")
+        new_sample = self._build_sample(sample)
+        new_sample.survey_id = survey_id
+        session.add(new_sample)
+        session.flush()
+        return new_sample
+
+    def update_sample(
+        self,
+        session: Session,
+        *,
+        sample_id: int,
+        updates: dict[str, Any],
+    ) -> models.FruitCountSample:
+        sample = session.get(models.FruitCountSample, sample_id)
+        if sample is None:
+            raise ValueError(f"Could not find any fruit count sample with id {sample_id}")
+
+        for field_key, raw_value in updates.items():
+            if field_key == "apple_count":
+                if raw_value is None:
+                    raise ValueError("apple_count cannot be null")
+                apple_count = int(raw_value)
+                if apple_count < 0:
+                    raise ValueError("apple_count must be greater than or equal to 0")
+                sample.apple_count = apple_count
+            elif field_key in {"tree_label", "notes"}:
+                setattr(sample, field_key, self._normalize_optional_text(raw_value))
+            else:
+                raise ValueError(f"Invalid key {field_key} in update_fruit_count_sample")
+
+        session.flush()
+        return sample
+
+    def delete_sample(self, session: Session, sample_id: int) -> bool:
+        sample = session.get(models.FruitCountSample, sample_id)
+        if sample is None:
+            return False
+        session.delete(sample)
+        return True
 
     def delete(self, session: Session, survey_id: int) -> bool:
         survey = self.get_by_id(session, survey_id)

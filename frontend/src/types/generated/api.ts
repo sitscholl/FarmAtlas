@@ -246,6 +246,12 @@ export type FruitCountSampleRead = {
   notes?: string | null
 }
 
+export type FruitCountSampleUpdate = {
+  tree_label?: string | null
+  apple_count?: number | null
+  notes?: string | null
+}
+
 export type FruitCountSurveyCreate = {
   season_year: number
   date: string
@@ -259,6 +265,20 @@ export type FruitCountSurveyCreate = {
   include_in_aggregation?: boolean
   quality_flag?: string | null
   samples: Array<FruitCountSampleCreate>
+}
+
+export type FruitCountSurveyDraftCreate = {
+  season_year: number
+  date: string
+  timing_code: string
+  field_id?: number | null
+  planting_id?: number | null
+  section_id?: number | null
+  method?: string | null
+  observer?: string | null
+  notes?: string | null
+  include_in_aggregation?: boolean
+  quality_flag?: string | null
 }
 
 export type FruitCountSurveyRead = {
