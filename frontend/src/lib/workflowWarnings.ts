@@ -23,6 +23,7 @@ export function formatWorkflowWarningText(warning: WorkflowWarningRead) {
     case 'WATER_BALANCE_ET_INPUTS_INCOMPLETE':
     case 'WATER_BALANCE_ET0_INCOMPLETE':
     case 'WATER_BALANCE_ET_CORRECTED_INCOMPLETE':
+    case 'WATER_BALANCE_EVAPOTRANSPIRATION_INCOMPLETE':
       return count === null
         ? 'Evapotranspirationsdaten fehlen in der Wasserbilanz. Betroffene Werte werden mit 0,0 mm angesetzt.'
         : `${count} Wetterzeilen fuer Evapotranspiration fehlen in der Wasserbilanz. Betroffene Werte werden mit 0,0 mm angesetzt.`

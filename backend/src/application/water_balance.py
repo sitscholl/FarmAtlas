@@ -20,9 +20,15 @@ from ..field_weather import FieldWeatherCacheService
 from ..meteo.station import Station
 from ..results import FarmAtlasError, FarmAtlasWarning
 from ..weather_frame import WeatherFrame
-from ..weather_quality import build_missing_weather_warning
+from ..weather_quality import aggregate_missing_weather_warnings, build_missing_weather_warning
 
 logger = logging.getLogger(__name__)
+
+WATER_BALANCE_EVAPOTRANSPIRATION_WARNING_CODES = {
+    "WATER_BALANCE_ET_INPUTS_INCOMPLETE",
+    "WATER_BALANCE_ET0_INCOMPLETE",
+    "WATER_BALANCE_ET_CORRECTED_INCOMPLETE",
+}
 
 
 def missing_soil_parameters(field: FieldContext) -> list[str]:
@@ -416,6 +422,15 @@ class WaterBalanceService:
                 warnings.append(warning)
         metadata["et0_missing_count"] = int(pd.to_numeric(prepared["et0"], errors="coerce").isna().sum())
         metadata["et0_corrected_missing_count"] = missing_corrected_count
+        warnings = aggregate_missing_weather_warnings(
+            warnings,
+            source_codes=WATER_BALANCE_EVAPOTRANSPIRATION_WARNING_CODES,
+            code="WATER_BALANCE_EVAPOTRANSPIRATION_INCOMPLETE",
+            calculation="water_balance",
+            subject="evapotranspiration",
+            assumption="missing_evapotranspiration_treated_as_zero",
+            impact="Affected evapotranspiration rows are treated as 0.0 mm.",
+        )
         return PreparedDailyWeatherResult(data=prepared, warnings=warnings, metadata=metadata)
 
     def calculate_field(
