@@ -28,6 +28,13 @@ async def list_yearly_stats(
     return [YearlyStatsRead.model_validate(item) for item in stats]
 
 
+@router.get("/fields/{field_id}", response_model=list[YearlyStatsRead])
+async def list_field_yearly_stats(field_id: int):
+    with runtime.db.session_scope() as session:
+        stats = runtime.db.yearly_stats.list_for_field(session, field_id=field_id)
+    return [YearlyStatsRead.model_validate(item) for item in stats]
+
+
 @router.get("/{stats_id}", response_model=YearlyStatsRead)
 async def get_yearly_stats(stats_id: int):
     with runtime.db.session_scope() as session:

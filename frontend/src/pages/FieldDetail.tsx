@@ -8,6 +8,7 @@ import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import FruitCountSurveyModal from '../components/FruitCountSurveyModal'
 import type { FruitCountScope } from '../components/FruitCountScopePicker'
+import YearlyStatsModal from '../components/YearlyStatsModal'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
 import {
@@ -29,6 +30,7 @@ import {
   type PlantingDetailRead,
   type SectionRead,
   type WaterBalanceSummary,
+  type YearlyStatsRead,
 } from '../types/generated/api'
 
 type DetailMetric = {
@@ -60,6 +62,26 @@ function formatDate(value: string | null | undefined) {
     return 'n/a'
   }
   return new Intl.DateTimeFormat('de-DE').format(new Date(value))
+}
+
+function formatCurrency(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return 'n/a'
+  }
+
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatNumberWithUnit(value: number | null | undefined, unit: string, digits = 1) {
+  if (value === null || value === undefined) {
+    return 'n/a'
+  }
+
+  return `${formatNumber(value, digits)} ${unit}`
 }
 
 function squareMetresToHectares(value: number | null | undefined) {
@@ -129,6 +151,47 @@ function describeFruitCountScope(survey: FruitCountSurveyRead, fieldDetail: Fiel
   }
 
   return 'n/a'
+}
+
+function describeYearlyStatsScope(stats: YearlyStatsRead, fieldDetail: FieldDetailRead) {
+  if (stats.field_id !== null && stats.field_id !== undefined) {
+    return `Anlage: ${fieldDetail.field.name}`
+  }
+
+  if (stats.planting_id !== null && stats.planting_id !== undefined) {
+    const planting = fieldDetail.plantings.find((candidate) => candidate.id === stats.planting_id)
+    return `Pflanzung: ${planting?.variety ?? stats.planting_id}`
+  }
+
+  if (stats.section_id !== null && stats.section_id !== undefined) {
+    for (const planting of fieldDetail.plantings) {
+      const section = planting.sections.find((candidate) => candidate.id === stats.section_id)
+      if (section !== undefined) {
+        return `Abschnitt: ${planting.variety} | ${section.name}`
+      }
+    }
+    return `Abschnitt: ${stats.section_id}`
+  }
+
+  return 'n/a'
+}
+
+function compareYearlyStats(left: YearlyStatsRead, right: YearlyStatsRead) {
+  if (left.season_year !== right.season_year) {
+    return right.season_year - left.season_year
+  }
+
+  return left.id - right.id
+}
+
+function buildYearlyStatsMetrics(stats: YearlyStatsRead): DetailMetric[] {
+  return [
+    { label: 'Ausduennung', value: formatNumberWithUnit(stats.thinning_hours, 'h', 1) },
+    { label: 'Ernte', value: formatNumberWithUnit(stats.harvest_hours, 'h', 1) },
+    { label: 'Grosskisten', value: formatNumber(stats.filled_boxes, 1) },
+    { label: 'Ertrag', value: formatNumberWithUnit(stats.yield_kg, 'kg', 0) },
+    { label: 'Umsatz', value: formatCurrency(stats.revenue) },
+  ]
 }
 
 function summarizeFruitCountSurvey(survey: FruitCountSurveyRead) {
@@ -311,6 +374,7 @@ export default function FieldDetail() {
   const [fieldDetail, setFieldDetail] = useState<FieldDetailRead | null>(null)
   const [waterSummary, setWaterSummary] = useState<WaterBalanceSummary | null>(null)
   const [fruitCountSurveys, setFruitCountSurveys] = useState<FruitCountSurveyRead[]>([])
+  const [yearlyStats, setYearlyStats] = useState<YearlyStatsRead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [activeAction, setActiveAction] = useState<CreateActionConfig | null>(null)
@@ -320,6 +384,9 @@ export default function FieldDetail() {
   const [fruitCountInitialScope, setFruitCountInitialScope] = useState<FruitCountScope | null>(null)
   const [editingFruitCountSurvey, setEditingFruitCountSurvey] = useState<FruitCountSurveyRead | null>(null)
   const [isFruitCountOpen, setIsFruitCountOpen] = useState(false)
+  const [yearlyStatsInitialScope, setYearlyStatsInitialScope] = useState<FruitCountScope | null>(null)
+  const [editingYearlyStats, setEditingYearlyStats] = useState<YearlyStatsRead | null>(null)
+  const [isYearlyStatsOpen, setIsYearlyStatsOpen] = useState(false)
 
   useEffect(() => {
     let isActive = true
@@ -332,10 +399,11 @@ export default function FieldDetail() {
       }
 
       try {
-        const [detailResponse, summaryResponse, fruitCountResponse] = await Promise.all([
+        const [detailResponse, summaryResponse, fruitCountResponse, yearlyStatsResponse] = await Promise.all([
           api.get<FieldDetailRead>(`/fields/${fieldId}`),
           api.get<WaterBalanceSummary>(`/fields/${fieldId}/water-balance/summary`),
           api.get<FruitCountSurveyRead[]>(`/fruit-counts/fields/${fieldId}/surveys`),
+          api.get<YearlyStatsRead[]>(`/yearly-stats/fields/${fieldId}`),
         ])
         if (!isActive) {
           return
@@ -344,6 +412,7 @@ export default function FieldDetail() {
         setFieldDetail(detailResponse.data)
         setWaterSummary(summaryResponse.data)
         setFruitCountSurveys(fruitCountResponse.data)
+        setYearlyStats(yearlyStatsResponse.data.slice().sort(compareYearlyStats))
         setErrorMessage(null)
         setIsLoading(false)
       } catch (error) {
@@ -475,6 +544,23 @@ export default function FieldDetail() {
     }
   }
 
+  const handleDeleteYearlyStats = async (stats: YearlyStatsRead) => {
+    const confirmed = window.confirm(
+      `Sollen die Jahresdaten ${stats.season_year} wirklich geloescht werden?`,
+    )
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await api.delete(`/yearly-stats/${stats.id}`)
+      setYearlyStats((currentStats) => currentStats.filter((currentItem) => currentItem.id !== stats.id))
+    } catch (error) {
+      console.error(`Error deleting yearly stats ${stats.id}`, error)
+      setErrorMessage('Die Jahresdaten konnten nicht geloescht werden.')
+    }
+  }
+
   return (
     <section className="w-full max-w-6xl">
       <div className="px-3 py-4 sm:px-6 sm:py-6 lg:p-8">
@@ -534,6 +620,18 @@ export default function FieldDetail() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                setEditingYearlyStats(null)
+                setYearlyStatsInitialScope({ type: 'field', field_id: field.id })
+                setIsYearlyStatsOpen(true)
+              }}
+              className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+            >
+              <IoMdAdd />
+              Jahresdaten
+            </button>
+            <button
+              type="button"
               onClick={handleDeleteField}
               className="inline-flex items-center gap-2 border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
             >
@@ -551,6 +649,97 @@ export default function FieldDetail() {
           <MetricSection title="Bewaesserung" metrics={irrigationMetrics} />
           <MetricSection title="Wasserhaushalt" metrics={waterMetrics} />
         </div>
+
+        <section className="mt-10 border border-slate-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Jahresdaten
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+                Jahreswerte
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingYearlyStats(null)
+                setYearlyStatsInitialScope({ type: 'field', field_id: field.id })
+                setIsYearlyStatsOpen(true)
+              }}
+              className="inline-flex items-center gap-2 border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+            >
+              <IoMdAdd />
+              Jahresdaten
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {yearlyStats.length === 0 ? (
+              <div className="border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-500">
+                Keine Jahresdaten vorhanden.
+              </div>
+            ) : (
+              yearlyStats.map((stats) => {
+                const metrics = buildYearlyStatsMetrics(stats)
+
+                return (
+                  <div key={stats.id} className="border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {stats.season_year}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                          {describeYearlyStatsScope(stats, fieldDetail)}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingYearlyStats(stats)
+                            setYearlyStatsInitialScope(null)
+                            setIsYearlyStatsOpen(true)
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center border border-amber-200 bg-amber-50 text-amber-900 transition hover:bg-amber-100"
+                          aria-label={`Jahresdaten ${stats.season_year} bearbeiten`}
+                        >
+                          <GoPencil />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteYearlyStats(stats)}
+                          className="inline-flex h-9 w-9 items-center justify-center border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100"
+                          aria-label={`Jahresdaten ${stats.season_year} loeschen`}
+                        >
+                          <PiTrashBold />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                      {metrics.map((metric) => (
+                        <div key={metric.label}>
+                          <div className="text-caption font-semibold uppercase tracking-[0.2em] text-slate-400">
+                            {metric.label}
+                          </div>
+                          <div className="font-semibold text-slate-900">{metric.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {stats.notes ? (
+                      <div className="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-600">
+                        {stats.notes}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
 
         <section className="mt-10 border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -746,6 +935,17 @@ export default function FieldDetail() {
           setIsFruitCountOpen(false)
           setFruitCountInitialScope(null)
           setEditingFruitCountSurvey(null)
+        }}
+      />
+      <YearlyStatsModal
+        isOpen={isYearlyStatsOpen}
+        initialScope={yearlyStatsInitialScope}
+        stats={editingYearlyStats}
+        fieldDetails={fruitCountFieldDetails}
+        onClose={() => {
+          setIsYearlyStatsOpen(false)
+          setYearlyStatsInitialScope(null)
+          setEditingYearlyStats(null)
         }}
       />
     </section>
