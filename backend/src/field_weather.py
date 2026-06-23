@@ -38,6 +38,13 @@ class WeatherRefreshResult:
 
 @dataclass
 class FieldWeatherCacheService:
+    """Read and refresh station weather cache data.
+
+    default_max_age is used when callers do not pass a freshness threshold,
+    freshness_grace gives non-zero thresholds a small tolerance, and
+    refresh_lookback controls how far back the stale cache tail is reloaded.
+    """
+
     db: Database
     meteo_loader: MeteoLoader
     meteo_validator: MeteoValidator

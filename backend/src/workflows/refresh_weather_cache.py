@@ -54,6 +54,14 @@ class WeatherRefreshResult:
 
 @dataclass
 class WeatherRefreshWorkflow:
+    """Orchestrate scheduled/manual weather cache refreshes.
+
+    lookback_days defines the requested historical window, max_age_hours and
+    force control observed-cache freshness, active_only filters fields,
+    refresh_forecast/forecast_provider/forecast_days control forecast loading,
+    and cleanup_older_than_days prunes old hourly cache rows when set.
+    """
+
     workflow_name: ClassVar[str] = "refresh_weather_cache"
     requires_fields: ClassVar[bool] = True
 
