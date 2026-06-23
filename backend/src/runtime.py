@@ -1,3 +1,4 @@
+import datetime
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,6 +119,7 @@ class RuntimeContext:
             base_dir=config_base_dir,
         )
 
+        weather_cache_config = config.get("weather_cache", {})
         self.field_weather_service = FieldWeatherCacheService(
             db=self.db,
             meteo_loader=self.meteo_loader,
@@ -125,6 +127,15 @@ class RuntimeContext:
             meteo_resampler=self.meteo_resampler,
             timezone=self.timezone,
             min_sample_size=int(self.min_sample_size),
+            default_max_age=datetime.timedelta(
+                hours=float(weather_cache_config.get("default_max_age_hours", 3))
+            ),
+            freshness_grace=datetime.timedelta(
+                minutes=float(weather_cache_config.get("freshness_grace_minutes", 10))
+            ),
+            refresh_lookback=datetime.timedelta(
+                days=float(weather_cache_config.get("refresh_lookback_days", 2))
+            ),
         )
 
         self.workflows = WorkflowCollection(

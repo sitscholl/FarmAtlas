@@ -49,6 +49,11 @@ evapotranspiration:
             - {"name": "Kc_late", "kind": "linear", "start": "16-09", "end": "31-10", "start_value": 1.004, "end_value": 0.835} #starts when harvesting
             - {"name": "Kc_end", "value": 0.835, "start": "31-10", "end": "01-11"} #starts when leaves are falling
 
+weather_cache:
+    default_max_age_hours: 3
+    freshness_grace_minutes: 10
+    refresh_lookback_days: 2
+
 workflows:
   fetch_treatment_data:
     enabled: false
