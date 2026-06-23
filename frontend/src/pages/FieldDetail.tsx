@@ -318,6 +318,7 @@ export default function FieldDetail() {
   const [irrigationInitialValues, setIrrigationInitialValues] = useState<Record<string, string> | undefined>(undefined)
   const [isIrrigationOpen, setIsIrrigationOpen] = useState(false)
   const [fruitCountInitialScope, setFruitCountInitialScope] = useState<FruitCountScope | null>(null)
+  const [editingFruitCountSurvey, setEditingFruitCountSurvey] = useState<FruitCountSurveyRead | null>(null)
   const [isFruitCountOpen, setIsFruitCountOpen] = useState(false)
 
   useEffect(() => {
@@ -380,6 +381,10 @@ export default function FieldDetail() {
   const waterMetrics = useMemo(
     () => (waterSummary === null ? [] : buildWaterMetrics(waterSummary)),
     [waterSummary],
+  )
+  const fruitCountFieldDetails = useMemo(
+    () => (fieldDetail === null ? [] : [fieldDetail]),
+    [fieldDetail],
   )
 
   if (isLoading) {
@@ -518,6 +523,7 @@ export default function FieldDetail() {
             <button
               type="button"
               onClick={() => {
+                setEditingFruitCountSurvey(null)
                 setFruitCountInitialScope({ type: 'field', field_id: field.id })
                 setIsFruitCountOpen(true)
               }}
@@ -559,6 +565,7 @@ export default function FieldDetail() {
             <button
               type="button"
               onClick={() => {
+                setEditingFruitCountSurvey(null)
                 setFruitCountInitialScope({ type: 'field', field_id: field.id })
                 setIsFruitCountOpen(true)
               }}
@@ -598,6 +605,18 @@ export default function FieldDetail() {
                             Mittel {summary.mean === null ? 'n/a' : formatNumber(summary.mean, 1)} | Summe {summary.total}
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingFruitCountSurvey(survey)
+                            setFruitCountInitialScope(null)
+                            setIsFruitCountOpen(true)
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center border border-amber-200 bg-amber-50 text-amber-900 transition hover:bg-amber-100"
+                          aria-label={`Fruchtzaehlung vom ${formatDate(survey.date)} bearbeiten`}
+                        >
+                          <GoPencil />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteFruitCountSurvey(survey)}
@@ -721,10 +740,12 @@ export default function FieldDetail() {
       <FruitCountSurveyModal
         isOpen={isFruitCountOpen}
         initialScope={fruitCountInitialScope}
-        fieldDetails={[fieldDetail]}
+        survey={editingFruitCountSurvey}
+        fieldDetails={fruitCountFieldDetails}
         onClose={() => {
           setIsFruitCountOpen(false)
           setFruitCountInitialScope(null)
+          setEditingFruitCountSurvey(null)
         }}
       />
     </section>

@@ -10,6 +10,7 @@ import type {
   FruitCountSampleRead,
   FruitCountSurveyDraftCreate,
   FruitCountSurveyRead,
+  FruitCountSurveyUpdate,
 } from '../types/generated/api'
 import FruitCountScopePicker, { type FruitCountScope } from './FruitCountScopePicker'
 
@@ -17,6 +18,7 @@ type FruitCountSurveyModalProps = {
   isOpen: boolean
   initialScope?: FruitCountScope | null
   fieldDetails?: FieldDetailRead[]
+  survey?: FruitCountSurveyRead | null
   onClose: () => void
 }
 
@@ -104,6 +106,56 @@ function getScopePayload(scope: FruitCountScope) {
   }
 }
 
+function getSurveyScope(
+  survey: FruitCountSurveyRead,
+  fieldDetails: FieldDetailRead[] | undefined,
+): FruitCountScope | null {
+  if (survey.field_id !== null && survey.field_id !== undefined) {
+    return { type: 'field', field_id: survey.field_id }
+  }
+  if (survey.planting_id !== null && survey.planting_id !== undefined) {
+    for (const fieldDetail of fieldDetails ?? []) {
+      const planting = fieldDetail.plantings.find((candidate) => candidate.id === survey.planting_id)
+      if (planting !== undefined) {
+        return {
+          type: 'planting',
+          field_id: fieldDetail.field.id,
+          planting_id: planting.id,
+        }
+      }
+    }
+    return null
+  }
+  if (survey.section_id !== null && survey.section_id !== undefined) {
+    for (const fieldDetail of fieldDetails ?? []) {
+      for (const planting of fieldDetail.plantings) {
+        const section = planting.sections.find((candidate) => candidate.id === survey.section_id)
+        if (section !== undefined) {
+          return {
+            type: 'section',
+            field_id: fieldDetail.field.id,
+            planting_id: planting.id,
+            section_id: section.id,
+          }
+        }
+      }
+    }
+    return null
+  }
+  return null
+}
+
+function buildSampleRow(sample: FruitCountSampleRead): SampleRow {
+  return {
+    localId: `sample-${sample.id}`,
+    id: sample.id,
+    tree_label: sample.tree_label ?? '',
+    apple_count: String(sample.apple_count),
+    notes: sample.notes ?? '',
+    status: 'saved',
+  }
+}
+
 function serializeStoredDraft(draft: StoredDraft) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
 }
@@ -135,8 +187,10 @@ export default function FruitCountSurveyModal({
   isOpen,
   initialScope,
   fieldDetails,
+  survey = null,
   onClose,
 }: FruitCountSurveyModalProps) {
+  const isEditingExistingSurvey = survey !== null
   const [surveyId, setSurveyId] = useState<number | null>(null)
   const surveyIdRef = useRef<number | null>(null)
   const draftPromiseRef = useRef<Promise<number> | null>(null)
@@ -156,9 +210,34 @@ export default function FruitCountSurveyModal({
   const [samples, setSamples] = useState<SampleRow[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false)
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false)
 
   useEffect(() => {
     if (!isOpen) {
+      return
+    }
+
+    if (survey !== null) {
+      setSurveyId(survey.id)
+      surveyIdRef.current = survey.id
+      draftPromiseRef.current = null
+      hasRemoteChangesRef.current = false
+      hasManualTimingCodeRef.current = true
+      setScope(getSurveyScope(survey, fieldDetails))
+      setDate(survey.date)
+      setSeasonYear(String(survey.season_year))
+      setTimingCode(survey.timing_code)
+      setMethod(survey.method ?? '')
+      setObserver(survey.observer ?? '')
+      setNotes(survey.notes ?? '')
+      setIncludeInAggregation(survey.include_in_aggregation)
+      setSamples((survey.samples ?? []).map(buildSampleRow))
+      setTreeLabel('')
+      setAppleCount('')
+      setSampleNotes('')
+      setErrorMessage(null)
+      setHasRestoredDraft(false)
+      setIsSavingMetadata(false)
       return
     }
 
@@ -185,10 +264,11 @@ export default function FruitCountSurveyModal({
     setSampleNotes('')
     setErrorMessage(null)
     setHasRestoredDraft(storedDraft !== null)
-  }, [initialScope, isOpen])
+    setIsSavingMetadata(false)
+  }, [fieldDetails, initialScope, isOpen, survey])
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || isEditingExistingSurvey) {
       return
     }
 
@@ -204,7 +284,7 @@ export default function FruitCountSurveyModal({
       includeInAggregation,
       samples,
     })
-  }, [date, includeInAggregation, isOpen, method, notes, observer, samples, scope, seasonYear, surveyId, timingCode])
+  }, [date, includeInAggregation, isEditingExistingSurvey, isOpen, method, notes, observer, samples, scope, seasonYear, surveyId, timingCode])
 
   const summary = useMemo(() => {
     const counts = samples
@@ -221,7 +301,7 @@ export default function FruitCountSurveyModal({
     }
   }, [samples])
 
-  const buildDraftPayload = (): FruitCountSurveyDraftCreate | null => {
+  const buildSurveyMetadataPayload = (): FruitCountSurveyUpdate | null => {
     if (scope === null) {
       setErrorMessage('Bitte Anlage, Pflanzung oder Abschnitt auswaehlen.')
       return null
@@ -254,6 +334,10 @@ export default function FruitCountSurveyModal({
       include_in_aggregation: includeInAggregation,
       quality_flag: null,
     }
+  }
+
+  const buildDraftPayload = (): FruitCountSurveyDraftCreate | null => {
+    return buildSurveyMetadataPayload() as FruitCountSurveyDraftCreate | null
   }
 
   const ensureDraft = async () => {
@@ -362,6 +446,34 @@ export default function FruitCountSurveyModal({
     await saveSample(row)
   }
 
+  const handleSaveMetadata = async () => {
+    setErrorMessage(null)
+
+    const payload = buildSurveyMetadataPayload()
+    if (payload === null) {
+      return
+    }
+
+    setIsSavingMetadata(true)
+    try {
+      const activeSurveyId = await ensureDraft()
+      const response = await api.put<FruitCountSurveyRead>(
+        `/fruit-counts/surveys/${activeSurveyId}`,
+        payload,
+      )
+      setSurveyId(response.data.id)
+      surveyIdRef.current = response.data.id
+      setSamples((response.data.samples ?? []).map(buildSampleRow))
+      hasRemoteChangesRef.current = true
+      setIsSavingMetadata(false)
+      handleClose()
+    } catch (error) {
+      console.error('Error saving fruit count survey metadata', error)
+      setErrorMessage(getApiErrorMessage(error, 'Die Fruchtzaehlung konnte nicht gespeichert werden.'))
+      setIsSavingMetadata(false)
+    }
+  }
+
   const handleDeleteSample = async (row: SampleRow) => {
     if (row.id === undefined) {
       setSamples((currentRows) => currentRows.filter((currentRow) => currentRow.localId !== row.localId))
@@ -396,7 +508,7 @@ export default function FruitCountSurveyModal({
 
   const handleClose = () => {
     const hasUnsavedRows = samples.some((sample) => sample.status !== 'saved')
-    if (!hasUnsavedRows) {
+    if (!isEditingExistingSurvey && !hasUnsavedRows) {
       removeStoredDraft()
     }
     if (hasRemoteChangesRef.current) {
@@ -443,6 +555,10 @@ export default function FruitCountSurveyModal({
 
   const inputClasses =
     'mt-2 w-full border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
+  const isMetadataLocked = surveyId !== null && !isEditingExistingSurvey
+  const timingOptions = TIMING_OPTIONS.some((option) => option === timingCode)
+    ? TIMING_OPTIONS
+    : [timingCode, ...TIMING_OPTIONS]
 
   return (
     <div
@@ -456,7 +572,7 @@ export default function FruitCountSurveyModal({
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:border-b-0 sm:px-6 sm:pt-6 sm:pb-0 sm:p-7">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
-              Neuer Eintrag
+              {isEditingExistingSurvey ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
             </p>
             <h2 className="mt-3 text-3xl font-semibold text-slate-900">
               Fruchtzaehlung
@@ -492,10 +608,10 @@ export default function FruitCountSurveyModal({
               <FruitCountScopePicker
                 value={scope}
                 onChange={setScope}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 fieldDetails={fieldDetails}
               />
-              {surveyId !== null ? (
+              {isMetadataLocked ? (
                 <div className="mt-2 text-xs text-slate-500">
                   Die Bezugsflaeche ist nach dem ersten gespeicherten Zaehlwert fixiert.
                 </div>
@@ -508,7 +624,7 @@ export default function FruitCountSurveyModal({
                 type="date"
                 value={date}
                 onChange={(event) => handleDateChange(event.target.value)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className={inputClasses}
                 required
               />
@@ -519,7 +635,7 @@ export default function FruitCountSurveyModal({
                 type="number"
                 value={seasonYear}
                 onChange={(event) => setSeasonYear(event.target.value)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className={inputClasses}
                 step="1"
                 required
@@ -530,11 +646,11 @@ export default function FruitCountSurveyModal({
               <select
                 value={timingCode}
                 onChange={(event) => handleTimingCodeChange(event.target.value)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className={inputClasses}
                 required
               >
-                {TIMING_OPTIONS.map((option) => (
+                {timingOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
@@ -547,7 +663,7 @@ export default function FruitCountSurveyModal({
                 type="text"
                 value={method}
                 onChange={(event) => setMethod(event.target.value)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className={inputClasses}
                 placeholder="Stichprobe"
               />
@@ -558,7 +674,7 @@ export default function FruitCountSurveyModal({
                 type="text"
                 value={observer}
                 onChange={(event) => setObserver(event.target.value)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className={inputClasses}
               />
             </label>
@@ -567,7 +683,7 @@ export default function FruitCountSurveyModal({
                 type="checkbox"
                 checked={includeInAggregation}
                 onChange={(event) => setIncludeInAggregation(event.target.checked)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400"
               />
               <span className="text-sm font-medium text-slate-700">In Aggregation verwenden</span>
@@ -578,7 +694,7 @@ export default function FruitCountSurveyModal({
                 type="text"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                disabled={surveyId !== null}
+                disabled={isMetadataLocked}
                 className={inputClasses}
               />
             </label>
@@ -728,6 +844,16 @@ export default function FruitCountSurveyModal({
         </div>
 
         <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:mt-6 sm:flex sm:justify-end sm:gap-3 sm:px-6 sm:pt-4 sm:pb-6">
+          {isEditingExistingSurvey ? (
+            <button
+              type="button"
+              onClick={handleSaveMetadata}
+              disabled={isSavingMetadata}
+              className="mb-3 w-full rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:mb-0 sm:w-auto"
+            >
+              {isSavingMetadata ? 'Speichert...' : 'Aenderungen speichern'}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={handleClose}
