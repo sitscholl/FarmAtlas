@@ -163,6 +163,62 @@ export type FieldRead = {
   valve_open: boolean
 }
 
+export type FieldStatisticsMetric = {
+  value?: number | null
+  value_per_hectare?: number | null
+  source_scope?: string | null
+  source_mix?: {
+  [key: string]: number
+}
+  sample_tree_count?: number | null
+  survey_count?: number | null
+}
+
+export type FieldStatisticsResponse = {
+  season_year: number
+  available_years?: Array<number>
+  history_years?: Array<number>
+  metrics?: Array<ProductionMetricDefinition>
+  rows?: Array<FieldStatisticsRow>
+  summary: FieldStatisticsSummary
+}
+
+export type FieldStatisticsRow = {
+  field_id: number
+  field_group: string
+  field_name: string
+  planting_id: number
+  planting_name: string
+  active: boolean
+  area: number
+  area_ha: number
+  section_count: number
+  tree_count?: number | null
+  metrics?: {
+  [key: string]: FieldStatisticsMetric
+}
+  history?: Array<FieldStatisticsYearValue>
+}
+
+export type FieldStatisticsSummary = {
+  label?: string
+  area: number
+  area_ha: number
+  section_count: number
+  tree_count?: number | null
+  metrics?: {
+  [key: string]: FieldStatisticsMetric
+}
+  history?: Array<FieldStatisticsYearValue>
+}
+
+export type FieldStatisticsYearValue = {
+  season_year: number
+  metrics?: {
+  [key: string]: FieldStatisticsMetric
+}
+}
+
 export type FieldSummaryRead = {
   id: number
   group: string
@@ -485,56 +541,10 @@ export type PlantingUpdate = {
   valid_to?: string | null
 }
 
-export type PlantingYearComparisonResponse = {
-  season_year: number
-  previous_year: number
-  history_years: Array<number>
-  metrics?: Array<ProductionMetricDefinition>
-  rows?: Array<PlantingYearComparisonRow>
-}
-
-export type PlantingYearComparisonRow = {
-  field_id: number
-  field_group: string
-  field_name: string
-  planting_id: number
-  variety: string
-  valid_from: string
-  valid_to?: string | null
-  active: boolean
-  section_count: number
-  area: number
-  tree_count?: number | null
-  metrics?: Array<ProductionComparisonMetric>
-}
-
-export type ProductionComparisonMetric = {
-  metric_code: string
-  label: string
-  unit?: string | null
-  current_value?: number | null
-  previous_value?: number | null
-  percent_change?: number | null
-  current_source_scope?: string | null
-  current_source_mix?: {
-  [key: string]: number
-}
-  history?: Array<ProductionYearValue>
-}
-
 export type ProductionMetricDefinition = {
   metric_code: string
   label: string
   unit?: string | null
-}
-
-export type ProductionYearValue = {
-  season_year: number
-  value?: number | null
-  source_scope?: string | null
-  source_mix?: {
-  [key: string]: number
-}
 }
 
 export type SectionCreate = {

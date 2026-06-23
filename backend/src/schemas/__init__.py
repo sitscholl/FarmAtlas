@@ -44,7 +44,7 @@ from .phenology import (
     PhenologyEventUpdate,
 )
 from .planting import PlantingCreate, PlantingDetailRead, PlantingRead, PlantingUpdate
-from .production import PlantingYearComparisonResponse
+from .production import FieldStatisticsResponse
 from .section import SectionCreate, SectionRead, SectionUpdate
 from .treatment import (
     TreatmentCsvImportResponse,
@@ -86,6 +86,7 @@ __all__ = [
     "FruitCountSurveyDraftCreate",
     "FruitCountSurveyRead",
     "FruitCountSurveyUpdate",
+    "FieldStatisticsResponse",
     "StationWeatherHourlyRead",
     "WeatherCacheRefreshResponse",
     "WeatherCacheRefreshStationResult",
@@ -104,7 +105,6 @@ __all__ = [
     "PhenologyEventCreate",
     "PhenologyEventRead",
     "PhenologyEventUpdate",
-    "PlantingYearComparisonResponse",
     "PlantingCreate",
     "PlantingDetailRead",
     "PlantingRead",

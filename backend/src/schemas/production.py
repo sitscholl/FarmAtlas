@@ -1,5 +1,3 @@
-from datetime import date
-
 from pydantic import BaseModel, Field
 
 
@@ -9,40 +7,49 @@ class ProductionMetricDefinition(BaseModel):
     unit: str | None = None
 
 
-class ProductionYearValue(BaseModel):
-    season_year: int
+class FieldStatisticsMetric(BaseModel):
     value: float | None = None
+    value_per_hectare: float | None = None
     source_scope: str | None = None
     source_mix: dict[str, int] = Field(default_factory=dict)
+    sample_tree_count: int | None = None
+    survey_count: int | None = None
 
 
-class ProductionComparisonMetric(ProductionMetricDefinition):
-    current_value: float | None = None
-    previous_value: float | None = None
-    percent_change: float | None = None
-    current_source_scope: str | None = None
-    current_source_mix: dict[str, int] = Field(default_factory=dict)
-    history: list[ProductionYearValue] = Field(default_factory=list)
+class FieldStatisticsYearValue(BaseModel):
+    season_year: int
+    metrics: dict[str, FieldStatisticsMetric] = Field(default_factory=dict)
 
 
-class PlantingYearComparisonRow(BaseModel):
+class FieldStatisticsRow(BaseModel):
     field_id: int
     field_group: str
     field_name: str
     planting_id: int
-    variety: str
-    valid_from: date
-    valid_to: date | None = None
+    planting_name: str
     active: bool
-    section_count: int
     area: float
+    area_ha: float
+    section_count: int
     tree_count: int | None = None
-    metrics: list[ProductionComparisonMetric] = Field(default_factory=list)
+    metrics: dict[str, FieldStatisticsMetric] = Field(default_factory=dict)
+    history: list[FieldStatisticsYearValue] = Field(default_factory=list)
 
 
-class PlantingYearComparisonResponse(BaseModel):
+class FieldStatisticsSummary(BaseModel):
+    label: str = "Summe"
+    area: float
+    area_ha: float
+    section_count: int
+    tree_count: int | None = None
+    metrics: dict[str, FieldStatisticsMetric] = Field(default_factory=dict)
+    history: list[FieldStatisticsYearValue] = Field(default_factory=list)
+
+
+class FieldStatisticsResponse(BaseModel):
     season_year: int
-    previous_year: int
-    history_years: list[int]
+    available_years: list[int] = Field(default_factory=list)
+    history_years: list[int] = Field(default_factory=list)
     metrics: list[ProductionMetricDefinition] = Field(default_factory=list)
-    rows: list[PlantingYearComparisonRow] = Field(default_factory=list)
+    rows: list[FieldStatisticsRow] = Field(default_factory=list)
+    summary: FieldStatisticsSummary

@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import CropProtectionPage from './pages/CropProtectionPage'
 import FieldDetail from './pages/FieldDetail'
 import FieldsTablePage from './pages/FieldsTablePage'
+import FieldStatisticsPage from './pages/FieldStatisticsPage'
 import Home from './pages/Home'
 import IrrigationTablePage from './pages/IrrigationTablePage'
 import NutrientsTablePage from './pages/NutrientsTablePage'
@@ -56,6 +57,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/fields" element={<FieldsTablePage />} />
+            <Route path="/field-statistics" element={<FieldStatisticsPage />} />
             <Route path="/irrigation" element={<IrrigationTablePage />} />
             <Route path="/crop-protection" element={<CropProtectionPage />} />
             <Route path="/vegetation" element={<VegetationTablePage />} />

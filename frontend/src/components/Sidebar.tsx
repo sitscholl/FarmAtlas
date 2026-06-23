@@ -16,6 +16,7 @@ type SidebarProps = {
 const navigationItems = [
   { to: '/', label: 'Home', icon: IoHomeOutline, end: true },
   { to: '/fields', label: 'Anlagen', icon: LuTableProperties },
+  { to: '/field-statistics', label: 'Feldstatistik', icon: LuTableProperties },
   { to: '/irrigation', label: 'Bewaesserung', icon: GiPlantWatering },
   { to: '/crop-protection', label: 'Pflanzenschutz', icon: LuShieldAlert },
   { to: '/vegetation', label: 'Vegetation', icon: LuTrees },
