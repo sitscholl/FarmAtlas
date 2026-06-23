@@ -65,7 +65,7 @@ workflows:
       source: smartfarmer
 
   refresh_weather_cache:
-    enabled: true
+    enabled: false
     schedule:
       freq: 1h
       time: "00:00"
