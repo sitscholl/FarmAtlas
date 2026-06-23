@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import DataTable, {
   type DataTableColumn,
+  type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
 import type {
@@ -70,6 +71,11 @@ export default function FieldStatisticsPage() {
   const [selectedYear, setSelectedYear] = useState('')
   const [perHectare, setPerHectare] = useState(false)
   const [selectedRowKey, setSelectedRowKey] = useState<number | null>(null)
+  const [filters, setFilters] = useState({
+    query: '',
+    group: '',
+    variety: '',
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -116,6 +122,87 @@ export default function FieldStatisticsPage() {
     [statistics],
   )
 
+  const groupOptions = useMemo(
+    () =>
+      [...new Set(rows.map((row) => row.field_group).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right, 'de-DE'))
+        .map((group) => ({ label: group, value: group })),
+    [rows],
+  )
+
+  const varietyOptions = useMemo(
+    () =>
+      [...new Set(rows.map((row) => row.planting_name).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right, 'de-DE'))
+        .map((variety) => ({ label: variety, value: variety })),
+    [rows],
+  )
+
+  const tableFilters = useMemo<DataTableFilter[]>(
+    () => [
+      {
+        id: 'query',
+        label: 'Suche',
+        type: 'text',
+        value: filters.query,
+        placeholder: 'Anlage, Sorte oder Gruppe',
+      },
+      {
+        id: 'group',
+        label: 'Gruppe',
+        type: 'select',
+        value: filters.group,
+        options: [
+          { label: 'Alle', value: '' },
+          ...groupOptions,
+        ],
+      },
+      {
+        id: 'variety',
+        label: 'Sorte',
+        type: 'select',
+        value: filters.variety,
+        options: [
+          { label: 'Alle', value: '' },
+          ...varietyOptions,
+        ],
+      },
+    ],
+    [filters, groupOptions, varietyOptions],
+  )
+
+  const filteredRows = useMemo(() => {
+    const normalizedQuery = filters.query.trim().toLowerCase()
+
+    return rows.filter((row) => {
+      const matchesQuery =
+        normalizedQuery === '' ||
+        [row.field_name, row.planting_name, row.field_group]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedQuery)
+
+      const matchesGroup = filters.group === '' || row.field_group === filters.group
+      const matchesVariety = filters.variety === '' || row.planting_name === filters.variety
+
+      return matchesQuery && matchesGroup && matchesVariety
+    })
+  }, [filters, rows])
+
+  const handleFilterChange = (filterId: string, value: string) => {
+    setFilters((current) => ({ ...current, [filterId]: value }))
+    setSelectedRowKey(null)
+  }
+
+  const handleResetFilters = () => {
+    setFilters({
+      query: '',
+      group: '',
+      variety: '',
+    })
+    setSelectedRowKey(null)
+  }
+
   const metricCell = useCallback(
     (metricCode: string) => (row: FieldStatisticsRow) =>
       formatNumber(
@@ -132,21 +219,21 @@ export default function FieldStatisticsPage() {
         header: 'Pflanzung',
         cell: (row) => (
           <div>
-            <div className="font-semibold text-slate-900">{row.planting_name}</div>
-            <div className="text-xs text-slate-500">{row.field_name}</div>
+            <div className="font-semibold text-slate-900">{row.field_name}</div>
+            <div className="text-xs text-slate-500">{row.planting_name}</div>
           </div>
         ),
       },
       {
         id: 'count_before',
-        header: 'Vor Handausdünnung',
+        header: 'Zupfen',
         cell: metricCell('count.before_hand_thinning'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
       {
         id: 'count_after',
-        header: 'Nach Handausdünnung',
+        header: 'Ernte',
         cell: metricCell('count.after_hand_thinning'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
@@ -190,39 +277,85 @@ export default function FieldStatisticsPage() {
     [metricCell],
   )
 
+  const getFilteredSummaryMetric = useCallback(
+    (visibleRows: FieldStatisticsRow[], metricCode: string) => {
+      const rowsWithMetric = visibleRows
+        .map((row) => ({
+          value: getMetric(row, metricCode)?.value,
+          area: row.area,
+          treeCount: row.tree_count,
+        }))
+        .filter((row): row is { value: number; area: number; treeCount: number | null | undefined } =>
+          row.value !== null && row.value !== undefined,
+        )
+
+      if (COUNT_METRIC_CODES.has(metricCode)) {
+        const weightedRows = rowsWithMetric.filter((row) => (row.treeCount ?? row.area) > 0)
+        if (weightedRows.length > 0) {
+          const totalWeight = weightedRows.reduce((sum, row) => sum + (row.treeCount ?? row.area), 0)
+          return weightedRows.reduce(
+            (sum, row) => sum + row.value * (row.treeCount ?? row.area),
+            0,
+          ) / totalWeight
+        }
+        return rowsWithMetric.length === 0
+          ? null
+          : rowsWithMetric.reduce((sum, row) => sum + row.value, 0) / rowsWithMetric.length
+      }
+
+      const totalValue = rowsWithMetric.reduce((sum, row) => sum + row.value, 0)
+      if (!perHectare) {
+        return rowsWithMetric.length === 0 ? null : totalValue
+      }
+
+      const totalArea = visibleRows.reduce((sum, row) => sum + row.area, 0)
+      return totalArea <= 0 ? null : totalValue / (totalArea / 10000)
+    },
+    [perHectare],
+  )
+
   const summaryCells = useMemo<DataTableSummaryCell<FieldStatisticsRow>[]>(() => {
     if (statistics === null) {
       return []
     }
 
-    const summaryMetric = (metricCode: string) =>
-      formatNumber(
-        getDisplayedMetricValue(statistics.summary.metrics?.[metricCode], metricCode, perHectare),
-        metricDigits(metricCode),
-      )
-
     return [
       {
         columnId: 'planting',
-        content: statistics.summary.label,
+        content: (visibleRows) =>
+          visibleRows.length === rows.length
+            ? statistics.summary.label
+            : `Summe (${visibleRows.length})`,
       },
       {
         columnId: 'count_before',
-        content: summaryMetric('count.before_hand_thinning'),
+        content: (visibleRows) =>
+          formatNumber(
+            getFilteredSummaryMetric(visibleRows, 'count.before_hand_thinning'),
+            metricDigits('count.before_hand_thinning'),
+          ),
         className: 'text-right tabular-nums',
       },
       {
         columnId: 'count_after',
-        content: summaryMetric('count.after_hand_thinning'),
+        content: (visibleRows) =>
+          formatNumber(
+            getFilteredSummaryMetric(visibleRows, 'count.after_hand_thinning'),
+            metricDigits('count.after_hand_thinning'),
+          ),
         className: 'text-right tabular-nums',
       },
       ...YEARLY_METRIC_CODES.map((metricCode) => ({
         columnId: metricCode,
-        content: summaryMetric(metricCode),
+        content: (visibleRows: FieldStatisticsRow[]) =>
+          formatNumber(
+            getFilteredSummaryMetric(visibleRows, metricCode),
+            metricDigits(metricCode),
+          ),
         className: 'text-right tabular-nums',
       })),
     ]
-  }, [perHectare, statistics])
+  }, [getFilteredSummaryMetric, rows.length, statistics])
 
   return (
     <section className="w-full max-w-7xl">
@@ -282,9 +415,12 @@ export default function FieldStatisticsPage() {
           ) : (
             <DataTable
               columns={columns}
-              rows={rows}
+              rows={filteredRows}
               getRowKey={(row) => row.planting_id}
               emptyMessage="Keine Feldstatistik vorhanden."
+              filters={tableFilters}
+              onFilterChange={handleFilterChange}
+              onResetFilters={handleResetFilters}
               summaryCells={summaryCells}
               selectedRowKey={selectedRowKey}
               onRowSelect={(row) => setSelectedRowKey(row?.planting_id ?? null)}
