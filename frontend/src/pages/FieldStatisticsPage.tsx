@@ -212,6 +212,12 @@ export default function FieldStatisticsPage() {
     [perHectare],
   )
 
+  const metricSortValue = useCallback(
+    (metricCode: string) => (row: FieldStatisticsRow) =>
+      getDisplayedMetricValue(getMetric(row, metricCode), metricCode, perHectare),
+    [perHectare],
+  )
+
   const columns = useMemo<DataTableColumn<FieldStatisticsRow>[]>(
     () => [
       {
@@ -223,11 +229,13 @@ export default function FieldStatisticsPage() {
             <div className="text-xs text-slate-500">{row.planting_name}</div>
           </div>
         ),
+        sortValue: (row) => `${row.field_name} ${row.planting_name}`,
       },
       {
         id: 'count_before',
         header: 'Zupfen',
         cell: metricCell('count.before_hand_thinning'),
+        sortValue: metricSortValue('count.before_hand_thinning'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
@@ -235,6 +243,7 @@ export default function FieldStatisticsPage() {
         id: 'count_after',
         header: 'Ernte',
         cell: metricCell('count.after_hand_thinning'),
+        sortValue: metricSortValue('count.after_hand_thinning'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
@@ -242,6 +251,7 @@ export default function FieldStatisticsPage() {
         id: 'thinning_hours',
         header: 'Zupfen [h]',
         cell: metricCell('thinning_hours'),
+        sortValue: metricSortValue('thinning_hours'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
@@ -249,6 +259,7 @@ export default function FieldStatisticsPage() {
         id: 'yield_kg',
         header: 'Ertrag [kg]',
         cell: metricCell('yield_kg'),
+        sortValue: metricSortValue('yield_kg'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
@@ -256,6 +267,7 @@ export default function FieldStatisticsPage() {
         id: 'filled_boxes',
         header: 'Kisten',
         cell: metricCell('filled_boxes'),
+        sortValue: metricSortValue('filled_boxes'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
@@ -263,6 +275,7 @@ export default function FieldStatisticsPage() {
         id: 'harvest_hours',
         header: 'Ernte [h]',
         cell: metricCell('harvest_hours'),
+        sortValue: metricSortValue('harvest_hours'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
@@ -270,11 +283,12 @@ export default function FieldStatisticsPage() {
         id: 'revenue',
         header: 'Erlös [€]',
         cell: metricCell('revenue'),
+        sortValue: metricSortValue('revenue'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
     ],
-    [metricCell],
+    [metricCell, metricSortValue],
   )
 
   const getFilteredSummaryMetric = useCallback(
