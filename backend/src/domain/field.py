@@ -168,76 +168,84 @@ class FieldContext:
 
     @property
     def active(self) -> bool:
-        return any(section.active for section in self.sections) or any(planting.active for planting in self.plantings)
+        return bool(self.active_sections) or bool(self.active_plantings)
+
+    @property
+    def active_sections(self) -> list[SectionContext]:
+        return [section for section in self.sections if section.active]
+
+    @property
+    def active_plantings(self) -> list[PlantingContext]:
+        return [planting for planting in self.plantings if planting.active]
 
     @property
     def variety(self) -> str | None:
-        values = [section.variety for section in self.sections if section.variety != ""]
+        values = [section.variety for section in self.active_sections if section.variety != ""]
         if values:
             result = _single_or_none(values)
             return None if result is None else str(result)
 
-        planting_values = [planting.variety for planting in self.plantings]
+        planting_values = [planting.variety for planting in self.active_plantings]
         result = _single_or_none(planting_values)
         return None if result is None else str(result)
 
     @property
     def section(self) -> str | None:
-        result = _single_or_none([section.name for section in self.sections])
+        result = _single_or_none([section.name for section in self.active_sections])
         return None if result is None else str(result)
 
     @property
     def planting_year(self) -> int | None:
-        result = _single_or_none([section.planting_year for section in self.sections])
+        result = _single_or_none([section.planting_year for section in self.active_sections])
         return None if result is None else int(result)
 
     @property
     def tree_count(self) -> int | None:
-        return _sum_optional_int([section.tree_count for section in self.sections])
+        return _sum_optional_int([section.tree_count for section in self.active_sections])
 
     @property
     def tree_height(self) -> float | None:
-        result = _single_or_none([section.tree_height for section in self.sections])
+        result = _single_or_none([section.tree_height for section in self.active_sections])
         return None if result is None else float(result)
 
     @property
     def row_distance(self) -> float | None:
-        result = _single_or_none([section.row_distance for section in self.sections])
+        result = _single_or_none([section.row_distance for section in self.active_sections])
         return None if result is None else float(result)
 
     @property
     def tree_distance(self) -> float | None:
-        result = _single_or_none([section.tree_distance for section in self.sections])
+        result = _single_or_none([section.tree_distance for section in self.active_sections])
         return None if result is None else float(result)
 
     @property
     def running_metre(self) -> float | None:
-        return _sum_optional_float([section.running_metre for section in self.sections])
+        return _sum_optional_float([section.running_metre for section in self.active_sections])
 
     @property
     def herbicide_free(self) -> bool | None:
-        result = _single_or_none([section.herbicide_free for section in self.sections])
+        result = _single_or_none([section.herbicide_free for section in self.active_sections])
         return None if result is None else bool(result)
 
     @property
     def area(self) -> float:
-        return sum(section.area for section in self.sections)
+        return sum(section.area for section in self.active_sections)
 
     @property
     def valid_from(self):
-        dates = [section.valid_from for section in self.sections]
+        dates = [section.valid_from for section in self.active_sections]
         if not dates:
-            dates = [planting.valid_from for planting in self.plantings]
+            dates = [planting.valid_from for planting in self.active_plantings]
         return min(dates) if dates else None
 
     @property
     def valid_to(self):
-        dates = [section.valid_to for section in self.sections if section.valid_to is not None]
+        dates = [section.valid_to for section in self.active_sections if section.valid_to is not None]
         if not dates:
-            dates = [planting.valid_to for planting in self.plantings if planting.valid_to is not None]
+            dates = [planting.valid_to for planting in self.active_plantings if planting.valid_to is not None]
         return max(dates) if dates else None
 
     @property
     def current_phenology(self) -> str | None:
-        all_stages = [i.current_phenology for i in self.sections]
+        all_stages = [i.current_phenology for i in self.active_sections]
         return _single_or_none(all_stages)

@@ -72,7 +72,13 @@ def serialize_field_summary(
     last_irrigation_date,
 ) -> FieldSummaryRead:
     field_context = FieldContext.from_model(field)
-    planting_years = [section.planting_year for section in field_context.sections]
+    active_sections = field_context.active_sections
+    active_planting_ids = {planting.id for planting in field_context.active_plantings}
+    active_planting_ids.update(section.planting_id for section in active_sections)
+    active_variety_names = {section.variety for section in active_sections if section.variety}
+    if not active_variety_names:
+        active_variety_names = {planting.variety for planting in field_context.active_plantings}
+    planting_years = [section.planting_year for section in active_sections]
     return FieldSummaryRead(
         id=field.id,
         group=field.group,
@@ -95,10 +101,10 @@ def serialize_field_summary(
         active=field_context.active,
         current_phenology=field_context.current_phenology,
         herbicide_free=field_context.herbicide_free,
-        planting_count=len(field.plantings),
-        section_count=len(field_context.sections),
-        variety_names=sorted({planting.variety for planting in field_context.plantings}),
-        section_names=sorted({section.name for section in field_context.sections}),
+        planting_count=len(active_planting_ids),
+        section_count=len(active_sections),
+        variety_names=sorted(active_variety_names),
+        section_names=sorted({section.name for section in active_sections}),
         planting_year_min=min(planting_years) if planting_years else None,
         planting_year_max=max(planting_years) if planting_years else None,
         last_irrigation_date=None if last_irrigation_date is None else last_irrigation_date.isoformat(),

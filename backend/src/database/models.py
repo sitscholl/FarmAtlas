@@ -88,17 +88,25 @@ class Field(Base):
         return [section for planting in self.plantings for section in planting.sections]
 
     @property
+    def active_sections(self) -> list["Section"]:
+        return [section for section in self.sections if section.active]
+
+    @property
+    def active_plantings(self) -> list["Planting"]:
+        return [planting for planting in self.plantings if planting.active]
+
+    @property
     def area(self) -> float:
-        return sum(float(section.area) for section in self.sections)
+        return sum(float(section.area) for section in self.active_sections)
 
     @property
     def tree_count(self) -> int | None:
-        counts = [int(section.tree_count) for section in self.sections if section.tree_count is not None]
+        counts = [int(section.tree_count) for section in self.active_sections if section.tree_count is not None]
         return sum(counts) if counts else None
 
     @property
     def running_metre(self) -> int | None:
-        counts = [int(section.running_metre) for section in self.sections if section.running_metre is not None]
+        counts = [int(section.running_metre) for section in self.active_sections if section.running_metre is not None]
         return sum(counts) if counts else None
 
 
@@ -142,17 +150,21 @@ class Planting(Base, ValidityRangeMixin):
     )
 
     @property
+    def active_sections(self) -> list["Section"]:
+        return [section for section in self.sections if section.active]
+
+    @property
     def area(self) -> float:
-        return sum(float(section.area) for section in self.sections)
+        return sum(float(section.area) for section in self.active_sections)
 
     @property
     def tree_count(self) -> int | None:
-        counts = [int(section.tree_count) for section in self.sections if section.tree_count is not None]
+        counts = [int(section.tree_count) for section in self.active_sections if section.tree_count is not None]
         return sum(counts) if counts else None
 
     @property
     def running_metre(self) -> int | None:
-        counts = [int(section.running_metre) for section in self.sections if section.running_metre is not None]
+        counts = [int(section.running_metre) for section in self.active_sections if section.running_metre is not None]
         return sum(counts) if counts else None
 
 

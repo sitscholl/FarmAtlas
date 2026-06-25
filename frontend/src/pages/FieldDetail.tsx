@@ -91,16 +91,26 @@ function squareMetresToHectares(value: number | null | undefined) {
   return value / 10000
 }
 
+function getActiveSections(planting: PlantingDetailRead) {
+  return planting.sections.filter((section) => section.active)
+}
+
 function buildFieldMetrics(fieldDetail: FieldDetailRead): DetailMetric[] {
   const field = fieldDetail.field
-  const sections = fieldDetail.plantings.flatMap((planting) => planting.sections)
+  const sections = fieldDetail.plantings.flatMap(getActiveSections)
+  const activePlantingIds = new Set(
+    fieldDetail.plantings
+      .filter((planting) => planting.active)
+      .map((planting) => planting.id),
+  )
+  sections.forEach((section) => activePlantingIds.add(section.planting_id))
   const totalArea = sections.reduce((sum, section) => sum + section.area, 0)
   const treeCount = sections.reduce((sum, section) => sum + (section.tree_count ?? 0), 0)
   const runningMetre = sections.reduce((sum, section) => sum + (section.running_metre ?? 0), 0)
 
   return [
     { label: 'Flaeche', value: `${formatNumber(squareMetresToHectares(totalArea), 2)} ha` },
-    { label: 'Pflanzungen', value: String(fieldDetail.plantings.length) },
+    { label: 'Pflanzungen', value: String(activePlantingIds.size) },
     { label: 'Abschnitte', value: String(sections.length) },
     { label: 'Baumzahl', value: treeCount > 0 ? formatNumber(treeCount, 0) : 'n/a' },
     { label: 'Laufmeter', value: runningMetre > 0 ? `${formatNumber(runningMetre, 1)} m` : 'n/a' },
@@ -306,7 +316,8 @@ function PlantingCard({
   onEditSection: (section: SectionRead) => void
   onDeleteSection: (section: SectionRead) => void
 }) {
-  const totalArea = planting.sections.reduce((sum, section) => sum + section.area, 0)
+  const activeSections = getActiveSections(planting)
+  const totalArea = activeSections.reduce((sum, section) => sum + section.area, 0)
 
   return (
     <section className="border border-slate-200 bg-slate-50 p-5">
@@ -317,7 +328,7 @@ function PlantingCard({
           </p>
           <h3 className="mt-1 text-xl font-semibold text-slate-900">{planting.variety}</h3>
           <p className="mt-1 text-sm text-slate-500">
-            {planting.sections.length} Abschnitte | {formatNumber(squareMetresToHectares(totalArea), 2)} ha | {planting.active ? 'Aktiv' : 'Inaktiv'}
+            {activeSections.length} aktive Abschnitte | {formatNumber(squareMetresToHectares(totalArea), 2)} ha | {planting.active ? 'Aktiv' : 'Inaktiv'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
