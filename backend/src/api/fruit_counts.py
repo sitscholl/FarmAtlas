@@ -52,12 +52,14 @@ async def get_fruit_count_survey(survey_id: int):
 @router.get("/fields/{field_id}/surveys", response_model=list[FruitCountSurveyRead])
 async def list_field_fruit_count_surveys(
     field_id: int,
+    season_year: int | None = None,
     include_excluded: bool = Query(default=True),
 ):
     with runtime.db.session_scope() as session:
         surveys = runtime.db.fruit_counts.list_for_field(
             session,
             field_id=field_id,
+            season_years=None if season_year is None else [season_year],
             include_excluded=include_excluded,
         )
     return [FruitCountSurveyRead.model_validate(survey) for survey in surveys]

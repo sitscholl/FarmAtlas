@@ -29,9 +29,13 @@ async def list_yearly_stats(
 
 
 @router.get("/fields/{field_id}", response_model=list[YearlyStatsRead])
-async def list_field_yearly_stats(field_id: int):
+async def list_field_yearly_stats(field_id: int, season_year: int | None = None):
     with runtime.db.session_scope() as session:
-        stats = runtime.db.yearly_stats.list_for_field(session, field_id=field_id)
+        stats = runtime.db.yearly_stats.list_for_field(
+            session,
+            field_id=field_id,
+            season_years=None if season_year is None else [season_year],
+        )
     return [YearlyStatsRead.model_validate(item) for item in stats]
 
 

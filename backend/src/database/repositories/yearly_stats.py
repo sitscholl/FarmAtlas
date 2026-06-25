@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from ...domain.validity import field_active_in_year, planting_active_in_year, season_bounds, section_active_in_year
 from .. import models
 
 
@@ -50,6 +51,7 @@ class YearlyStatsRepository:
         self,
         session: Session,
         *,
+        season_year: int,
         field_id: int | None = None,
         planting_id: int | None = None,
         section_id: int | None = None,
@@ -59,13 +61,45 @@ class YearlyStatsRepository:
             planting_id=planting_id,
             section_id=section_id,
         )
-        if field_id is not None and session.get(models.Field, field_id) is None:
-            raise ValueError(f"No field with id {field_id} found")
-        if planting_id is not None and session.get(models.Planting, planting_id) is None:
-            raise ValueError(f"No planting with id {planting_id} found")
-        if section_id is not None and session.get(models.Section, section_id) is None:
-            raise ValueError(f"No section with id {section_id} found")
+        if field_id is not None:
+            field = session.get(models.Field, field_id)
+            if field is None:
+                raise ValueError(f"No field with id {field_id} found")
+            season_start, season_end = season_bounds(season_year)
+            has_active_planting = (
+                session.query(models.Planting.id)
+                .filter(
+                    models.Planting.field_id == field_id,
+                    models.Planting.valid_from <= season_end,
+                    or_(models.Planting.valid_to.is_(None), models.Planting.valid_to >= season_start),
+                )
+                .first()
+                is not None
+            )
+            if not has_active_planting:
+                raise ValueError(f"Field {field_id} has no active planting in season_year {season_year}")
+        if planting_id is not None:
+            planting = session.get(models.Planting, planting_id)
+            if planting is None:
+                raise ValueError(f"No planting with id {planting_id} found")
+            if not planting_active_in_year(planting, season_year):
+                raise ValueError(f"Planting {planting_id} is not active in season_year {season_year}")
+        if section_id is not None:
+            section = session.get(models.Section, section_id)
+            if section is None:
+                raise ValueError(f"No section with id {section_id} found")
+            if not section_active_in_year(section, season_year):
+                raise ValueError(f"Section {section_id} is not active in season_year {season_year}")
         return field_id, planting_id, section_id
+
+    def _scope_active_in_year(self, item: models.YearlyStats) -> bool:
+        if item.field_id is not None:
+            return item.field is not None and field_active_in_year(item.field, item.season_year)
+        if item.planting_id is not None:
+            return item.planting is not None and planting_active_in_year(item.planting, item.season_year)
+        if item.section_id is not None:
+            return item.section is not None and section_active_in_year(item.section, item.season_year)
+        return False
 
     def _apply_values(self, stats: models.YearlyStats, values: dict[str, Any]) -> None:
         for field_key, raw_value in values.items():
@@ -89,6 +123,7 @@ class YearlyStatsRepository:
         field_id: int | None = None,
         planting_id: int | None = None,
         section_id: int | None = None,
+        active_scope_only: bool = True,
     ) -> list[models.YearlyStats]:
         query = session.query(models.YearlyStats)
         if season_year is not None:
@@ -99,7 +134,8 @@ class YearlyStatsRepository:
             query = query.filter(models.YearlyStats.planting_id == int(planting_id))
         if section_id is not None:
             query = query.filter(models.YearlyStats.section_id == int(section_id))
-        return query.order_by(models.YearlyStats.season_year, models.YearlyStats.id).all()
+        stats = query.order_by(models.YearlyStats.season_year, models.YearlyStats.id).all()
+        return [item for item in stats if self._scope_active_in_year(item)] if active_scope_only else stats
 
     def list_for_field(
         self,
@@ -107,6 +143,7 @@ class YearlyStatsRepository:
         *,
         field_id: int,
         season_years: list[int] | None = None,
+        active_scope_only: bool = True,
     ) -> list[models.YearlyStats]:
         field = session.get(models.Field, field_id)
         if field is None:
@@ -134,7 +171,8 @@ class YearlyStatsRepository:
         )
         if season_years is not None:
             query = query.filter(models.YearlyStats.season_year.in_([int(year) for year in season_years]))
-        return query.order_by(models.YearlyStats.season_year, models.YearlyStats.id).all()
+        stats = query.order_by(models.YearlyStats.season_year, models.YearlyStats.id).all()
+        return [item for item in stats if self._scope_active_in_year(item)] if active_scope_only else stats
 
     def create(
         self,
@@ -153,6 +191,7 @@ class YearlyStatsRepository:
     ) -> models.YearlyStats:
         field_id, planting_id, section_id = self._validate_scope(
             session,
+            season_year=season_year,
             field_id=field_id,
             planting_id=planting_id,
             section_id=section_id,
@@ -192,7 +231,12 @@ class YearlyStatsRepository:
             else:
                 normalized_updates[field_key] = raw_value
 
-        field_id, planting_id, section_id = self._validate_scope(session, **pending_scope)
+        season_year = int(updates.get("season_year", stats.season_year))
+        field_id, planting_id, section_id = self._validate_scope(
+            session,
+            season_year=season_year,
+            **pending_scope,
+        )
         stats.field_id = field_id
         stats.planting_id = planting_id
         stats.section_id = section_id

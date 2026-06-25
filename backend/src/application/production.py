@@ -6,6 +6,7 @@ from typing import Any
 
 from ..database.db import Database
 from ..database import models
+from ..domain.validity import active_sections_for_year, planting_active_in_year
 
 
 COUNT_METRIC_PREFIX = "count."
@@ -83,6 +84,47 @@ class ProductionSummaryService:
     def _empty_source_mix(self) -> dict[str, int]:
         return {"section": 0, "planting": 0, "field": 0, "missing": 0}
 
+    def _planting_sections_for_year(self, planting: models.Planting, season_year: int) -> list[models.Section]:
+        return active_sections_for_year(planting, season_year)
+
+    def _planting_area_for_year(self, planting: models.Planting, season_year: int) -> float:
+        return sum(float(section.area) for section in self._planting_sections_for_year(planting, season_year))
+
+    def _planting_tree_count_for_year(self, planting: models.Planting, season_year: int) -> int | None:
+        counts = [
+            int(section.tree_count)
+            for section in self._planting_sections_for_year(planting, season_year)
+            if section.tree_count is not None
+        ]
+        return sum(counts) if counts else None
+
+    def _field_area_for_year(self, field: models.Field, season_year: int) -> float:
+        return sum(
+            self._planting_area_for_year(planting, season_year)
+            for planting in field.plantings
+            if planting_active_in_year(planting, season_year)
+        )
+
+    def _missing_count_metric(self, missing_count: int) -> dict[str, Any]:
+        return {
+            "value": None,
+            "value_per_hectare": None,
+            "source_scope": None,
+            "source_mix": {"missing": missing_count},
+            "sample_tree_count": 0,
+            "survey_count": 0,
+        }
+
+    def _missing_yearly_metric(self, missing_count: int) -> dict[str, Any]:
+        return {
+            "value": None,
+            "value_per_hectare": None,
+            "source_scope": None,
+            "source_mix": {"missing": missing_count},
+            "sample_tree_count": None,
+            "survey_count": None,
+        }
+
     def _index_count_surveys(
         self,
         surveys: list[models.FruitCountSurvey],
@@ -133,11 +175,15 @@ class ProductionSummaryService:
         timing_codes: tuple[str, ...],
         surveys_by_scope: dict[tuple[str, int, int, str], list[models.FruitCountSurvey]],
     ) -> dict[str, Any]:
+        active_sections = self._planting_sections_for_year(planting, season_year)
+        if not planting_active_in_year(planting, season_year):
+            return self._missing_count_metric(0)
+
         values: list[tuple[float, float | None]] = []
         source_mix = self._empty_source_mix()
         survey_ids: set[int] = set()
         sample_counts_by_survey: dict[int, int] = {}
-        for section in planting.sections:
+        for section in active_sections:
             effective = self._effective_section_count_for_timing_codes(
                 field_id=field.id,
                 planting_id=planting.id,
@@ -189,6 +235,11 @@ class ProductionSummaryService:
         metric_code: str,
         stats_by_scope: dict[tuple[str, int, int], models.YearlyStats],
     ) -> dict[str, Any]:
+        active_sections = self._planting_sections_for_year(planting, season_year)
+        planting_area = self._planting_area_for_year(planting, season_year)
+        if not planting_active_in_year(planting, season_year):
+            return self._missing_yearly_metric(0)
+
         direct = stats_by_scope.get(("planting", planting.id, season_year))
         if direct is not None:
             value = getattr(direct, metric_code)
@@ -196,7 +247,7 @@ class ProductionSummaryService:
                 metric_value = float(value)
                 return {
                     "value": metric_value,
-                    "value_per_hectare": self._per_hectare(metric_value, planting.area),
+                    "value_per_hectare": self._per_hectare(metric_value, planting_area),
                     "source_scope": "planting",
                     "source_mix": {"planting": 1},
                     "sample_tree_count": None,
@@ -204,7 +255,7 @@ class ProductionSummaryService:
                 }
 
         section_values = []
-        for section in planting.sections:
+        for section in active_sections:
             section_stats = stats_by_scope.get(("section", section.id, season_year))
             if section_stats is None:
                 continue
@@ -215,9 +266,9 @@ class ProductionSummaryService:
             metric_value = sum(section_values)
             return {
                 "value": metric_value,
-                "value_per_hectare": self._per_hectare(metric_value, planting.area),
+                "value_per_hectare": self._per_hectare(metric_value, planting_area),
                 "source_scope": "section",
-                "source_mix": {"section": len(section_values), "missing": len(planting.sections) - len(section_values)},
+                "source_mix": {"section": len(section_values), "missing": len(active_sections) - len(section_values)},
                 "sample_tree_count": None,
                 "survey_count": None,
             }
@@ -225,26 +276,19 @@ class ProductionSummaryService:
         field_stats = stats_by_scope.get(("field", field.id, season_year))
         if field_stats is not None:
             value = getattr(field_stats, metric_code)
-            field_area = field.area
+            field_area = self._field_area_for_year(field, season_year)
             if value is not None and field_area > 0:
-                metric_value = float(value) * (planting.area / field_area)
+                metric_value = float(value) * (planting_area / field_area)
                 return {
                     "value": metric_value,
-                    "value_per_hectare": self._per_hectare(metric_value, planting.area),
+                    "value_per_hectare": self._per_hectare(metric_value, planting_area),
                     "source_scope": "field",
                     "source_mix": {"field": 1},
                     "sample_tree_count": None,
                     "survey_count": None,
                 }
 
-        return {
-            "value": None,
-            "value_per_hectare": None,
-            "source_scope": None,
-            "source_mix": {"missing": len(planting.sections)},
-            "sample_tree_count": None,
-            "survey_count": None,
-        }
+        return self._missing_yearly_metric(len(active_sections))
 
     def _per_hectare(self, value: float | None, area_square_metres: float | None) -> float | None:
         if value is None or area_square_metres is None or area_square_metres <= 0:
@@ -288,10 +332,13 @@ class ProductionSummaryService:
         metric_values = [
             (
                 row["history_by_year"][season_year]["metrics"][metric_code]["value"],
-                row["tree_count"] if row["tree_count"] is not None else row["area"],
+                row["tree_count_by_year"][season_year]
+                if row["tree_count_by_year"][season_year] is not None
+                else row["area_by_year"][season_year],
             )
             for row in rows
             if row["history_by_year"][season_year]["metrics"][metric_code]["value"] is not None
+            and row["active_by_year"][season_year]
         ]
 
         if metric_code.startswith(COUNT_METRIC_PREFIX):
@@ -304,15 +351,17 @@ class ProductionSummaryService:
                 "sample_tree_count": sum(
                     row["history_by_year"][season_year]["metrics"][metric_code]["sample_tree_count"] or 0
                     for row in rows
+                    if row["active_by_year"][season_year]
                 ),
                 "survey_count": sum(
                     row["history_by_year"][season_year]["metrics"][metric_code]["survey_count"] or 0
                     for row in rows
+                    if row["active_by_year"][season_year]
                 ),
             }
 
         value = sum(value for value, _ in metric_values) if metric_values else None
-        area = sum(row["area"] for row in rows)
+        area = sum(row["area_by_year"][season_year] for row in rows if row["active_by_year"][season_year])
         return {
             "value": value,
             "value_per_hectare": self._per_hectare(value, area),
@@ -327,31 +376,45 @@ class ProductionSummaryService:
         *,
         rows: list[dict[str, Any]],
         years: list[int],
+        selected_year: int,
     ) -> dict[str, Any]:
-        area = sum(row["area"] for row in rows)
-        tree_counts = [row["tree_count"] for row in rows if row["tree_count"] is not None]
+        area = sum(
+            row["area_by_year"][selected_year]
+            for row in rows
+            if row["active_by_year"][selected_year]
+        )
+        tree_counts = [
+            row["tree_count_by_year"][selected_year]
+            for row in rows
+            if row["active_by_year"][selected_year] and row["tree_count_by_year"][selected_year] is not None
+        ]
         summary_history = []
+        history_by_year = {}
         for year in years:
-            summary_history.append(
-                {
-                    "season_year": year,
-                    "metrics": {
-                        metric["metric_code"]: self._summary_metric(
-                            metric_code=metric["metric_code"],
-                            rows=rows,
-                            season_year=year,
-                        )
-                        for metric in FIELD_STATISTICS_METRICS
-                    },
-                }
-            )
+            history_entry = {
+                "season_year": year,
+                "metrics": {
+                    metric["metric_code"]: self._summary_metric(
+                        metric_code=metric["metric_code"],
+                        rows=rows,
+                        season_year=year,
+                    )
+                    for metric in FIELD_STATISTICS_METRICS
+                },
+            }
+            summary_history.append(history_entry)
+            history_by_year[year] = history_entry
         return {
             "label": "Summe",
             "area": area,
             "area_ha": area / 10000,
-            "section_count": sum(row["section_count"] for row in rows),
+            "section_count": sum(
+                row["section_count_by_year"][selected_year]
+                for row in rows
+                if row["active_by_year"][selected_year]
+            ),
             "tree_count": sum(tree_counts) if tree_counts else None,
-            "metrics": summary_history[-1]["metrics"] if summary_history else {},
+            "metrics": history_by_year[selected_year]["metrics"] if selected_year in history_by_year else {},
             "history": summary_history,
         }
 
@@ -414,7 +477,17 @@ class ProductionSummaryService:
                 for planting in field.plantings:
                     history = []
                     history_by_year = {}
+                    active_by_year = {}
+                    area_by_year = {}
+                    tree_count_by_year = {}
+                    section_count_by_year = {}
                     for year in years:
+                        active_sections = self._planting_sections_for_year(planting, year)
+                        is_active = planting_active_in_year(planting, year)
+                        active_by_year[year] = is_active
+                        area_by_year[year] = self._planting_area_for_year(planting, year)
+                        tree_count_by_year[year] = self._planting_tree_count_for_year(planting, year)
+                        section_count_by_year[year] = len(active_sections)
                         metrics = {
                             metric["metric_code"]: self._metric_for_year(
                                 metric_definition=metric,
@@ -433,8 +506,11 @@ class ProductionSummaryService:
                         history.append(history_entry)
                         history_by_year[year] = history_entry
 
+                    if not active_by_year.get(selected_year, False):
+                        continue
+
                     selected_metrics = history_by_year.get(selected_year, {"metrics": {}})["metrics"]
-                    area = planting.area
+                    area = area_by_year.get(selected_year, 0)
                     rows.append(
                         {
                             "field_id": field.id,
@@ -442,22 +518,36 @@ class ProductionSummaryService:
                             "field_name": field.name,
                             "planting_id": planting.id,
                             "planting_name": planting.variety.name,
-                            "active": planting.active,
-                            "section_count": len(planting.sections),
+                            "active": active_by_year.get(selected_year, False),
+                            "section_count": section_count_by_year.get(selected_year, 0),
                             "area": area,
                             "area_ha": area / 10000,
-                            "tree_count": planting.tree_count,
+                            "tree_count": tree_count_by_year.get(selected_year),
                             "metrics": selected_metrics,
                             "history": history,
                             "history_by_year": history_by_year,
+                            "active_by_year": active_by_year,
+                            "area_by_year": area_by_year,
+                            "tree_count_by_year": tree_count_by_year,
+                            "section_count_by_year": section_count_by_year,
                         }
                     )
 
         response_rows = [
-            {key: value for key, value in row.items() if key != "history_by_year"}
+            {
+                key: value
+                for key, value in row.items()
+                if key not in {
+                    "history_by_year",
+                    "active_by_year",
+                    "area_by_year",
+                    "tree_count_by_year",
+                    "section_count_by_year",
+                }
+            }
             for row in rows
         ]
-        summary = self._build_summary(rows=rows, years=years)
+        summary = self._build_summary(rows=rows, years=years, selected_year=selected_year)
 
         return {
             "season_year": selected_year,
