@@ -27,7 +27,7 @@ const YEARLY_METRIC_CODES = [
 
 function formatNumber(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
-    return 'n/a'
+    return '-'
   }
 
   return new Intl.NumberFormat('de-DE', {
