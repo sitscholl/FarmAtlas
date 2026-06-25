@@ -391,8 +391,23 @@ class ProductionSummaryService:
         summary_history = []
         history_by_year = {}
         for year in years:
+            year_area = sum(row["area_by_year"][year] for row in rows if row["active_by_year"][year])
+            year_tree_counts = [
+                row["tree_count_by_year"][year]
+                for row in rows
+                if row["active_by_year"][year] and row["tree_count_by_year"][year] is not None
+            ]
             history_entry = {
                 "season_year": year,
+                "active": any(row["active_by_year"][year] for row in rows),
+                "area": year_area,
+                "area_ha": year_area / 10000,
+                "section_count": sum(
+                    row["section_count_by_year"][year]
+                    for row in rows
+                    if row["active_by_year"][year]
+                ),
+                "tree_count": sum(year_tree_counts) if year_tree_counts else None,
                 "metrics": {
                     metric["metric_code"]: self._summary_metric(
                         metric_code=metric["metric_code"],
@@ -501,6 +516,11 @@ class ProductionSummaryService:
                         }
                         history_entry = {
                             "season_year": year,
+                            "active": is_active,
+                            "area": area_by_year[year],
+                            "area_ha": area_by_year[year] / 10000,
+                            "section_count": section_count_by_year[year],
+                            "tree_count": tree_count_by_year[year],
                             "metrics": metrics,
                         }
                         history.append(history_entry)

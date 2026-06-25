@@ -18,6 +18,11 @@ class FieldStatisticsMetric(BaseModel):
 
 class FieldStatisticsYearValue(BaseModel):
     season_year: int
+    active: bool = True
+    area: float = 0
+    area_ha: float = 0
+    section_count: int = 0
+    tree_count: int | None = None
     metrics: dict[str, FieldStatisticsMetric] = Field(default_factory=dict)
 
 

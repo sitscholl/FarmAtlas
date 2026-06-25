@@ -6,6 +6,7 @@ import DataTable, {
   type DataTableFilter,
   type DataTableSummaryCell,
 } from '../components/DataTable'
+import FieldStatisticBarChart from '../components/FieldStatisticBarChart'
 import type {
   FieldStatisticsMetric,
   FieldStatisticsResponse,
@@ -23,6 +24,16 @@ const YEARLY_METRIC_CODES = [
   'filled_boxes',
   'harvest_hours',
   'revenue',
+] as const
+
+const CHART_METRICS = [
+  { metricCode: 'count.before_hand_thinning' },
+  { metricCode: 'count.after_hand_thinning' },
+  { metricCode: 'thinning_hours' },
+  { metricCode: 'yield_kg' },
+  { metricCode: 'filled_boxes' },
+  { metricCode: 'harvest_hours' },
+  { metricCode: 'revenue' },
 ] as const
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -64,6 +75,89 @@ function metricDigits(metricCode: string) {
     return 0
   }
   return 1
+}
+
+function metricTitle(metricCode: string, perHectare: boolean) {
+  switch (metricCode) {
+    case 'count.before_hand_thinning':
+      return 'Zupfen'
+    case 'count.after_hand_thinning':
+      return 'Ernte'
+    case 'thinning_hours':
+      return perHectare ? 'Zupfen [h/ha]' : 'Zupfen [h]'
+    case 'yield_kg':
+      return perHectare ? 'Ertrag [kg/ha]' : 'Ertrag [kg]'
+    case 'filled_boxes':
+      return perHectare ? 'Kisten [n/ha]' : 'Kisten [n]'
+    case 'harvest_hours':
+      return perHectare ? 'Ernte [h/ha]' : 'Ernte [h]'
+    case 'revenue':
+      return perHectare ? 'Erlös [€/ha]' : 'Erlös [€]'
+    default:
+      return metricCode
+  }
+}
+
+function getHistoricalSummaryMetric(
+  visibleRows: FieldStatisticsRow[],
+  metricCode: string,
+  year: number,
+  perHectare: boolean,
+) {
+  const rowsForYear = visibleRows
+    .map((row) => {
+      const historyEntry = row.history?.find((entry) => entry.season_year === year)
+      if (historyEntry === undefined || historyEntry.active === false) {
+        return null
+      }
+
+      return {
+        metric: historyEntry.metrics?.[metricCode],
+        area: historyEntry.area ?? row.area,
+        treeCount: historyEntry.tree_count === undefined ? row.tree_count : historyEntry.tree_count,
+      }
+    })
+    .filter((row): row is {
+      metric: FieldStatisticsMetric | undefined
+      area: number
+      treeCount: number | null | undefined
+    } => row !== null)
+
+  const rowsWithMetric = rowsForYear
+    .map((row) => ({
+      value: row.metric?.value,
+      area: row.area,
+      treeCount: row.treeCount,
+    }))
+    .filter((row): row is { value: number; area: number; treeCount: number | null | undefined } =>
+      row.value !== null && row.value !== undefined,
+    )
+
+  if (COUNT_METRIC_CODES.has(metricCode)) {
+    const weightedRows = rowsWithMetric.filter((row) => (row.treeCount ?? row.area) > 0)
+    if (weightedRows.length > 0) {
+      const totalWeight = weightedRows.reduce((sum, row) => sum + (row.treeCount ?? row.area), 0)
+      return weightedRows.reduce(
+        (sum, row) => sum + row.value * (row.treeCount ?? row.area),
+        0,
+      ) / totalWeight
+    }
+
+    return rowsWithMetric.length === 0
+      ? null
+      : rowsWithMetric.reduce((sum, row) => sum + row.value, 0) / rowsWithMetric.length
+  }
+
+  const totalValue = rowsWithMetric.reduce((sum, row) => sum + row.value, 0)
+  if (rowsWithMetric.length === 0) {
+    return null
+  }
+  if (!perHectare) {
+    return totalValue
+  }
+
+  const totalArea = rowsForYear.reduce((sum, row) => sum + row.area, 0)
+  return totalArea <= 0 ? null : totalValue / (totalArea / 10000)
 }
 
 export default function FieldStatisticsPage() {
@@ -189,6 +283,38 @@ export default function FieldStatisticsPage() {
     })
   }, [filters, rows])
 
+  const selectedYearNumber = selectedYear === '' ? null : Number(selectedYear)
+
+  const chartYears = useMemo(() => {
+    const years = new Set(statistics?.history_years ?? [])
+    if (selectedYearNumber !== null) {
+      years.add(selectedYearNumber)
+    }
+    return [...years].sort((left, right) => left - right)
+  }, [selectedYearNumber, statistics])
+
+  const chartRows = useMemo(() => {
+    if (selectedRowKey === null) {
+      return filteredRows
+    }
+
+    const selectedRow = filteredRows.find((row) => row.planting_id === selectedRowKey)
+    return selectedRow === undefined ? filteredRows : [selectedRow]
+  }, [filteredRows, selectedRowKey])
+
+  const charts = useMemo(
+    () =>
+      CHART_METRICS.map((metric) => ({
+        ...metric,
+        title: metricTitle(metric.metricCode, perHectare),
+        data: chartYears.map((year) => ({
+          year,
+          value: getHistoricalSummaryMetric(chartRows, metric.metricCode, year, perHectare),
+        })),
+      })),
+    [chartRows, chartYears, perHectare],
+  )
+
   const handleFilterChange = (filterId: string, value: string) => {
     setFilters((current) => ({ ...current, [filterId]: value }))
     setSelectedRowKey(null)
@@ -249,7 +375,7 @@ export default function FieldStatisticsPage() {
       },
       {
         id: 'thinning_hours',
-        header: 'Zupfen [h]',
+        header: metricTitle('thinning_hours', perHectare),
         cell: metricCell('thinning_hours'),
         sortValue: metricSortValue('thinning_hours'),
         cellClassName: 'text-right tabular-nums',
@@ -257,7 +383,7 @@ export default function FieldStatisticsPage() {
       },
       {
         id: 'yield_kg',
-        header: 'Ertrag [kg]',
+        header: metricTitle('yield_kg', perHectare),
         cell: metricCell('yield_kg'),
         sortValue: metricSortValue('yield_kg'),
         cellClassName: 'text-right tabular-nums',
@@ -265,7 +391,7 @@ export default function FieldStatisticsPage() {
       },
       {
         id: 'filled_boxes',
-        header: 'Kisten',
+        header: metricTitle('filled_boxes', perHectare),
         cell: metricCell('filled_boxes'),
         sortValue: metricSortValue('filled_boxes'),
         cellClassName: 'text-right tabular-nums',
@@ -273,7 +399,7 @@ export default function FieldStatisticsPage() {
       },
       {
         id: 'harvest_hours',
-        header: 'Ernte [h]',
+        header: metricTitle('harvest_hours', perHectare),
         cell: metricCell('harvest_hours'),
         sortValue: metricSortValue('harvest_hours'),
         cellClassName: 'text-right tabular-nums',
@@ -281,14 +407,14 @@ export default function FieldStatisticsPage() {
       },
       {
         id: 'revenue',
-        header: 'Erlös [€]',
+        header: metricTitle('revenue', perHectare),
         cell: metricCell('revenue'),
         sortValue: metricSortValue('revenue'),
         cellClassName: 'text-right tabular-nums',
         headerClassName: 'text-right',
       },
     ],
-    [metricCell, metricSortValue],
+    [metricCell, metricSortValue, perHectare],
   )
 
   const getFilteredSummaryMetric = useCallback(
@@ -427,18 +553,48 @@ export default function FieldStatisticsPage() {
               Feldstatistik wird geladen...
             </div>
           ) : (
-            <DataTable
-              columns={columns}
-              rows={filteredRows}
-              getRowKey={(row) => row.planting_id}
-              emptyMessage="Keine Feldstatistik vorhanden."
-              filters={tableFilters}
-              onFilterChange={handleFilterChange}
-              onResetFilters={handleResetFilters}
-              summaryCells={summaryCells}
-              selectedRowKey={selectedRowKey}
-              onRowSelect={(row) => setSelectedRowKey(row?.planting_id ?? null)}
-            />
+            <>
+              <DataTable
+                columns={columns}
+                rows={filteredRows}
+                getRowKey={(row) => row.planting_id}
+                emptyMessage="Keine Feldstatistik vorhanden."
+                filters={tableFilters}
+                onFilterChange={handleFilterChange}
+                onResetFilters={handleResetFilters}
+                summaryCells={summaryCells}
+                selectedRowKey={selectedRowKey}
+                onRowSelect={(row) => setSelectedRowKey(row?.planting_id ?? null)}
+              />
+
+              <div className="mt-8">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">Zeitverlauf</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {chartRows.length === 1
+                        ? `${chartRows[0].field_name} · ${chartRows[0].planting_name}`
+                        : `Summe (${chartRows.length})`}
+                    </p>
+                  </div>
+                  {perHectare ? (
+                    <span className="text-sm font-medium text-slate-500">pro ha</span>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  {charts.map((chart) => (
+                    <FieldStatisticBarChart
+                      key={chart.metricCode}
+                      title={chart.title}
+                      data={chart.data}
+                      selectedYear={selectedYearNumber}
+                      digits={metricDigits(chart.metricCode)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

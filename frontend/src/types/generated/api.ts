@@ -214,6 +214,11 @@ export type FieldStatisticsSummary = {
 
 export type FieldStatisticsYearValue = {
   season_year: number
+  active?: boolean
+  area?: number
+  area_ha?: number
+  section_count?: number
+  tree_count?: number | null
   metrics?: {
   [key: string]: FieldStatisticsMetric
 }
