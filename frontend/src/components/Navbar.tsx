@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { HiOutlineBars3 } from 'react-icons/hi2'
 import { IoMdAdd } from 'react-icons/io'
-import { LuCloudSun, LuTractor } from 'react-icons/lu'
+import { LuCloudSun, LuRefreshCw, LuTractor } from 'react-icons/lu'
 
 import api from '../api'
 import { createActions } from '../config/createActions'
@@ -30,15 +30,15 @@ function normalizeWorkflowStatus(status: string): 'success' | 'warning' | 'faile
 }
 
 export default function Navbar({ onToggleSidebar }: NavbarProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [openMenu, setOpenMenu] = useState<'add' | 'sync' | null>(null)
   const [activeAction, setActiveAction] = useState<CreateActionConfig | null>(null)
   const [isFruitCountOpen, setIsFruitCountOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  const menuContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
-      if (containerRef.current !== null && !containerRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false)
+      if (menuContainerRef.current !== null && !menuContainerRef.current.contains(event.target as Node)) {
+        setOpenMenu(null)
       }
     }
 
@@ -65,76 +65,99 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2">
-            <WorkflowSyncButton<TreatmentSmartFarmerSyncResponse, TreatmentSmartFarmerSyncResult>
-              ariaLabel="Smartfarmer Spritzungen synchronisieren"
-              title="Smartfarmer Spritzungen synchronisieren"
-              icon={LuTractor}
-              loadingTitle="Smartfarmer Sync"
-              loadingMessage="Spritzungen werden synchronisiert."
-              successTitle="Smartfarmer Sync abgeschlossen"
-              warningTitle="Smartfarmer Sync mit Hinweisen"
-              failedTitle="Smartfarmer Sync fehlgeschlagen"
-              fallbackErrorMessage="Smartfarmer Spritzungen konnten nicht synchronisiert werden."
-              request={() => api.post<TreatmentSmartFarmerSyncResponse>('/treatments/sync-smartfarmer').then((response) => response.data)}
-              getStatus={(response) => normalizeWorkflowStatus(response.status)}
-              getMessage={(response) => response.message}
-              getDetails={(response) => response.results}
-              getDetailKey={(result) => `${result.source}-${result.season_year}`}
-              renderDetail={(result) => (
-                <>
-                  {result.season_year}: {result.status}, {result.row_count ?? 0} Zeilen
-                  {(result.unresolved_count ?? 0) > 0 ? `, ${result.unresolved_count} nicht zugeordnet` : ''}
-                  {result.error ? `, ${result.error}` : ''}
-                </>
-              )}
-              onCompleted={(response) => {
-                if (normalizeWorkflowStatus(response.status) !== 'failed') {
-                  notifyDataChanged()
-                }
-              }}
-            />
-
-            <WorkflowSyncButton<WeatherCacheRefreshResponse, WeatherCacheRefreshStationResult>
-              ariaLabel="Wettercache aktualisieren"
-              title="Wettercache aktualisieren"
-              icon={LuCloudSun}
-              loadingTitle="Wettercache Refresh"
-              loadingMessage="Wetterdaten werden aktualisiert."
-              successTitle="Wettercache aktualisiert"
-              warningTitle="Wettercache mit Hinweisen aktualisiert"
-              failedTitle="Wettercache Refresh fehlgeschlagen"
-              fallbackErrorMessage="Der Wettercache konnte nicht aktualisiert werden."
-              request={() => api.post<WeatherCacheRefreshResponse>('/weather/cache/refresh').then((response) => response.data)}
-              getStatus={(response) => normalizeWorkflowStatus(response.status)}
-              getMessage={(response) => response.message}
-              getDetails={(response) => response.results}
-              getDetailKey={(result, index) => `${result.source_provider}-${result.source_station}-${result.cache_kind}-${index}`}
-              renderDetail={(result) => (
-                <>
-                  {result.source_provider}/{result.source_station} {result.cache_kind}: {result.status}, {result.row_count ?? 0} Zeilen
-                  {result.refreshed ? ', aktualisiert' : ', aktuell'}
-                  {result.error ? `, ${result.error}` : ''}
-                </>
-              )}
-              onCompleted={(response) => {
-                if (normalizeWorkflowStatus(response.status) !== 'failed') {
-                  notifyDataChanged()
-                }
-              }}
-            />
-
-            <div ref={containerRef} className="relative">
+          <div ref={menuContainerRef} className="flex items-center gap-2">
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
+                onClick={() => setOpenMenu((current) => (current === 'sync' ? null : 'sync'))}
+                className={styles.navbarButton}
+                aria-label="Synchronisieren"
+              >
+                <LuRefreshCw />
+              </button>
+
+              {openMenu === 'sync' ? (
+                <div className="absolute right-0 top-10 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                  <WorkflowSyncButton<TreatmentSmartFarmerSyncResponse, TreatmentSmartFarmerSyncResult>
+                    ariaLabel="Smartfarmer Spritzungen synchronisieren"
+                    title="Smartfarmer Spritzungen synchronisieren"
+                    icon={LuTractor}
+                    triggerLabel="Smartfarmer Spritzungen synchronisieren"
+                    triggerClassName={[styles.interactiveLink, styles.sidebarItem].join(' ')}
+                    showTriggerIcon={false}
+                    onTriggered={() => setOpenMenu(null)}
+                    loadingTitle="Smartfarmer Sync"
+                    loadingMessage="Spritzungen werden synchronisiert."
+                    successTitle="Smartfarmer Sync abgeschlossen"
+                    warningTitle="Smartfarmer Sync mit Hinweisen"
+                    failedTitle="Smartfarmer Sync fehlgeschlagen"
+                    fallbackErrorMessage="Smartfarmer Spritzungen konnten nicht synchronisiert werden."
+                    request={() => api.post<TreatmentSmartFarmerSyncResponse>('/treatments/sync-smartfarmer').then((response) => response.data)}
+                    getStatus={(response) => normalizeWorkflowStatus(response.status)}
+                    getMessage={(response) => response.message}
+                    getDetails={(response) => response.results}
+                    getDetailKey={(result) => `${result.source}-${result.season_year}`}
+                    renderDetail={(result) => (
+                      <>
+                        {result.season_year}: {result.status}, {result.row_count ?? 0} Zeilen
+                        {(result.unresolved_count ?? 0) > 0 ? `, ${result.unresolved_count} nicht zugeordnet` : ''}
+                        {result.error ? `, ${result.error}` : ''}
+                      </>
+                    )}
+                    onCompleted={(response) => {
+                      if (normalizeWorkflowStatus(response.status) !== 'failed') {
+                        notifyDataChanged()
+                      }
+                    }}
+                  />
+
+                  <WorkflowSyncButton<WeatherCacheRefreshResponse, WeatherCacheRefreshStationResult>
+                    ariaLabel="Wettercache aktualisieren"
+                    title="Wettercache aktualisieren"
+                    icon={LuCloudSun}
+                    triggerLabel="Wettercache aktualisieren"
+                    triggerClassName={[styles.interactiveLink, styles.sidebarItem].join(' ')}
+                    showTriggerIcon={false}
+                    onTriggered={() => setOpenMenu(null)}
+                    loadingTitle="Wettercache Refresh"
+                    loadingMessage="Wetterdaten werden aktualisiert."
+                    successTitle="Wettercache aktualisiert"
+                    warningTitle="Wettercache mit Hinweisen aktualisiert"
+                    failedTitle="Wettercache Refresh fehlgeschlagen"
+                    fallbackErrorMessage="Der Wettercache konnte nicht aktualisiert werden."
+                    request={() => api.post<WeatherCacheRefreshResponse>('/weather/cache/refresh').then((response) => response.data)}
+                    getStatus={(response) => normalizeWorkflowStatus(response.status)}
+                    getMessage={(response) => response.message}
+                    getDetails={(response) => response.results}
+                    getDetailKey={(result, index) => `${result.source_provider}-${result.source_station}-${result.cache_kind}-${index}`}
+                    renderDetail={(result) => (
+                      <>
+                        {result.source_provider}/{result.source_station} {result.cache_kind}: {result.status}, {result.row_count ?? 0} Zeilen
+                        {result.refreshed ? ', aktualisiert' : ', aktuell'}
+                        {result.error ? `, ${result.error}` : ''}
+                      </>
+                    )}
+                    onCompleted={(response) => {
+                      if (normalizeWorkflowStatus(response.status) !== 'failed') {
+                        notifyDataChanged()
+                      }
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setOpenMenu((current) => (current === 'add' ? null : 'add'))}
                 className={styles.navbarButton}
                 aria-label="Eintrag hinzufuegen"
               >
                 <IoMdAdd />
               </button>
 
-              {isMenuOpen ? (
+              {openMenu === 'add' ? (
                 <div className="absolute right-0 top-10 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                   {createActions.map((action) => (
                     <button
@@ -142,7 +165,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                       type="button"
                       onClick={() => {
                         setActiveAction(action)
-                        setIsMenuOpen(false)
+                        setOpenMenu(null)
                       }}
                       className={[styles.interactiveLink, styles.sidebarItem].join(' ')}
                     >
@@ -153,7 +176,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     type="button"
                     onClick={() => {
                       setIsFruitCountOpen(true)
-                      setIsMenuOpen(false)
+                      setOpenMenu(null)
                     }}
                     className={[styles.interactiveLink, styles.sidebarItem].join(' ')}
                   >

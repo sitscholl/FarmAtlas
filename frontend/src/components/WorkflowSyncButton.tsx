@@ -33,6 +33,10 @@ type WorkflowSyncButtonProps<TResponse, TDetail> = {
   renderDetail?: (detail: TDetail) => ReactNode
   getDetailKey?: (detail: TDetail, index: number) => string
   onCompleted?: (response: TResponse) => void
+  onTriggered?: () => void
+  triggerLabel?: string
+  triggerClassName?: string
+  showTriggerIcon?: boolean
 }
 
 function titleForStatus(
@@ -68,6 +72,10 @@ export default function WorkflowSyncButton<TResponse, TDetail>({
   renderDetail,
   getDetailKey,
   onCompleted,
+  onTriggered,
+  triggerLabel,
+  triggerClassName,
+  showTriggerIcon = true,
   ...titles
 }: WorkflowSyncButtonProps<TResponse, TDetail>) {
   const [isRunning, setIsRunning] = useState(false)
@@ -78,6 +86,7 @@ export default function WorkflowSyncButton<TResponse, TDetail>({
       return
     }
 
+    onTriggered?.()
     setIsRunning(true)
     setDialog({
       status: 'loading',
@@ -112,11 +121,12 @@ export default function WorkflowSyncButton<TResponse, TDetail>({
         type="button"
         onClick={runWorkflow}
         disabled={isRunning}
-        className={`${styles.navbarButton} disabled:cursor-not-allowed disabled:opacity-60`}
+        className={`${triggerClassName ?? styles.navbarButton} disabled:cursor-not-allowed disabled:opacity-60`}
         aria-label={ariaLabel}
         title={title}
       >
-        <Icon className={isRunning ? 'animate-pulse' : ''} />
+        {showTriggerIcon ? <Icon className={isRunning ? 'animate-pulse' : ''} /> : null}
+        {triggerLabel ? <span>{triggerLabel}</span> : null}
       </button>
 
       {dialog ? createPortal(
