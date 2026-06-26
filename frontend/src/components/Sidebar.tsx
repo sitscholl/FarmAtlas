@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 import { CiApple } from 'react-icons/ci'
 import { GiPlantWatering } from 'react-icons/gi'
+import type { IconType } from 'react-icons'
 import { IoHomeOutline } from 'react-icons/io5'
 import { LuLeaf, LuShieldAlert, LuTableProperties, LuTrees } from 'react-icons/lu'
 
@@ -13,18 +14,83 @@ type SidebarProps = {
   onClose: () => void
 }
 
-const navigationItems = [
-  { to: '/', label: 'Home', icon: IoHomeOutline, end: true },
-  { to: '/fields', label: 'Anlagen', icon: LuTableProperties },
-  { to: '/field-statistics', label: 'Feldstatistik', icon: LuTableProperties },
-  { to: '/irrigation', label: 'Bewaesserung', icon: GiPlantWatering },
-  { to: '/zaehlungen', label: 'Zaehlungen', icon: LuTableProperties },
-  { to: '/jahreswerte', label: 'Jahreswerte', icon: LuTableProperties },
-  { to: '/crop-protection', label: 'Pflanzenschutz', icon: LuShieldAlert },
-  { to: '/vegetation', label: 'Vegetation', icon: LuTrees },
-  { to: '/nutrients', label: 'Naehrstoffe', icon: LuLeaf },
-  { to: '/variety', label: 'Sorten', icon: CiApple },
+type NavigationItem = {
+  to: string
+  label: string
+  icon: IconType
+  end?: boolean
+}
+
+type NavigationGroup = {
+  label: string
+  items: NavigationItem[]
+}
+
+const homeItem: NavigationItem = { to: '/', label: 'Home', icon: IoHomeOutline, end: true }
+
+const navigationGroups: NavigationGroup[] = [
+  {
+    label: 'Wasserbilanz',
+    items: [
+      { to: '/irrigation', label: 'Bewaesserung', icon: GiPlantWatering },
+    ],
+  },
+  {
+    label: 'Pflanzenschutz',
+    items: [
+      { to: '/crop-protection', label: 'Pflanzenschutz', icon: LuShieldAlert },
+    ],
+  },
+  {
+    label: 'Statistik',
+    items: [
+      { to: '/field-statistics', label: 'Feldstatistik', icon: LuTableProperties },
+      { to: '/zaehlungen', label: 'Zaehlungen', icon: LuTableProperties },
+      { to: '/jahreswerte', label: 'Jahreswerte', icon: LuTableProperties },
+    ],
+  },
+  {
+    label: 'Datenbank',
+    items: [
+      { to: '/fields', label: 'Anlagen', icon: LuTableProperties },
+      { to: '/vegetation', label: 'Vegetation', icon: LuTrees },
+      { to: '/nutrients', label: 'Naehrstoffe', icon: LuLeaf },
+      { to: '/variety', label: 'Sorten', icon: CiApple },
+    ],
+  },
 ]
+
+function SidebarLink({
+  item,
+  isDesktop,
+  onClose,
+}: {
+  item: NavigationItem
+  isDesktop: boolean
+  onClose: () => void
+}) {
+  const { to, label, icon: Icon, end } = item
+
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      onClick={() => {
+        if (!isDesktop) {
+          onClose()
+        }
+      }}
+      className={({ isActive }) =>
+        [styles.interactiveLink, styles.sidebarItem, isActive ? styles.sidebarItemActive : '']
+          .filter(Boolean)
+          .join(' ')
+      }
+    >
+      <Icon className={styles.sidebarIcon} />
+      <span className={styles.interactiveLinkLabel}>{label}</span>
+    </NavLink>
+  )
+}
 
 export default function Sidebar({ isDesktop, isOpen, onClose }: SidebarProps) {
   return (
@@ -43,30 +109,34 @@ export default function Sidebar({ isDesktop, isOpen, onClose }: SidebarProps) {
         } md:w-72`}
         aria-label="Seitenleiste"
       >
-        <div className="border-b border-[color:var(--color-border)] px-2 pb-2">
+        <div className="shrink-0 border-b border-[color:var(--color-border)] px-2 pb-2">
           <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">Navigation</p>
         </div>
 
-        <nav className="mt-6 flex flex-col gap-1">
-          {navigationItems.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={() => {
-                if (!isDesktop) {
-                  onClose()
-                }
-              }}
-              className={({ isActive }) =>
-                [styles.interactiveLink, styles.sidebarItem, isActive ? styles.sidebarItemActive : '']
-                  .filter(Boolean)
-                  .join(' ')
-              }
-            >
-              <Icon className={styles.sidebarIcon} />
-              <span className={styles.interactiveLinkLabel}>{label}</span>
-            </NavLink>
+        <nav className="mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1 pb-2">
+          <div className="flex flex-col gap-1">
+            <SidebarLink item={homeItem} isDesktop={isDesktop} onClose={onClose} />
+          </div>
+
+          {navigationGroups.map((group) => (
+            <section key={group.label} className="flex flex-col gap-1" aria-labelledby={`sidebar-${group.label}`}>
+              <h2
+                id={`sidebar-${group.label}`}
+                className="px-2 text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--color-text-muted)]"
+              >
+                {group.label}
+              </h2>
+              <div className="mt-1 flex flex-col gap-1">
+                {group.items.map((item) => (
+                  <SidebarLink
+                    key={item.to}
+                    item={item}
+                    isDesktop={isDesktop}
+                    onClose={onClose}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
       </aside>
