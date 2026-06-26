@@ -18,6 +18,8 @@ const navigationItems = [
   { to: '/fields', label: 'Anlagen', icon: LuTableProperties },
   { to: '/field-statistics', label: 'Feldstatistik', icon: LuTableProperties },
   { to: '/irrigation', label: 'Bewaesserung', icon: GiPlantWatering },
+  { to: '/zaehlungen', label: 'Zaehlungen', icon: LuTableProperties },
+  { to: '/jahreswerte', label: 'Jahreswerte', icon: LuTableProperties },
   { to: '/crop-protection', label: 'Pflanzenschutz', icon: LuShieldAlert },
   { to: '/vegetation', label: 'Vegetation', icon: LuTrees },
   { to: '/nutrients', label: 'Naehrstoffe', icon: LuLeaf },

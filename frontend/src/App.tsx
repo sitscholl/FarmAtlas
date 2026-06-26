@@ -7,8 +7,10 @@ import CropProtectionPage from './pages/CropProtectionPage'
 import FieldDetail from './pages/FieldDetail'
 import FieldsTablePage from './pages/FieldsTablePage'
 import FieldStatisticsPage from './pages/FieldStatisticsPage'
+import FruitCountsTablePage from './pages/FruitCountsTablePage'
 import Home from './pages/Home'
 import IrrigationTablePage from './pages/IrrigationTablePage'
+import YearlyStatsTablePage from './pages/YearlyStatsTablePage'
 import NutrientsTablePage from './pages/NutrientsTablePage'
 import VegetationTablePage from './pages/VegetationTablePage'
 import VarietyTablePage from './pages/VarietyTablePage'
@@ -59,6 +61,8 @@ export default function App() {
             <Route path="/fields" element={<FieldsTablePage />} />
             <Route path="/field-statistics" element={<FieldStatisticsPage />} />
             <Route path="/irrigation" element={<IrrigationTablePage />} />
+            <Route path="/zaehlungen" element={<FruitCountsTablePage />} />
+            <Route path="/jahreswerte" element={<YearlyStatsTablePage />} />
             <Route path="/crop-protection" element={<CropProtectionPage />} />
             <Route path="/vegetation" element={<VegetationTablePage />} />
             <Route path="/nutrients" element={<NutrientsTablePage />} />
