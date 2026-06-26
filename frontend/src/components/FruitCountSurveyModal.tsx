@@ -38,7 +38,6 @@ type StoredDraft = {
   surveyId: number | null
   scope: FruitCountScope | null
   date: string
-  seasonYear: string
   timingCode: string
   method: string
   observer: string
@@ -73,8 +72,9 @@ function normalizeTimingCode(value: string, date: string) {
     : defaultTimingCodeForDate(date)
 }
 
-function currentSeasonYear() {
-  return String(new Date().getFullYear())
+function getSeasonYearFromDate(date: string) {
+  const [yearValue] = date.split('-').map((part) => Number(part))
+  return Number.isInteger(yearValue) && yearValue >= 1900 ? yearValue : null
 }
 
 function emptyStoredDraft(initialScope?: FruitCountScope | null): StoredDraft {
@@ -83,7 +83,6 @@ function emptyStoredDraft(initialScope?: FruitCountScope | null): StoredDraft {
     surveyId: null,
     scope: initialScope ?? null,
     date,
-    seasonYear: currentSeasonYear(),
     timingCode: defaultTimingCodeForDate(date),
     method: '',
     observer: '',
@@ -198,7 +197,6 @@ export default function FruitCountSurveyModal({
   const hasManualTimingCodeRef = useRef(false)
   const [scope, setScope] = useState<FruitCountScope | null>(initialScope ?? null)
   const [date, setDate] = useState(todayIsoDate)
-  const [seasonYear, setSeasonYear] = useState(currentSeasonYear)
   const [timingCode, setTimingCode] = useState(() => defaultTimingCodeForDate(todayIsoDate()))
   const [method, setMethod] = useState('')
   const [observer, setObserver] = useState('')
@@ -225,7 +223,6 @@ export default function FruitCountSurveyModal({
       hasManualTimingCodeRef.current = true
       setScope(getSurveyScope(survey, fieldDetails))
       setDate(survey.date)
-      setSeasonYear(String(survey.season_year))
       setTimingCode(survey.timing_code)
       setMethod(survey.method ?? '')
       setObserver(survey.observer ?? '')
@@ -252,7 +249,6 @@ export default function FruitCountSurveyModal({
     hasManualTimingCodeRef.current = storedDraft !== null
     setScope(resolvedScope)
     setDate(nextDraft.date)
-    setSeasonYear(nextDraft.seasonYear)
     setTimingCode(normalizeTimingCode(nextDraft.timingCode, nextDraft.date))
     setMethod(nextDraft.method)
     setObserver(nextDraft.observer)
@@ -276,7 +272,6 @@ export default function FruitCountSurveyModal({
       surveyId,
       scope,
       date,
-      seasonYear,
       timingCode,
       method,
       observer,
@@ -284,7 +279,7 @@ export default function FruitCountSurveyModal({
       includeInAggregation,
       samples,
     })
-  }, [date, includeInAggregation, isEditingExistingSurvey, isOpen, method, notes, observer, samples, scope, seasonYear, surveyId, timingCode])
+  }, [date, includeInAggregation, isEditingExistingSurvey, isOpen, method, notes, observer, samples, scope, surveyId, timingCode])
 
   const summary = useMemo(() => {
     const counts = samples
@@ -307,9 +302,9 @@ export default function FruitCountSurveyModal({
       return null
     }
 
-    const parsedSeasonYear = Number(seasonYear)
-    if (!Number.isInteger(parsedSeasonYear) || parsedSeasonYear < 1900) {
-      setErrorMessage('Bitte ein gueltiges Jahr eingeben.')
+    const parsedSeasonYear = getSeasonYearFromDate(date)
+    if (parsedSeasonYear === null) {
+      setErrorMessage('Bitte ein gueltiges Datum eingeben.')
       return null
     }
 
@@ -527,7 +522,6 @@ export default function FruitCountSurveyModal({
     hasManualTimingCodeRef.current = false
     setScope(nextDraft.scope)
     setDate(nextDraft.date)
-    setSeasonYear(nextDraft.seasonYear)
     setTimingCode(nextDraft.timingCode)
     setMethod(nextDraft.method)
     setObserver(nextDraft.observer)
@@ -626,18 +620,6 @@ export default function FruitCountSurveyModal({
                 onChange={(event) => handleDateChange(event.target.value)}
                 disabled={isMetadataLocked}
                 className={inputClasses}
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Jahr</span>
-              <input
-                type="number"
-                value={seasonYear}
-                onChange={(event) => setSeasonYear(event.target.value)}
-                disabled={isMetadataLocked}
-                className={inputClasses}
-                step="1"
                 required
               />
             </label>
