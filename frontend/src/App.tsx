@@ -3,13 +3,15 @@ import { Route, Routes } from 'react-router-dom'
 
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
-import CropProtectionPage from './pages/CropProtectionPage'
 import FieldDetail from './pages/FieldDetail'
 import FieldsTablePage from './pages/FieldsTablePage'
 import FieldStatisticsPage from './pages/FieldStatisticsPage'
 import FruitCountsTablePage from './pages/FruitCountsTablePage'
 import Home from './pages/Home'
 import IrrigationTablePage from './pages/IrrigationTablePage'
+import RegelnPage from './pages/RegelnPage'
+import SmartFarmerMappingsPage from './pages/SmartFarmerMappingsPage'
+import SpritzungenPage from './pages/SpritzungenPage'
 import WaterBalanceTablePage from './pages/WaterBalanceTablePage'
 import YearlyStatsTablePage from './pages/YearlyStatsTablePage'
 import NutrientsTablePage from './pages/NutrientsTablePage'
@@ -65,7 +67,9 @@ export default function App() {
             <Route path="/irrigation" element={<IrrigationTablePage />} />
             <Route path="/zaehlungen" element={<FruitCountsTablePage />} />
             <Route path="/jahreswerte" element={<YearlyStatsTablePage />} />
-            <Route path="/crop-protection" element={<CropProtectionPage />} />
+            <Route path="/regeln" element={<RegelnPage />} />
+            <Route path="/smartfarmer-zuordnungen" element={<SmartFarmerMappingsPage />} />
+            <Route path="/spritzungen" element={<SpritzungenPage />} />
             <Route path="/vegetation" element={<VegetationTablePage />} />
             <Route path="/nutrients" element={<NutrientsTablePage />} />
             <Route path="/variety" element={<VarietyTablePage />} />

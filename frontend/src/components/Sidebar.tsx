@@ -5,7 +5,7 @@ import { GiPlantWatering } from 'react-icons/gi'
 import { MdWaterDrop } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { IoHomeOutline } from 'react-icons/io5'
-import { LuLeaf, LuShieldAlert, LuTableProperties, LuTrees } from 'react-icons/lu'
+import { LuLeaf, LuLink2, LuListChecks, LuSprayCan, LuTableProperties, LuTrees } from 'react-icons/lu'
 
 import styles from '../styles/Home.module.css'
 
@@ -40,7 +40,9 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: 'Pflanzenschutz',
     items: [
-      { to: '/crop-protection', label: 'Pflanzenschutz', icon: LuShieldAlert },
+      { to: '/regeln', label: 'Regeln', icon: LuListChecks },
+      { to: '/smartfarmer-zuordnungen', label: 'SmartFarmer Zuordnungen', icon: LuLink2 },
+      { to: '/spritzungen', label: 'Spritzungen', icon: LuSprayCan },
     ],
   },
   {
