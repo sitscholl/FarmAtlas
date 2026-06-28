@@ -35,7 +35,7 @@ type DetailMetric = {
 
 function formatNumber(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
-    return 'n/a'
+    return '-'
   }
 
   return new Intl.NumberFormat('de-DE', {
@@ -46,7 +46,7 @@ function formatNumber(value: number | null | undefined, digits = 1) {
 
 function formatBoolean(value: boolean | null | undefined) {
   if (value === null || value === undefined) {
-    return 'n/a'
+    return '-'
   }
 
   return value ? 'Ja' : 'Nein'
@@ -54,7 +54,7 @@ function formatBoolean(value: boolean | null | undefined) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
-    return 'n/a'
+    return '-'
   }
   return new Intl.DateTimeFormat('de-DE').format(new Date(value))
 }
@@ -125,7 +125,7 @@ function MetricSection({
   actions?: ReactNode
 }) {
   return (
-    <section className="border border-slate-200 bg-slate-50/80 p-5">
+    <section className="overflow-hidden border border-slate-200 bg-slate-50/80 p-5">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
           {title}
@@ -133,13 +133,13 @@ function MetricSection({
         {actions}
       </div>
 
-      <div className="mt-2 grid sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
         {metrics.map((metric) => (
-          <div key={metric.label} className="border border-transparent py-1">
-            <p className="text-caption font-semibold uppercase tracking-[0.2em] text-slate-400">
+          <div key={metric.label} className="min-w-0 border border-transparent">
+            <p className="min-w-0 break-words text-[0.68rem] font-semibold uppercase leading-snug tracking-[0.12em] text-slate-400">
               {metric.label}
             </p>
-            <p className="text-lg font-semibold text-slate-900">
+            <p className="mt-1 min-w-0 break-words text-lg font-semibold leading-tight text-slate-900">
               {metric.value}
             </p>
           </div>

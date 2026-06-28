@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
 import { FiMoreVertical } from 'react-icons/fi'
-import { LuClock, LuRadioTower, LuTrees } from 'react-icons/lu'
+import { LuClock, LuMap, LuRadioTower, LuRuler, LuTrees } from 'react-icons/lu'
 import { FaArrowRight } from 'react-icons/fa'
 import { IoMdAdd } from 'react-icons/io'
 import { Link } from 'react-router-dom'
@@ -53,6 +53,31 @@ type WeatherCacheState = {
 
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
   {
+    key: 'area',
+    label: 'Flaeche',
+    icon: LuMap,
+    unit: 'ha',
+    kind: 'number',
+    getValue: (field) => squareMetresToHectares(field.total_area),
+  },
+  {
+    key: 'running_metre',
+    label: 'Laufmeter',
+    icon: LuRuler,
+    unit: 'm',
+    kind: 'number',
+    emptyValueLabel: '-',
+    getValue: (field) => field.running_metre,
+  },
+  {
+    key: 'tree_count',
+    label: 'Baumzahl',
+    icon: LuTrees,
+    kind: 'number',
+    emptyValueLabel: '-',
+    getValue: (field) => field.tree_count,
+  },
+  {
     key: 'reference_station_display',
     label: 'Station',
     icon: LuRadioTower,
@@ -60,6 +85,20 @@ const fieldMetricDefinitions: FieldMetricDefinition[] = [
     getValue: (field) => field.reference_station,
   },
 ]
+
+function formatNumber(value: number, digits = 1) {
+  return new Intl.NumberFormat('de-DE', {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  }).format(value)
+}
+
+function squareMetresToHectares(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return value / 10000
+}
 
 function buildFieldMetrics(field: FieldSummaryRead): FieldBoxMetric[] {
   return fieldMetricDefinitions.flatMap((definition) => {
@@ -71,9 +110,16 @@ function buildFieldMetrics(field: FieldSummaryRead): FieldBoxMetric[] {
     return [{
       label: definition.label,
       icon: definition.icon,
-      value: value === null || value === undefined || value === '' ? definition.emptyValueLabel ?? '' : value,
+      value:
+        value === null || value === undefined || value === ''
+          ? definition.emptyValueLabel ?? ''
+          : definition.key === 'area' && typeof value === 'number'
+            ? formatNumber(value, 2)
+            : typeof value === 'number'
+              ? formatNumber(value, 0)
+              : value,
       unit: definition.unit,
-      kind: definition.kind,
+      kind: definition.key === 'area' ? 'text' : definition.kind,
       criticalBelow: definition.criticalBelow,
       tooltip: definition.label,
     }]
