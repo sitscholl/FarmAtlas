@@ -86,9 +86,7 @@ def calculate_water_balance(
 
     trigger_level = available_water_storage - readily_available_water
     water_balance["below_raw"] = water_balance["soil_water_content"] < trigger_level
-    water_balance["safe_ratio"] = (
-        water_balance["soil_water_content"] - trigger_level
-    ) / readily_available_water
+    water_balance["safe_ratio"] = water_balance["soil_water_content"] / available_water_storage
 
     for column in ("model", "station_id", "source_provider", "source_station"):
         if column in data.columns:
