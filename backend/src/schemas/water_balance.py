@@ -16,6 +16,16 @@ class WaterBalanceSummary(BaseModel):
     safe_ratio: float | None
 
 
+class WaterBalanceFieldSummaryRead(BaseModel):
+    field_id: int
+    field_name: str
+    field_group: str
+    active: bool
+    effective_root_depth_cm: float | None
+    last_irrigation_date: date | None
+    summary: WaterBalanceSummary
+
+
 class WaterBalanceSeriesPoint(BaseModel):
     date: date
     precipitation: float

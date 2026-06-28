@@ -110,7 +110,7 @@ function buildWaterMetrics(summary: WaterBalanceSummary): DetailMetric[] {
   return [
     { label: 'Verfuegbarer Wasserspeicher', value: `${formatNumber(summary.available_water_storage, 1)} mm` },
     { label: 'Wasserdefizit', value: `${formatNumber(summary.current_water_deficit, 1)} mm` },
-    { label: 'Safe Ratio', value: summary.safe_ratio === null ? 'n/a' : `${formatNumber(summary.safe_ratio * 100, 0)} %` },
+    { label: 'Bodenwasser', value: summary.safe_ratio === null ? 'n/a' : `${formatNumber(summary.safe_ratio * 100, 0)} %` },
     { label: 'Letzte Aktualisierung', value: formatDate(summary.as_of) },
   ]
 }

@@ -252,8 +252,6 @@ export type FieldSummaryRead = {
   section_names: Array<string>
   planting_year_min?: number | null
   planting_year_max?: number | null
-  last_irrigation_date?: string | null
-  water_balance_summary: WaterBalanceSummary
 }
 
 export type FieldUpdate = {
@@ -721,6 +719,16 @@ export type VarietyUpdate = {
   slope?: number | null
   intercept?: number | null
   specific_weight?: number | null
+}
+
+export type WaterBalanceFieldSummaryRead = {
+  field_id: number
+  field_name: string
+  field_group: string
+  active: boolean
+  effective_root_depth_cm: number | null
+  last_irrigation_date: string | null
+  summary: WaterBalanceSummary
 }
 
 export type WaterBalanceSeriesPoint = {

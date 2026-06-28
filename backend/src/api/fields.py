@@ -2,14 +2,13 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from ..schemas import FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, WaterBalanceSummary, FieldUpdate
+from ..schemas import FieldCreate, FieldDetailRead, FieldRead, FieldSummaryRead, FieldUpdate
 from .utils import (
     raise_write_http_error,
     runtime,
     serialize_field,
     serialize_field_detail,
     serialize_field_summary,
-    serialize_water_balance_summary,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,30 +27,9 @@ async def list_fields():
 async def list_field_summaries():
     with runtime.db.session_scope() as session:
         fields = runtime.db.fields.list_all(session)
-        latest_irrigation_dates = runtime.db.irrigation.get_latest_dates(session, field_ids=[field.id for field in fields])
-
-    field_contexts = runtime.get_fields_by_ids([field.id for field in fields])
-    water_balance_summaries = {
-        summary.field_id: serialize_water_balance_summary(summary)
-        for summary in runtime.water_balance_service.get_summaries(field_contexts)
-    }
 
     return [
-        serialize_field_summary(
-            field,
-            water_balance_summary=water_balance_summaries.get(field.id)
-            or WaterBalanceSummary(
-                field_id=field.id,
-                as_of=None,
-                current_water_deficit=None,
-                current_soil_water_content=None,
-                available_water_storage=None,
-                readily_available_water=None,
-                below_raw=None,
-                safe_ratio=None,
-            ),
-            last_irrigation_date=latest_irrigation_dates.get(field.id),
-        )
+        serialize_field_summary(field)
         for field in fields
     ]
 

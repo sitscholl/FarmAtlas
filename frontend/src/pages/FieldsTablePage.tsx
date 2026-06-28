@@ -130,14 +130,6 @@ export default function FieldsTablePage() {
         cell: (field) => field.reference_station,
       },
       {
-        id: 'water_balance',
-        header: 'Wasserbilanz',
-        cell: (field) =>
-          field.water_balance_summary.safe_ratio === null || field.water_balance_summary.safe_ratio === undefined
-            ? 'n/a'
-            : `${formatNumber(field.water_balance_summary.safe_ratio * 100, 0)} %`,
-      },
-      {
         id: 'herbicide_free',
         header: 'Herbizidfrei',
         cell: (field) => formatBoolean(field.herbicide_free),

@@ -22,6 +22,7 @@ from ..schemas import (
     PlantingRead,
     SectionRead,
     VarietyRead,
+    WaterBalanceFieldSummaryRead,
     WaterBalanceSeriesPoint,
     WaterBalanceSeriesResponse,
     WaterBalanceSummary,
@@ -67,9 +68,6 @@ def serialize_field_detail(field) -> FieldDetailRead:
 
 def serialize_field_summary(
     field,
-    *,
-    water_balance_summary: WaterBalanceSummary,
-    last_irrigation_date,
 ) -> FieldSummaryRead:
     field_context = FieldContext.from_model(field)
     active_sections = field_context.active_sections
@@ -107,8 +105,24 @@ def serialize_field_summary(
         section_names=sorted({section.name for section in active_sections}),
         planting_year_min=min(planting_years) if planting_years else None,
         planting_year_max=max(planting_years) if planting_years else None,
-        last_irrigation_date=None if last_irrigation_date is None else last_irrigation_date.isoformat(),
-        water_balance_summary=water_balance_summary,
+    )
+
+
+def serialize_water_balance_field_summary(
+    field,
+    *,
+    water_balance_summary: WaterBalanceSummary,
+    last_irrigation_date,
+) -> WaterBalanceFieldSummaryRead:
+    field_context = FieldContext.from_model(field)
+    return WaterBalanceFieldSummaryRead(
+        field_id=field.id,
+        field_name=field.name,
+        field_group=field.group,
+        active=field_context.active,
+        effective_root_depth_cm=None if field.effective_root_depth_cm is None else float(field.effective_root_depth_cm),
+        last_irrigation_date=last_irrigation_date,
+        summary=water_balance_summary,
     )
 
 

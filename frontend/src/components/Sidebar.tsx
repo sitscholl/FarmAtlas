@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 import { CiApple } from 'react-icons/ci'
 import { GiPlantWatering } from 'react-icons/gi'
+import { MdWaterDrop } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { IoHomeOutline } from 'react-icons/io5'
 import { LuLeaf, LuShieldAlert, LuTableProperties, LuTrees } from 'react-icons/lu'
@@ -32,6 +33,7 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: 'Wasserbilanz',
     items: [
+      { to: '/water-balance', label: 'Wasserbilanz', icon: MdWaterDrop },
       { to: '/irrigation', label: 'Bewaesserung', icon: GiPlantWatering },
     ],
   },

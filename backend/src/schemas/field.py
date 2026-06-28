@@ -3,7 +3,6 @@ from pydantic import BaseModel, model_validator
 from ..database import models
 from .base import ORMModel
 from .planting import PlantingDetailRead
-from .water_balance import WaterBalanceSummary
 
 
 class CadastralParcelRead(ORMModel):
@@ -79,8 +78,6 @@ class FieldSummaryRead(FieldRead):
     section_names: list[str]
     planting_year_min: int | None = None
     planting_year_max: int | None = None
-    last_irrigation_date: str | None = None
-    water_balance_summary: WaterBalanceSummary
 
 
 class FieldDetailRead(BaseModel):

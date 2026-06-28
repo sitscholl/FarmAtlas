@@ -19,7 +19,7 @@ class ApiUtilsTests(unittest.TestCase):
                 "available_water_storage": [100.0],
                 "water_deficit": [1.0],
                 "readily_available_water": [40.0],
-                "safe_ratio": [1.475],
+                "safe_ratio": [0.99],
                 "below_raw": [False],
                 "value_type": ["observed"],
             },

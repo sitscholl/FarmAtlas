@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IconType } from 'react-icons'
-import { FiAlertTriangle, FiMoreVertical, FiX } from 'react-icons/fi'
-import { LuArrowDown, LuCalendarDays, LuClock, LuRadioTower, LuTrees } from 'react-icons/lu'
-import { MdWaterDrop } from 'react-icons/md'
+import { FiMoreVertical } from 'react-icons/fi'
+import { LuClock, LuRadioTower, LuTrees } from 'react-icons/lu'
 import { FaArrowRight } from 'react-icons/fa'
 import { IoMdAdd } from 'react-icons/io'
 import { Link } from 'react-router-dom'
@@ -12,21 +11,14 @@ import api from '../api'
 import CreateEntityModal from '../components/CreateEntityModal'
 import CropProtectionStatusLayer from '../components/CropProtectionStatusLayer'
 import FieldBox, { type FieldBoxMetric } from '../components/FieldBox'
-import WaterBalanceChart from '../components/WaterBalanceChart'
 import { irrigationCreateAction } from '../config/createActions'
 import { DATA_CHANGED_EVENT, notifyDataChanged } from '../lib/dataEvents'
-import { formatWorkflowWarning, type WorkflowMessage } from '../lib/workflowWarnings'
 import {
   type CropProtectionFieldSummaryRead,
   type CropProtectionRuleRead,
   type FieldDetailRead,
   type FieldSummaryRead,
-  type WaterBalanceSeriesPoint,
-  type WaterBalanceSeriesResponse,
-  type WorkflowErrorRead,
 } from '../types/generated/api'
-
-const FORECAST_DAYS = 5
 
 type FieldMetricDefinition = {
   key: string
@@ -37,21 +29,6 @@ type FieldMetricDefinition = {
   criticalBelow?: number
   emptyValueLabel?: string
   getValue: (field: FieldSummaryRead) => string | number | null | undefined
-}
-
-type WaterBalanceModalState = {
-  field: FieldSummaryRead
-  data: WaterBalanceSeriesPoint[]
-  workflowMessages: WorkflowMessage[]
-  isLoading: boolean
-  errorMessage: string | null
-}
-
-function formatWorkflowError(error: WorkflowErrorRead): WorkflowMessage {
-  return {
-    kind: 'error',
-    message: error.message,
-  }
 }
 
 type FieldPhenologyEvent = {
@@ -76,41 +53,11 @@ type WeatherCacheState = {
 
 const fieldMetricDefinitions: FieldMetricDefinition[] = [
   {
-    key: 'effective_root_depth_display',
-    label: 'Wurzeltiefe',
-    icon: LuArrowDown,
-    kind: 'text',
-    getValue: (field) => field.effective_root_depth_cm === null || field.effective_root_depth_cm === undefined
-      ? null
-      : `${Math.round(field.effective_root_depth_cm)} cm`,
-  },
-  {
     key: 'reference_station_display',
     label: 'Station',
     icon: LuRadioTower,
     kind: 'text',
     getValue: (field) => field.reference_station,
-  },
-  {
-    key: 'safe_ratio',
-    label: 'Wasserbilanz',
-    icon: MdWaterDrop,
-    unit: '%',
-    kind: 'number',
-    criticalBelow: 0,
-    emptyValueLabel: '-',
-    getValue: (field) =>
-      field.water_balance_summary.safe_ratio === null || field.water_balance_summary.safe_ratio === undefined
-        ? null
-        : Math.round(field.water_balance_summary.safe_ratio * 100),
-  },
-  {
-    key: 'last_irrigation_date',
-    label: 'Letzte Bewaesserung',
-    icon: LuCalendarDays,
-    kind: 'date',
-    emptyValueLabel: '-',
-    getValue: (field) => field.last_irrigation_date,
   },
 ]
 
@@ -302,82 +249,6 @@ function FieldActionsMenu({
   )
 }
 
-function WaterBalanceModal({
-  state,
-  onClose,
-}: {
-  state: WaterBalanceModalState | null
-  onClose: () => void
-}) {
-  if (state === null) {
-    return null
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:px-4 sm:py-4"
-      onClick={onClose}
-    >
-      <div
-        className="flex h-dvh w-full flex-col overflow-hidden bg-white sm:max-h-[calc(100vh-2rem)] sm:max-w-6xl sm:border sm:border-slate-200 sm:shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 sm:pt-6 sm:pb-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
-              Wasserbilanz
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold text-slate-900">
-              {state.field.name}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-            aria-label="Popup schliessen"
-          >
-            <FiX className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-6 sm:py-6">
-          {state.isLoading ? (
-            <div className="border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
-              Lade Wasserbilanz...
-            </div>
-          ) : state.errorMessage ? (
-            <div className="border border-rose-200 bg-rose-50 px-6 py-12 text-center text-rose-700">
-              {state.errorMessage}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {state.workflowMessages.length > 0 ? (
-                <div className="space-y-2">
-                  {state.workflowMessages.map((message) => (
-                    <div
-                      key={`${message.kind}-${message.message}`}
-                      className={
-                        message.kind === 'error'
-                          ? 'flex items-start gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800'
-                          : 'flex items-start gap-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'
-                      }
-                    >
-                      <FiAlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span>{message.message}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <WaterBalanceChart data={state.data} reservedForecastDays={FORECAST_DAYS} />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function Home() {
   const [fields, setFields] = useState<FieldSummaryRead[]>([])
   const [phenologyEventsByFieldId, setPhenologyEventsByFieldId] = useState<Record<number, FieldPhenologyEvent[]>>({})
@@ -386,7 +257,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [irrigationField, setIrrigationField] = useState<FieldSummaryRead | null>(null)
-  const [waterBalanceModal, setWaterBalanceModal] = useState<WaterBalanceModalState | null>(null)
   const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -530,46 +400,6 @@ export default function Home() {
     }
   }
 
-  const handleOpenWaterBalance = async (field: FieldSummaryRead) => {
-    setWaterBalanceModal({
-      field,
-      data: [],
-      workflowMessages: [],
-      isLoading: true,
-      errorMessage: null,
-    })
-
-    try {
-      const response = await api.get<WaterBalanceSeriesResponse>(
-        `/fields/${field.id}/water-balance/series`,
-        {
-          params: { forecast_days: FORECAST_DAYS },
-        },
-      )
-      const workflowMessages = [
-        ...(response.data.warnings ?? []).map(formatWorkflowWarning),
-        ...(response.data.errors ?? []).map(formatWorkflowError),
-      ]
-      const data = response.data.data ?? []
-      setWaterBalanceModal({
-        field,
-        data,
-        workflowMessages,
-        isLoading: false,
-        errorMessage: data.length === 0 && workflowMessages.length === 0 ? 'Keine Wasserbilanzdaten vorhanden.' : null,
-      })
-    } catch (error) {
-      console.error(`Error fetching water balance for field ${field.id}`, error)
-      setWaterBalanceModal({
-        field,
-        data: [],
-        workflowMessages: [],
-        isLoading: false,
-        errorMessage: 'Die Wasserbilanz konnte nicht geladen werden.',
-      })
-    }
-  }
-
   const content = (() => {
     if (isLoading) {
       return (
@@ -684,15 +514,6 @@ export default function Home() {
                       <IoMdAdd className="h-3 w-3" aria-hidden="true" />
                       <span>Bewaesserung</span>
                     </button>
-                    {field.water_balance_summary.as_of ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleOpenWaterBalance(field)}
-                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-                      >
-                        Wasserbilanz
-                      </button>
-                    ) : null}
                   </>
                 }
               />
@@ -733,10 +554,6 @@ export default function Home() {
         isOpen={irrigationField !== null}
         initialValues={irrigationInitialValues}
         onClose={() => setIrrigationField(null)}
-      />
-      <WaterBalanceModal
-        state={waterBalanceModal}
-        onClose={() => setWaterBalanceModal(null)}
       />
     </section>
   )

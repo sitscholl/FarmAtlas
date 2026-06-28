@@ -57,7 +57,12 @@ from .treatment import (
     TreatmentSmartFarmerSyncResult,
 )
 from .variety import VarietyCreate, VarietyRead, VarietyUpdate
-from .water_balance import WaterBalanceSeriesPoint, WaterBalanceSeriesResponse, WaterBalanceSummary
+from .water_balance import (
+    WaterBalanceFieldSummaryRead,
+    WaterBalanceSeriesPoint,
+    WaterBalanceSeriesResponse,
+    WaterBalanceSummary,
+)
 from .workflow import WorkflowErrorRead, WorkflowFieldResponseBase, WorkflowWarningRead
 from .yearly_stats import YearlyStatsCreate, YearlyStatsRead, YearlyStatsUpdate
 

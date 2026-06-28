@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Query
 
-from ..schemas import WaterBalanceSeriesResponse, WaterBalanceSummary
+from ..schemas import WaterBalanceFieldSummaryRead, WaterBalanceSeriesResponse, WaterBalanceSummary
 from .utils import (
     runtime,
     serialize_water_balance_application_result,
+    serialize_water_balance_field_summary,
     serialize_water_balance_summary,
     validate_field_id,
 )
@@ -16,6 +17,41 @@ async def get_water_balance_summary():
     return [
         serialize_water_balance_summary(summary)
         for summary in runtime.water_balance_service.get_summaries(runtime.fields)
+    ]
+
+
+@router.get("/api/fields/water-balance/table", response_model=list[WaterBalanceFieldSummaryRead])
+async def get_water_balance_table():
+    with runtime.db.session_scope() as session:
+        fields = runtime.db.fields.list_all(session)
+        latest_irrigation_dates = runtime.db.irrigation.get_latest_dates(
+            session,
+            field_ids=[field.id for field in fields],
+        )
+
+    field_contexts = runtime.get_fields_by_ids([field.id for field in fields])
+    water_balance_summaries = {
+        summary.field_id: serialize_water_balance_summary(summary)
+        for summary in runtime.water_balance_service.get_summaries(field_contexts)
+    }
+
+    return [
+        serialize_water_balance_field_summary(
+            field,
+            water_balance_summary=water_balance_summaries.get(field.id)
+            or WaterBalanceSummary(
+                field_id=field.id,
+                as_of=None,
+                current_water_deficit=None,
+                current_soil_water_content=None,
+                available_water_storage=None,
+                readily_available_water=None,
+                below_raw=None,
+                safe_ratio=None,
+            ),
+            last_irrigation_date=latest_irrigation_dates.get(field.id),
+        )
+        for field in fields
     ]
 
 
